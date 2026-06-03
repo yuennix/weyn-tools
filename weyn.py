@@ -1134,15 +1134,14 @@ def run_method2(year_choice, min_followers=0):
 
     def check_gmail_m2(em):
         nonlocal hits_m2, taken_m2
-        usr = em.split("@")[0]
-        try:
-            with open("google.txt", "r") as ys:
-                tl = ys.read().strip()
-            url    = "https://accounts.google.com/_/signup/usernameavailability"
-            params = {'hl': "en-GB", 'TL': tl, '_reqid': "446000", 'rt': "j"}
-            payload= {
+        usr   = em.split("@")[0]
+        g_url = "https://accounts.google.com/_/signup/usernameavailability"
+
+        def _gcheck(tl, host):
+            params  = {'hl': "en-GB", 'TL': tl, '_reqid': str(random.randint(100000, 999999)), 'rt': "j"}
+            payload = {
                 'continue': "https://accounts.google.com/ManageAccount?nc=1",
-                'f.req': "[\"TL:"+ tl +"\",\""+ usr +"\",0,0,1,null,1,2464]",
+                'f.req': f'["TL:{tl}","{usr}",0,0,1,null,1,2464]',
                 'azt': "AFoagUUWePV-jOFGpL5c7eI9kfCfGnCl5w:1776669382039",
                 'cookiesDisabled': "false",
                 'deviceinfo': "[null,null,null,null,null,\"IN\",null,null,null,\"GlifWebSignIn\",null,[],null,null,null,null,1,null,0,1,\"\",null,null,2,2,2]",
@@ -1150,44 +1149,64 @@ def run_method2(year_choice, min_followers=0):
                 'checkConnection': "youtube:301", 'checkedDomains': "youtube",
                 'pstMsg': "1", '': ""
             }
-            hdrs   = {
-                'User-Agent': "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Mobile Safari/537.36",
-                'x-same-domain': "1", 'google-accounts-xsrf': "1",
-                'origin': "https://accounts.google.com",
-                'Cookie': "__Host-GAPS=1:6oR-TWX06t3JKSEu3DqYRT_IWnQLlw:Rc9Z7lHTPNW6qMCN"
+            hdrs = {
+                'authority': 'accounts.google.com', 'accept': '*/*',
+                'accept-language': 'en-US,en;q=0.9',
+                'content-type': 'application/x-www-form-urlencoded;charset=UTF-8',
+                'google-accounts-xsrf': '1', 'x-same-domain': '1',
+                'origin': 'https://accounts.google.com',
+                'user-agent': random.choice(_M1_USER_AGENTS),
             }
-            resp   = _session_m2.post(url, params=params, data=payload, headers=hdrs, timeout=20)
-            if '"gf.uar",1' in resp.text:
-                hits_m2 += 1
-                hit_count[0] += 1
-                with hits_lock_m2:
-                    recent_hits_m2.append(em)
-                data      = info_m2.get(usr, {})
-                followers = data.get('follower_count', 'None')
-                following = data.get('following_count', 'None')
-                bio       = data.get('biography', 'None') or 'None'
-                user_id   = data.get('pk', 0)
-                year_lbl  = str(gdate(user_id))
-                output    = format_hit(
-                    hit_num   = hit_count[0],
-                    username  = usr,
-                    email     = em,
-                    followers = followers,
-                    following = following,
-                    bio       = bio,
-                    year_label= year_lbl,
-                    reset_text= "-",
-                    join_date = year_lbl,
-                    country   = "-",
-                )
-                try:
-                    requests.post(f"https://api.telegram.org/bot{token}/sendMessage?chat_id={tg_id}&text={urllib.parse.quote(output)}", timeout=20)
-                except Exception:
-                    with open('weyn_hits_m2.txt', 'a') as af:
-                        af.write(output + '\n')
-            else:
-                taken_m2 += 1
+            resp = _session_m2.post(g_url, params=params, cookies={'__Host-GAPS': host}, headers=hdrs, data=payload, timeout=20)
+            return '"gf.uar",1' in resp.text
+
+        hit = False
+        try:
+            with open(_M1_CONFIG["token_file"], 'r') as f:
+                line = f.read().splitlines()[0]
+                tl, host = line.split('//')
+            hit = _gcheck(tl, host)
         except Exception:
+            pass
+
+        if not hit:
+            try:
+                with open("google.txt", "r") as ys:
+                    tl2 = ys.read().strip()
+                host2 = ''.join(random.choice('abcdefghijklmnopqrstuvwxyz') for _ in range(randrange(15, 30)))
+                hit = _gcheck(tl2, host2)
+            except Exception:
+                pass
+
+        if hit:
+            hits_m2 += 1
+            hit_count[0] += 1
+            with hits_lock_m2:
+                recent_hits_m2.append(em)
+            data      = info_m2.get(usr, {})
+            followers = data.get('follower_count', 'None')
+            following = data.get('following_count', 'None')
+            bio       = data.get('biography', 'None') or 'None'
+            user_id   = data.get('pk', 0)
+            year_lbl  = str(gdate(user_id))
+            output    = format_hit(
+                hit_num   = hit_count[0],
+                username  = usr,
+                email     = em,
+                followers = followers,
+                following = following,
+                bio       = bio,
+                year_label= year_lbl,
+                reset_text= "-",
+                join_date = year_lbl,
+                country   = "-",
+            )
+            try:
+                requests.post(f"https://api.telegram.org/bot{token}/sendMessage?chat_id={tg_id}&text={urllib.parse.quote(output)}", timeout=20)
+            except Exception:
+                with open('weyn_hits_m2.txt', 'a') as af:
+                    af.write(output + '\n')
+        else:
             taken_m2 += 1
 
     def lookup_m2(em):
@@ -1197,39 +1216,46 @@ def run_method2(year_choice, min_followers=0):
             good_m2 += 1
             check_gmail_m2(em)
             return
-        url    = "https://i.instagram.com/api/v1/bloks/async_action/com.bloks.www.caa.ar.search.async/"
-        device = str(uuid.uuid4())
-        family = str(uuid.uuid4())
-        android= "android-" + secrets.token_hex(8)
-        payload = {
-            'params': "{\"client_input_params\":{\"aac\":\"{\\\"aac_init_timestamp\\\":"+ str(int(time.time())) +",\\\"aacjid\\\":\\\""+ str(uuid.uuid4()) +"\\\",\\\"aaccs\\\":\\\""+ secrets.token_urlsafe(32) +"\\\"}\",\"flash_call_permissions_status\":{\"READ_PHONE_STATE\":\"PERMANENTLY_DENIED\",\"READ_CALL_LOG\":\"DENIED\",\"ANSWER_PHONE_CALLS\":\"DENIED\"},\"was_headers_prefill_available\":0,\"network_bssid\":null,\"sfdid\":\"\",\"fetched_email_token_list\":{},\"search_query\":\""+ em +"\",\"auth_secure_device_id\":\"\",\"ig_oauth_token\":[],\"cloud_trust_token\":null,\"was_headers_prefill_used\":0,\"sso_accounts_auth_data\":[],\"encrypted_msisdn\":\"\",\"device_network_info\":null,\"text_input_id\":\"akyuf0:61\",\"zero_balance_state\":null,\"android_build_type\":\"release\",\"accounts_list\":[],\"is_oauth_without_permission\":0,\"ig_android_qe_device_id\":\""+ device +"\",\"gms_incoming_call_retriever_eligibility\":\"client_not_supported\",\"search_screen_type\":\"email_or_username\",\"is_whatsapp_installed\":1,\"lois_settings\":{\"lois_token\":\"\"},\"ig_vetted_device_nonce\":null,\"headers_infra_flow_id\":\"\",\"fetched_email_list\":[]},\"server_params\":{\"event_request_id\":\""+ str(uuid.uuid4()) +"\",\"is_from_logged_out\":0,\"layered_homepage_experiment_group\":null,\"device_id\":\""+ android +"\",\"login_surface\":\"login_home\",\"waterfall_id\":\""+ str(uuid.uuid4()) +"\",\"INTERNAL__latency_qpl_instance_id\":6.3987980400102E13,\"is_platform_login\":0,\"context_data\":\"\",\"login_entry_point\":\"logged_out\",\"INTERNAL__latency_qpl_marker_id\":36707139,\"family_device_id\":\""+ family +"\",\"offline_experiment_group\":\"caa_iteration_v3_perf_ig_4\",\"access_flow_version\":\"pre_mt_behavior\",\"is_from_logged_in_switcher\":0,\"qe_device_id\":\""+ device +"\"}}",
-            'bk_client_context': "{\"bloks_version\":\"5e47baf35c5a270b44c8906c8b99063564b30ef69779f3dee0b828bee2e4ef5b\",\"styles_id\":\"instagram\"}",
-            'bloks_versioning_id': "5e47baf35c5a270b44c8906c8b99063564b30ef69779f3dee0b828bee2e4ef5b"
-        }
-        hdrs = {
-            'User-Agent': "Instagram 370.1.0.43.96 Android (34/14; 450dpi; 1080x2207; samsung; SM-A235F; a23; qcom; en_IN; 704872281)",
-            'accept-language': "en-IN, en-US",
-            'x-bloks-version-id': "5e47baf35c5a270b44c8906c8b99063564b30ef69779f3dee0b828bee2e4ef5b",
-            'x-fb-friendly-name': "IgApi: bloks/async_action/com.bloks.www.caa.ar.search.async/",
-            'x-ig-android-id': android, 'x-ig-app-id': "567067343352427",
-            'x-ig-app-locale': "en_IN", 'x-ig-client-endpoint': "com.bloks.www.caa.ar.search",
-            'x-ig-device-id': device, 'x-ig-family-device-id': family,
-            'x-ig-timezone-offset': str(datetime.now().astimezone().utcoffset().total_seconds()),
-            'x-mid': base64.urlsafe_b64encode(secrets.token_bytes(18)).decode().rstrip('='),
-            'x-pigeon-rawclienttime': str(time.time()),
-            'x-pigeon-session-id': f"UFS-{uuid.uuid4()}-0",
-        }
-        try:
-            response = requests.post(url, data=payload, headers=hdrs, timeout=20)
-            if f"{em}" in response.text:
-                good_m2 += 1
-                check_gmail_m2(em)
-            elif 'Sorry, something' in response.text:
-                limit_m2 += 1
-            else:
+        bloks_url = "https://i.instagram.com/api/v1/bloks/async_action/com.bloks.www.caa.ar.search.async/"
+        for _attempt in range(4):
+            if _attempt > 0:
+                time.sleep(random.uniform(0.5, 1.5))
+            device  = str(uuid.uuid4())
+            family  = str(uuid.uuid4())
+            android = "android-" + secrets.token_hex(8)
+            payload = {
+                'params': "{\"client_input_params\":{\"aac\":\"{\\\"aac_init_timestamp\\\":"+ str(int(time.time())) +",\\\"aacjid\\\":\\\""+ str(uuid.uuid4()) +"\\\",\\\"aaccs\\\":\\\""+ secrets.token_urlsafe(32) +"\\\"}\",\"flash_call_permissions_status\":{\"READ_PHONE_STATE\":\"PERMANENTLY_DENIED\",\"READ_CALL_LOG\":\"DENIED\",\"ANSWER_PHONE_CALLS\":\"DENIED\"},\"was_headers_prefill_available\":0,\"network_bssid\":null,\"sfdid\":\"\",\"fetched_email_token_list\":{},\"search_query\":\""+ em +"\",\"auth_secure_device_id\":\"\",\"ig_oauth_token\":[],\"cloud_trust_token\":null,\"was_headers_prefill_used\":0,\"sso_accounts_auth_data\":[],\"encrypted_msisdn\":\"\",\"device_network_info\":null,\"text_input_id\":\"akyuf0:61\",\"zero_balance_state\":null,\"android_build_type\":\"release\",\"accounts_list\":[],\"is_oauth_without_permission\":0,\"ig_android_qe_device_id\":\""+ device +"\",\"gms_incoming_call_retriever_eligibility\":\"client_not_supported\",\"search_screen_type\":\"email_or_username\",\"is_whatsapp_installed\":1,\"lois_settings\":{\"lois_token\":\"\"},\"ig_vetted_device_nonce\":null,\"headers_infra_flow_id\":\"\",\"fetched_email_list\":[]},\"server_params\":{\"event_request_id\":\""+ str(uuid.uuid4()) +"\",\"is_from_logged_out\":0,\"layered_homepage_experiment_group\":null,\"device_id\":\""+ android +"\",\"login_surface\":\"login_home\",\"waterfall_id\":\""+ str(uuid.uuid4()) +"\",\"INTERNAL__latency_qpl_instance_id\":6.3987980400102E13,\"is_platform_login\":0,\"context_data\":\"\",\"login_entry_point\":\"logged_out\",\"INTERNAL__latency_qpl_marker_id\":36707139,\"family_device_id\":\""+ family +"\",\"offline_experiment_group\":\"caa_iteration_v3_perf_ig_4\",\"access_flow_version\":\"pre_mt_behavior\",\"is_from_logged_in_switcher\":0,\"qe_device_id\":\""+ device +"\"}}",
+                'bk_client_context': "{\"bloks_version\":\"5e47baf35c5a270b44c8906c8b99063564b30ef69779f3dee0b828bee2e4ef5b\",\"styles_id\":\"instagram\"}",
+                'bloks_versioning_id': "5e47baf35c5a270b44c8906c8b99063564b30ef69779f3dee0b828bee2e4ef5b"
+            }
+            hdrs = {
+                'User-Agent': random.choice(_M1_USER_AGENTS),
+                'accept-language': "en-IN, en-US",
+                'x-bloks-version-id': "5e47baf35c5a270b44c8906c8b99063564b30ef69779f3dee0b828bee2e4ef5b",
+                'x-fb-friendly-name': "IgApi: bloks/async_action/com.bloks.www.caa.ar.search.async/",
+                'x-ig-android-id': android, 'x-ig-app-id': "567067343352427",
+                'x-ig-app-locale': "en_IN", 'x-ig-client-endpoint': "com.bloks.www.caa.ar.search",
+                'x-ig-device-id': device, 'x-ig-family-device-id': family,
+                'x-ig-timezone-offset': str(datetime.now().astimezone().utcoffset().total_seconds()),
+                'x-mid': base64.urlsafe_b64encode(secrets.token_bytes(18)).decode().rstrip('='),
+                'x-pigeon-rawclienttime': str(time.time()),
+                'x-pigeon-session-id': f"UFS-{uuid.uuid4()}-0",
+            }
+            try:
+                response = requests.post(bloks_url, data=payload, headers=hdrs, timeout=20)
+                if f"{em}" in response.text:
+                    good_m2 += 1
+                    check_gmail_m2(em)
+                    break
+                elif 'Sorry, something' in response.text:
+                    limit_m2 += 1
+                    continue
+                else:
+                    bad_m2 += 1
+                    break
+            except Exception:
                 bad_m2 += 1
-        except Exception:
-            bad_m2 += 1
+                break
 
     def get_tokens_m2():
         while True:
@@ -1404,15 +1430,14 @@ def run_method3(year_choice, min_followers=0):
 
     def check_gmail_m3(em):
         nonlocal hits_m3, taken_m3
-        usr = em.split("@")[0]
-        try:
-            with open("google.txt", "r") as ys:
-                tl = ys.read().strip()
-            url    = "https://accounts.google.com/_/signup/usernameavailability"
-            params = {'hl': "en-GB", 'TL': tl, '_reqid': "446000", 'rt': "j"}
-            payload= {
+        usr   = em.split("@")[0]
+        g_url = "https://accounts.google.com/_/signup/usernameavailability"
+
+        def _gcheck(tl, host):
+            params  = {'hl': "en-GB", 'TL': tl, '_reqid': str(random.randint(100000, 999999)), 'rt': "j"}
+            payload = {
                 'continue': "https://accounts.google.com/ManageAccount?nc=1",
-                'f.req': "[\"TL:"+ tl +"\",\""+ usr +"\",0,0,1,null,1,2464]",
+                'f.req': f'["TL:{tl}","{usr}",0,0,1,null,1,2464]',
                 'azt': "AFoagUUWePV-jOFGpL5c7eI9kfCfGnCl5w:1776669382039",
                 'cookiesDisabled': "false",
                 'deviceinfo': "[null,null,null,null,null,\"IN\",null,null,null,\"GlifWebSignIn\",null,[],null,null,null,null,1,null,0,1,\"\",null,null,2,2,2]",
@@ -1420,44 +1445,64 @@ def run_method3(year_choice, min_followers=0):
                 'checkConnection': "youtube:301", 'checkedDomains': "youtube",
                 'pstMsg': "1", '': ""
             }
-            hdrs   = {
-                'User-Agent': "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Mobile Safari/537.36",
-                'x-same-domain': "1", 'google-accounts-xsrf': "1",
-                'origin': "https://accounts.google.com",
-                'Cookie': "__Host-GAPS=1:6oR-TWX06t3JKSEu3DqYRT_IWnQLlw:Rc9Z7lHTPNW6qMCN"
+            hdrs = {
+                'authority': 'accounts.google.com', 'accept': '*/*',
+                'accept-language': 'en-US,en;q=0.9',
+                'content-type': 'application/x-www-form-urlencoded;charset=UTF-8',
+                'google-accounts-xsrf': '1', 'x-same-domain': '1',
+                'origin': 'https://accounts.google.com',
+                'user-agent': random.choice(_M1_USER_AGENTS),
             }
-            resp   = _session_m3.post(url, params=params, data=payload, headers=hdrs, timeout=20)
-            if '"gf.uar",1' in resp.text:
-                hits_m3 += 1
-                hit_count[0] += 1
-                with hits_lock_m3:
-                    recent_hits_m3.append(em)
-                data      = info_m3.get(usr, {})
-                followers = data.get('follower_count', 'None')
-                following = data.get('following_count', 'None')
-                bio       = data.get('biography', 'None') or 'None'
-                user_id   = data.get('pk', 0)
-                year_lbl  = str(gdate(user_id))
-                output    = format_hit(
-                    hit_num   = hit_count[0],
-                    username  = usr,
-                    email     = em,
-                    followers = followers,
-                    following = following,
-                    bio       = bio,
-                    year_label= year_lbl,
-                    reset_text= "-",
-                    join_date = year_lbl,
-                    country   = "-",
-                )
-                try:
-                    requests.post(f"https://api.telegram.org/bot{token}/sendMessage?chat_id={tg_id}&text={urllib.parse.quote(output)}", timeout=20)
-                except Exception:
-                    with open('weyn_hits_m3.txt', 'a') as af:
-                        af.write(output + '\n')
-            else:
-                taken_m3 += 1
+            resp = _session_m3.post(g_url, params=params, cookies={'__Host-GAPS': host}, headers=hdrs, data=payload, timeout=20)
+            return '"gf.uar",1' in resp.text
+
+        hit = False
+        try:
+            with open(_M1_CONFIG["token_file"], 'r') as f:
+                line = f.read().splitlines()[0]
+                tl, host = line.split('//')
+            hit = _gcheck(tl, host)
         except Exception:
+            pass
+
+        if not hit:
+            try:
+                with open("google.txt", "r") as ys:
+                    tl2 = ys.read().strip()
+                host2 = ''.join(random.choice('abcdefghijklmnopqrstuvwxyz') for _ in range(randrange(15, 30)))
+                hit = _gcheck(tl2, host2)
+            except Exception:
+                pass
+
+        if hit:
+            hits_m3 += 1
+            hit_count[0] += 1
+            with hits_lock_m3:
+                recent_hits_m3.append(em)
+            data      = info_m3.get(usr, {})
+            followers = data.get('follower_count', 'None')
+            following = data.get('following_count', 'None')
+            bio       = data.get('biography', 'None') or 'None'
+            user_id   = data.get('pk', 0)
+            year_lbl  = str(gdate(user_id))
+            output    = format_hit(
+                hit_num   = hit_count[0],
+                username  = usr,
+                email     = em,
+                followers = followers,
+                following = following,
+                bio       = bio,
+                year_label= year_lbl,
+                reset_text= "-",
+                join_date = year_lbl,
+                country   = "-",
+            )
+            try:
+                requests.post(f"https://api.telegram.org/bot{token}/sendMessage?chat_id={tg_id}&text={urllib.parse.quote(output)}", timeout=20)
+            except Exception:
+                with open('weyn_hits_m3.txt', 'a') as af:
+                    af.write(output + '\n')
+        else:
             taken_m3 += 1
 
     def lookup_m3(em):
@@ -1467,39 +1512,46 @@ def run_method3(year_choice, min_followers=0):
             good_m3 += 1
             check_gmail_m3(em)
             return
-        url    = "https://i.instagram.com/api/v1/bloks/async_action/com.bloks.www.caa.ar.search.async/"
-        device = str(uuid.uuid4())
-        family = str(uuid.uuid4())
-        android= "android-" + secrets.token_hex(8)
-        payload = {
-            'params': "{\"client_input_params\":{\"aac\":\"{\\\"aac_init_timestamp\\\":"+ str(int(time.time())) +",\\\"aacjid\\\":\\\""+ str(uuid.uuid4()) +"\\\",\\\"aaccs\\\":\\\""+ secrets.token_urlsafe(32) +"\\\"}\",\"flash_call_permissions_status\":{\"READ_PHONE_STATE\":\"PERMANENTLY_DENIED\",\"READ_CALL_LOG\":\"DENIED\",\"ANSWER_PHONE_CALLS\":\"DENIED\"},\"was_headers_prefill_available\":0,\"network_bssid\":null,\"sfdid\":\"\",\"fetched_email_token_list\":{},\"search_query\":\""+ em +"\",\"auth_secure_device_id\":\"\",\"ig_oauth_token\":[],\"cloud_trust_token\":null,\"was_headers_prefill_used\":0,\"sso_accounts_auth_data\":[],\"encrypted_msisdn\":\"\",\"device_network_info\":null,\"text_input_id\":\"akyuf0:61\",\"zero_balance_state\":null,\"android_build_type\":\"release\",\"accounts_list\":[],\"is_oauth_without_permission\":0,\"ig_android_qe_device_id\":\""+ device +"\",\"gms_incoming_call_retriever_eligibility\":\"client_not_supported\",\"search_screen_type\":\"email_or_username\",\"is_whatsapp_installed\":1,\"lois_settings\":{\"lois_token\":\"\"},\"ig_vetted_device_nonce\":null,\"headers_infra_flow_id\":\"\",\"fetched_email_list\":[]},\"server_params\":{\"event_request_id\":\""+ str(uuid.uuid4()) +"\",\"is_from_logged_out\":0,\"layered_homepage_experiment_group\":null,\"device_id\":\""+ android +"\",\"login_surface\":\"login_home\",\"waterfall_id\":\""+ str(uuid.uuid4()) +"\",\"INTERNAL__latency_qpl_instance_id\":6.3987980400102E13,\"is_platform_login\":0,\"context_data\":\"\",\"login_entry_point\":\"logged_out\",\"INTERNAL__latency_qpl_marker_id\":36707139,\"family_device_id\":\""+ family +"\",\"offline_experiment_group\":\"caa_iteration_v3_perf_ig_4\",\"access_flow_version\":\"pre_mt_behavior\",\"is_from_logged_in_switcher\":0,\"qe_device_id\":\""+ device +"\"}}",
-            'bk_client_context': "{\"bloks_version\":\"5e47baf35c5a270b44c8906c8b99063564b30ef69779f3dee0b828bee2e4ef5b\",\"styles_id\":\"instagram\"}",
-            'bloks_versioning_id': "5e47baf35c5a270b44c8906c8b99063564b30ef69779f3dee0b828bee2e4ef5b"
-        }
-        hdrs = {
-            'User-Agent': "Instagram 370.1.0.43.96 Android (34/14; 450dpi; 1080x2207; samsung; SM-A235F; a23; qcom; en_IN; 704872281)",
-            'accept-language': "en-IN, en-US",
-            'x-bloks-version-id': "5e47baf35c5a270b44c8906c8b99063564b30ef69779f3dee0b828bee2e4ef5b",
-            'x-fb-friendly-name': "IgApi: bloks/async_action/com.bloks.www.caa.ar.search.async/",
-            'x-ig-android-id': android, 'x-ig-app-id': "567067343352427",
-            'x-ig-app-locale': "en_IN", 'x-ig-client-endpoint': "com.bloks.www.caa.ar.search",
-            'x-ig-device-id': device, 'x-ig-family-device-id': family,
-            'x-ig-timezone-offset': str(datetime.now().astimezone().utcoffset().total_seconds()),
-            'x-mid': base64.urlsafe_b64encode(secrets.token_bytes(18)).decode().rstrip('='),
-            'x-pigeon-rawclienttime': str(time.time()),
-            'x-pigeon-session-id': f"UFS-{uuid.uuid4()}-0",
-        }
-        try:
-            response = requests.post(url, data=payload, headers=hdrs, timeout=20)
-            if f"{em}" in response.text:
-                good_m3 += 1
-                check_gmail_m3(em)
-            elif 'Sorry, something' in response.text:
-                limit_m3 += 1
-            else:
+        bloks_url = "https://i.instagram.com/api/v1/bloks/async_action/com.bloks.www.caa.ar.search.async/"
+        for _attempt in range(4):
+            if _attempt > 0:
+                time.sleep(random.uniform(0.5, 1.5))
+            device  = str(uuid.uuid4())
+            family  = str(uuid.uuid4())
+            android = "android-" + secrets.token_hex(8)
+            payload = {
+                'params': "{\"client_input_params\":{\"aac\":\"{\\\"aac_init_timestamp\\\":"+ str(int(time.time())) +",\\\"aacjid\\\":\\\""+ str(uuid.uuid4()) +"\\\",\\\"aaccs\\\":\\\""+ secrets.token_urlsafe(32) +"\\\"}\",\"flash_call_permissions_status\":{\"READ_PHONE_STATE\":\"PERMANENTLY_DENIED\",\"READ_CALL_LOG\":\"DENIED\",\"ANSWER_PHONE_CALLS\":\"DENIED\"},\"was_headers_prefill_available\":0,\"network_bssid\":null,\"sfdid\":\"\",\"fetched_email_token_list\":{},\"search_query\":\""+ em +"\",\"auth_secure_device_id\":\"\",\"ig_oauth_token\":[],\"cloud_trust_token\":null,\"was_headers_prefill_used\":0,\"sso_accounts_auth_data\":[],\"encrypted_msisdn\":\"\",\"device_network_info\":null,\"text_input_id\":\"akyuf0:61\",\"zero_balance_state\":null,\"android_build_type\":\"release\",\"accounts_list\":[],\"is_oauth_without_permission\":0,\"ig_android_qe_device_id\":\""+ device +"\",\"gms_incoming_call_retriever_eligibility\":\"client_not_supported\",\"search_screen_type\":\"email_or_username\",\"is_whatsapp_installed\":1,\"lois_settings\":{\"lois_token\":\"\"},\"ig_vetted_device_nonce\":null,\"headers_infra_flow_id\":\"\",\"fetched_email_list\":[]},\"server_params\":{\"event_request_id\":\""+ str(uuid.uuid4()) +"\",\"is_from_logged_out\":0,\"layered_homepage_experiment_group\":null,\"device_id\":\""+ android +"\",\"login_surface\":\"login_home\",\"waterfall_id\":\""+ str(uuid.uuid4()) +"\",\"INTERNAL__latency_qpl_instance_id\":6.3987980400102E13,\"is_platform_login\":0,\"context_data\":\"\",\"login_entry_point\":\"logged_out\",\"INTERNAL__latency_qpl_marker_id\":36707139,\"family_device_id\":\""+ family +"\",\"offline_experiment_group\":\"caa_iteration_v3_perf_ig_4\",\"access_flow_version\":\"pre_mt_behavior\",\"is_from_logged_in_switcher\":0,\"qe_device_id\":\""+ device +"\"}}",
+                'bk_client_context': "{\"bloks_version\":\"5e47baf35c5a270b44c8906c8b99063564b30ef69779f3dee0b828bee2e4ef5b\",\"styles_id\":\"instagram\"}",
+                'bloks_versioning_id': "5e47baf35c5a270b44c8906c8b99063564b30ef69779f3dee0b828bee2e4ef5b"
+            }
+            hdrs = {
+                'User-Agent': random.choice(_M1_USER_AGENTS),
+                'accept-language': "en-IN, en-US",
+                'x-bloks-version-id': "5e47baf35c5a270b44c8906c8b99063564b30ef69779f3dee0b828bee2e4ef5b",
+                'x-fb-friendly-name': "IgApi: bloks/async_action/com.bloks.www.caa.ar.search.async/",
+                'x-ig-android-id': android, 'x-ig-app-id': "567067343352427",
+                'x-ig-app-locale': "en_IN", 'x-ig-client-endpoint': "com.bloks.www.caa.ar.search",
+                'x-ig-device-id': device, 'x-ig-family-device-id': family,
+                'x-ig-timezone-offset': str(datetime.now().astimezone().utcoffset().total_seconds()),
+                'x-mid': base64.urlsafe_b64encode(secrets.token_bytes(18)).decode().rstrip('='),
+                'x-pigeon-rawclienttime': str(time.time()),
+                'x-pigeon-session-id': f"UFS-{uuid.uuid4()}-0",
+            }
+            try:
+                response = requests.post(bloks_url, data=payload, headers=hdrs, timeout=20)
+                if f"{em}" in response.text:
+                    good_m3 += 1
+                    check_gmail_m3(em)
+                    break
+                elif 'Sorry, something' in response.text:
+                    limit_m3 += 1
+                    continue
+                else:
+                    bad_m3 += 1
+                    break
+            except Exception:
                 bad_m3 += 1
-        except Exception:
-            bad_m3 += 1
+                break
 
     def get_tokens_m3():
         while True:
