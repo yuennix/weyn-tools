@@ -259,7 +259,21 @@ _M1_USER_AGENTS = [
     "Instagram 318.0.0.22.110 Android (29/10; 400dpi; 1080x2310; HUAWEI; ELE-L29; hwELE; kirin980; en_GB; 439875334)",
     "Instagram 320.0.0.34.109 Android (33/13; 440dpi; 1080x2400; vivo; V2145; PD2145; mt6893; en_US; 478932112)",
     "Instagram 321.0.0.28.120 Android (33/13; 420dpi; 1080x2400; samsung; SM-S911B; dm1q; qcom; en_US; 475223914)",
+    "Instagram 321.0.0.28.120 Android (33/13; 440dpi; 1080x2400; xiaomi; 2211133G; ruby; mt6983; en_US; 467882419)",
+    "Instagram 319.0.0.30.121 Android (32/12; 480dpi; 1080x2412; OnePlus; CPH2413; NE2213; qcom; en_GB; 453228190)",
+    "Instagram 318.0.0.22.110 Android (30/11; 420dpi; 1080x2400; realme; RMX3311; serpent; qcom; en_US; 442119875)",
+    "Instagram 320.0.0.34.109 Android (33/13; 440dpi; 1080x2340; samsung; SM-M526BR; m52x; qcom; en_US; 483662991)",
+    "Instagram 322.0.0.45.112 Android (34/14; 400dpi; 1080x2400; sony; XQ-CT72; pdx234; qcom; en_US; 498722341)",
+    "Instagram 319.0.0.30.121 Android (31/12; 420dpi; 1080x2400; oppo; CPH2457; PHB110; mt6895; en_US; 462775910)",
+    "Instagram 321.0.0.28.120 Android (33/13; 480dpi; 1080x2340; samsung; SM-A346B; a34x; mt6877; en_GB; 479201567)",
+    "Instagram 322.0.0.45.112 Android (34/14; 440dpi; 1080x2400; motorola; XT2303-2; crosby; qcom; en_US; 492874115)",
+    "Instagram 318.0.0.22.110 Android (30/11; 420dpi; 1080x2376; honor; FNE-NX9; fne; kirin9000; en_GB; 431597221)",
+    "Instagram 320.0.0.34.109 Android (33/13; 400dpi; 1080x2400; xiaomi; 2201117TY; veux; qcom; en_US; 487266531)",
+    "Instagram 319.0.0.30.121 Android (32/12; 440dpi; 1080x2340; samsung; SM-M336B; m33x; exynos1280; en_US; 471823650)",
+    "Instagram 321.0.0.28.120 Android (33/13; 420dpi; 1080x2400; realme; RMX3710; halo; mt6833; en_GB; 469862234)",
+    "Instagram 322.0.0.45.112 Android (34/14; 480dpi; 1440x3120; lg; LM-V600; judyln; qcom; en_US; 499178234)",
     "Instagram 370.1.0.43.96 Android (34/14; 450dpi; 1080x2207; samsung; SM-A235F; a23; qcom; en_IN; 704872281)",
+    "Instagram 368.0.0.45.96 Android (30/11; 440dpi; 1080x2220; Xiaomi/Redmi; 23127PN0CC; begonia; mt6785; ar_EG; 700073482)",
 ]
 
 _M1_BASE_URL      = "https://www.instagram.com"
@@ -627,13 +641,39 @@ def _m1_get_country_flag(country_name):
     flags = {
         "Türkiye": "🇹🇷", "Irak": "🇮🇶", "Fransa": "🇫🇷", "Endonezya": "🇮🇩",
         "Arjantin": "🇦🇷", "Almanya": "🇩🇪", "Amerika Birleşik Devletleri": "🇺🇸",
-        "Birleşik Krallık": "🇬🇧", "İtalya": "🇮🇹", "İspanya": "🇪🇸",
-        "Hollanda": "🇳🇱", "Belçika": "🇧🇪", "Rusya": "🇷🇺", "Ukrayna": "🇺🇦",
+        "Birleşik Krallık": "🇬🇧", "İngiltere": "🇬🇧", "İtalya": "🇮🇹",
+        "İspanya": "🇪🇸", "Hollanda": "🇳🇱", "Belçika": "🇧🇪", "İsviçre": "🇨🇭",
+        "Avusturya": "🇦🇹", "İsveç": "🇸🇪", "Norveç": "🇳🇴", "Danimarka": "🇩🇰",
+        "Finlandiya": "🇫🇮", "Polonya": "🇵🇱", "Rusya": "🇷🇺", "Ukrayna": "🇺🇦",
         "Brezilya": "🇧🇷", "Meksika": "🇲🇽", "Hindistan": "🇮🇳", "Japonya": "🇯🇵",
-        "Avustralya": "🇦🇺", "Kanada": "🇨🇦", "Suudi Arabistan": "🇸🇦",
-        "Birleşik Arap Emirlikleri": "🇦🇪", "Katar": "🇶🇦", "İran": "🇮🇷",
-        "Yunanistan": "🇬🇷", "Portekiz": "🇵🇹", "Pakistan": "🇵🇰",
-        "Güney Kore": "🇰🇷", "Çin": "🇨🇳", "Malezya": "🇲🇾", "Fas": "🇲🇦",
+        "Güney Kore": "🇰🇷", "Avustralya": "🇦🇺", "Kanada": "🇨🇦", "Mısır": "🇪🇬",
+        "Suudi Arabistan": "🇸🇦", "Birleşik Arap Emirlikleri": "🇦🇪", "Katar": "🇶🇦",
+        "Kuveyt": "🇰🇼", "İran": "🇮🇷", "Yunanistan": "🇬🇷", "Portekiz": "🇵🇹",
+        "Romanya": "🇷🇴", "Bulgaristan": "🇧🇬", "Macaristan": "🇭🇺", "Çekya": "🇨🇿",
+        "Hırvatistan": "🇭🇷", "Sırbistan": "🇷🇸", "Arnavutluk": "🇦🇱", "Kosova": "🇽🇰",
+        "Malezya": "🇲🇾", "Singapur": "🇸🇬", "Tayland": "🇹🇭", "Vietnam": "🇻🇳",
+        "Filipinler": "🇵🇭", "Çin": "🇨🇳", "Hong Kong": "🇭🇰", "Tayvan": "🇹🇼",
+        "Gürcistan": "🇬🇪", "Azerbaycan": "🇦🇿", "Kazakistan": "🇰🇿", "Özbekistan": "🇺🇿",
+        "Pakistan": "🇵🇰", "Bangladeş": "🇧🇩", "Kolombiya": "🇨🇴", "Şili": "🇨🇱",
+        "Peru": "🇵🇪", "Venezuela": "🇻🇪", "Güney Afrika": "🇿🇦", "Nijerya": "🇳🇬",
+        "Kenya": "🇰🇪", "Fas": "🇲🇦", "Tunus": "🇹🇳", "Cezayir": "🇩🇿",
+        "Libya": "🇱🇾", "Sudan": "🇸🇩", "Etyopya": "🇪🇹", "Gana": "🇬🇭",
+        "Tanzanya": "🇹🇿", "Uganda": "🇺🇬", "Kamerun": "🇨🇲", "Senegal": "🇸🇳",
+        "Ürdün": "🇯🇴", "Lübnan": "🇱🇧", "Suriye": "🇸🇾", "Yemen": "🇾🇪",
+        "Umman": "🇴🇲", "Bahreyn": "🇧🇭", "İsrail": "🇮🇱", "Filistin": "🇵🇸",
+        "Afganistan": "🇦🇫", "Sri Lanka": "🇱🇰", "Nepal": "🇳🇵", "Myanmar": "🇲🇲",
+        "Kamboçya": "🇰🇭", "Moğolistan": "🇲🇳", "Kırgızistan": "🇰🇬",
+        "Tacikistan": "🇹🇯", "Türkmenistan": "🇹🇲", "Yeni Zelanda": "🇳🇿",
+        "İrlanda": "🇮🇪", "Slovakya": "🇸🇰", "Slovenya": "🇸🇮",
+        "Bosna Hersek": "🇧🇦", "Karadağ": "🇲🇪", "Kuzey Makedonya": "🇲🇰",
+        "Moldova": "🇲🇩", "Belarus": "🇧🇾", "Litvanya": "🇱🇹", "Letonya": "🇱🇻",
+        "Estonya": "🇪🇪", "Lüksemburg": "🇱🇺", "Malta": "🇲🇹", "Kıbrıs": "🇨🇾",
+        "İzlanda": "🇮🇸", "Ermenistan": "🇦🇲", "Ekuador": "🇪🇨", "Bolivya": "🇧🇴",
+        "Paraguay": "🇵🇾", "Uruguay": "🇺🇾", "Küba": "🇨🇺",
+        "Guatemala": "🇬🇹", "Honduras": "🇭🇳", "El Salvador": "🇸🇻",
+        "Nikaragua": "🇳🇮", "Kosta Rika": "🇨🇷", "Panama": "🇵🇦",
+        "Trinidad ve Tobago": "🇹🇹", "Jamaika": "🇯🇲",
+        "Fildişi Sahili": "🇨🇮", "Dominik Cumhuriyeti": "🇩🇴",
     }
     if country_name in flags:
         return flags[country_name]
@@ -830,22 +870,18 @@ def _m1_cgmail(email, token, chat_id, user, loc_session):
                 'content-type': _M1_CONFIG["form_type"],
                 'google-accounts-xsrf': '1',
                 'origin': _M1_CONFIG["google_url"],
+                'referer': f"https://accounts.google.com/signup/v2/createusername?service=mail&continue=https%3A%2F%2Fmail.google.com%2Fmail%2Fu%2F0%2F&theme=mn&TL={tl}",
                 'user-agent': random.choice(_M1_USER_AGENTS)
             }
-            params = {
-                'hl': 'en-GB', 'TL': tl,
-                '_reqid': str(random.randint(100000, 999999)), 'rt': 'j'
-            }
-            data = {
-                'continue': "https://accounts.google.com/ManageAccount?nc=1",
-                'f.req': f'[\"TL:{tl}\",\"{usr}\",0,0,1,null,1,2464]',
-                'azt': "AFoagUUWePV-jOFGpL5c7eI9kfCfGnCl5w:1776669382039",
-                'cookiesDisabled': "false",
-                'deviceinfo': "[null,null,null,null,null,\"IN\",null,null,null,\"GlifWebSignIn\",null,[],null,null,null,null,1,null,0,1,\"\",null,null,2,2,2]",
-                'gmscoreversion': "null", 'flowName': "GlifWebSignIn",
-                'checkConnection': "youtube:301", 'checkedDomains': "youtube",
-                'pstMsg': "1", '': ""
-            }
+            params = {'TL': tl}
+            data = (
+                f"continue=https%3A%2F%2Fmail.google.com%2Fmail%2Fu%2F0%2F&ddm=0&flowEntry=SignUp&service=mail&theme=mn"
+                f"&f.req=%5B%22TL%3A{tl}%22%2C%22{usr}%22%2C0%2C0%2C1%2Cnull%2C0%2C5167%5D"
+                "&azt=AFoagUUtRlvV928oS9O7F6eeI4dCO2r1ig%3A1712322460888&cookiesDisabled=false"
+                "&deviceinfo=%5Bnull%2Cnull%2Cnull%2Cnull%2Cnull%2C%22NL%22%2Cnull%2Cnull%2Cnull%2C%22GlifWebSignIn%22"
+                "%2Cnull%2C%5B%5D%2Cnull%2Cnull%2Cnull%2Cnull%2C2%2Cnull%2C0%2C1%2C%22%22%2Cnull%2Cnull%2C2%2C2%5D"
+                "&gmscoreversion=undefined&flowName=GlifWebSignIn&"
+            )
             resp = _m1__session.post(
                 f"{_M1_CONFIG['google_url']}/_/signup/usernameavailability",
                 params=params, cookies=cookies, headers=headers, data=data
@@ -944,7 +980,9 @@ def _m1_sinsta(min_id, max_id, token, chat_id, min_followers=0, stop_event=None)
             headers    = {
                 'accept': '*/*', 'accept-language': 'en,en-US;q=0.9',
                 'content-type': 'application/x-www-form-urlencoded',
+                'dnt': '1',
                 'origin': 'https://www.instagram.com',
+                'priority': 'u=1, i',
                 'referer': 'https://www.instagram.com/cristiano/following/',
                 'user-agent': user_agent,
                 'x-fb-friendly-name': 'PolarisUserHoverCardContentV2Query',
