@@ -1,6 +1,6 @@
 (() => {
-  let selectedMethod = '1';
-  let evtSource      = null;
+  const selectedMethod = '1';
+  let evtSource        = null;
   let knownHits      = new Set();
   let totalHits      = 0;
 
@@ -27,15 +27,6 @@
 
   tokenEl.addEventListener('input',  () => localStorage.setItem('tg_token',   tokenEl.value));
   chatIdEl.addEventListener('input', () => localStorage.setItem('tg_chat_id', chatIdEl.value));
-
-  // ── Method tabs ──
-  document.querySelectorAll('.tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-      tab.classList.add('active');
-      selectedMethod = tab.dataset.method;
-    });
-  });
 
   // ── SSE stream ──
   function startSSE() {
