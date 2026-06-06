@@ -14,8 +14,7 @@ _job_lock   = threading.Lock()
 
 @app.route('/')
 def index():
-    years = [str(y) for _, _, y in weyn.ID_RANGES]
-    return render_template('index.html', years=years)
+    return render_template('index.html')
 
 
 @app.route('/api/start', methods=['POST'])
@@ -28,9 +27,8 @@ def start():
         method        = str(data.get('method', '1'))
         token         = (data.get('token') or '').strip()
         chat_id       = (data.get('chat_id') or '').strip()
-        year_raw      = data.get('year', '')
         min_followers = int(data.get('min_followers', 0) or 0)
-        year_choice   = int(year_raw) if year_raw else None
+        year_choice   = None
 
         if not token or not chat_id:
             return jsonify({'error': 'Bot Token and Chat ID are required'}), 400
