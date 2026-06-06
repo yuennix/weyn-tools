@@ -126,7 +126,6 @@
   startBtn.addEventListener('click', async () => {
     const token        = document.getElementById('token').value.trim();
     const chat_id      = document.getElementById('chat_id').value.trim();
-    const year         = document.getElementById('year').value;
     const min_followers= document.getElementById('min_followers').value;
 
     if (!token || !chat_id) {
@@ -147,7 +146,7 @@
       const res = await fetch('/api/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ method: selectedMethod, token, chat_id, year, min_followers })
+        body: JSON.stringify({ method: selectedMethod, token, chat_id, min_followers })
       });
       const data = await res.json();
       if (!res.ok) { alert(data.error || 'Failed to start.'); return; }
