@@ -7,6 +7,10 @@
   // ── DOM refs ──
   const startBtn    = document.getElementById('startBtn');
   const stopBtn     = document.getElementById('stopBtn');
+  const testBtn     = document.getElementById('testBtn');
+  const testStatus  = document.getElementById('testStatus');
+  const findChatBtn = document.getElementById('findChatBtn');
+  const chatResults = document.getElementById('chatResults');
   const statusBar   = document.getElementById('statusBar');
   const methodBadge = document.getElementById('methodBadge');
   const hitsFeed    = document.getElementById('hitsFeed');
@@ -38,7 +42,20 @@
     };
   }
 
+  const tgStatusEl = document.getElementById('tgStatus');
+
   function updateStats(d) {
+    if (d.tg_status === 'error' && d.tg_error) {
+      tgStatusEl.textContent = '⚠ TG: ' + d.tg_error;
+      tgStatusEl.className = 'tg-status-bar tg-err';
+    } else if (d.tg_status === 'ok') {
+      tgStatusEl.textContent = '✓ TG: Message sent';
+      tgStatusEl.className = 'tg-status-bar tg-ok';
+    } else {
+      tgStatusEl.textContent = '';
+      tgStatusEl.className = 'tg-status-bar';
+    }
+
     statIds.forEach(key => {
       const el = document.getElementById('s-' + key);
       if (!el) return;
@@ -138,6 +155,74 @@
     } catch (err) {
       alert('Connection error: ' + err.message);
     }
+  });
+
+  // ── Find Chat ID button ──
+  findChatBtn.addEventListener('click', async () => {
+    const token = document.getElementById('token').value.trim();
+    if (!token) {
+      chatResults.innerHTML = '<div class="chat-result-err">Enter your Bot Token first.</div>';
+      return;
+    }
+    findChatBtn.disabled = true;
+    chatResults.innerHTML = '<div class="chat-result-info">Scanning for groups… send any message in your group first if nothing appears.</div>';
+    try {
+      const res  = await fetch('/api/find_chat_id', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token })
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        chatResults.innerHTML = `<div class="chat-result-err">✗ ${escHtml(data.error)}</div>`;
+      } else if (!data.chats.length) {
+        chatResults.innerHTML = '<div class="chat-result-info">No groups found. Send any message in your group, then try again.</div>';
+      } else {
+        chatResults.innerHTML = data.chats.map(c => `
+          <div class="chat-result-item" data-id="${c.id}">
+            <span class="chat-result-name">${escHtml(c.name)}</span>
+            <span class="chat-result-type">${escHtml(c.type)}</span>
+            <span class="chat-result-id">${c.id}</span>
+            <button class="chat-use-btn" onclick="document.getElementById('chat_id').value='${c.id}';document.getElementById('chatResults').innerHTML='';">USE</button>
+          </div>`).join('');
+      }
+    } catch (err) {
+      chatResults.innerHTML = `<div class="chat-result-err">✗ ${escHtml(err.message)}</div>`;
+    }
+    findChatBtn.disabled = false;
+  });
+
+  // ── Test Telegram button ──
+  testBtn.addEventListener('click', async () => {
+    const token   = document.getElementById('token').value.trim();
+    const chat_id = document.getElementById('chat_id').value.trim();
+    if (!token || !chat_id) {
+      testStatus.textContent = '✗ Enter Bot Token and Chat ID first.';
+      testStatus.className = 'test-status fail';
+      return;
+    }
+    testBtn.disabled = true;
+    testStatus.textContent = 'Sending test message…';
+    testStatus.className = 'test-status';
+    try {
+      const res  = await fetch('/api/test_telegram', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, chat_id })
+      });
+      const data = await res.json();
+      if (data.ok) {
+        testStatus.textContent = '✓ Message sent! Check your group.';
+        testStatus.className = 'test-status ok';
+      } else {
+        testStatus.textContent = '✗ ' + (data.error || 'Failed');
+        testStatus.className = 'test-status fail';
+      }
+    } catch (err) {
+      testStatus.textContent = '✗ ' + err.message;
+      testStatus.className = 'test-status fail';
+    }
+    testBtn.disabled = false;
   });
 
   // ── Stop button ──
