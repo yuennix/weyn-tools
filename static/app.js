@@ -18,6 +18,16 @@
 
   const statIds = ['hits','good','bad_insta','bad_email','taken','limit','total','verified'];
 
+  // ── Persist token & chat_id across refreshes ──
+  const tokenEl  = document.getElementById('token');
+  const chatIdEl = document.getElementById('chat_id');
+
+  if (localStorage.getItem('tg_token'))   tokenEl.value  = localStorage.getItem('tg_token');
+  if (localStorage.getItem('tg_chat_id')) chatIdEl.value = localStorage.getItem('tg_chat_id');
+
+  tokenEl.addEventListener('input',  () => localStorage.setItem('tg_token',   tokenEl.value));
+  chatIdEl.addEventListener('input', () => localStorage.setItem('tg_chat_id', chatIdEl.value));
+
   // ── Method tabs ──
   document.querySelectorAll('.tab').forEach(tab => {
     tab.addEventListener('click', () => {
