@@ -62,7 +62,76 @@ def stop():
         if _stop_event:
             _stop_event.set()
         weyn._web_state['running'] = False
+    weyn.close_all_sessions()
     return jsonify({'status': 'stopped'})
+
+
+@app.route('/api/download_hits')
+def download_hits():
+    import os
+    path = weyn.HITS_FILE
+    if not os.path.exists(path):
+        return ('No hits have been saved yet.', 404)
+    return __import__('flask').send_file(
+        os.path.abspath(path),
+        as_attachment=True,
+        download_name='weyn_hits.txt',
+        mimetype='text/plain'
+    )
+
+
+@app.route('/api/find_chat_id', methods=['POST'])
+def find_chat_id():
+    data  = request.get_json()
+    token = (data.get('token') or '').strip()
+    if not token:
+        return jsonify({'ok': False, 'error': 'Bot Token is required'}), 400
+    try:
+        import requests as req
+        resp = req.get(
+            f"https://api.telegram.org/bot{token}/getUpdates",
+            params={'limit': 100, 'allowed_updates': ['message']},
+            timeout=10
+        )
+        body = resp.json()
+        if not body.get('ok'):
+            return jsonify({'ok': False, 'error': body.get('description', 'Failed to get updates')})
+        chats = {}
+        for update in body.get('result', []):
+            msg = update.get('message') or update.get('channel_post')
+            if msg:
+                chat = msg['chat']
+                cid  = chat['id']
+                if chat['type'] in ('group', 'supergroup', 'channel'):
+                    chats[cid] = {
+                        'id':   cid,
+                        'name': chat.get('title', str(cid)),
+                        'type': chat['type'],
+                    }
+        return jsonify({'ok': True, 'chats': list(chats.values())})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)})
+
+
+@app.route('/api/test_telegram', methods=['POST'])
+def test_telegram():
+    data    = request.get_json()
+    token   = (data.get('token') or '').strip()
+    chat_id = (data.get('chat_id') or '').strip()
+    if not token or not chat_id:
+        return jsonify({'ok': False, 'error': 'Bot Token and Chat ID are required'}), 400
+    try:
+        resp = __import__('requests').post(
+            f"https://api.telegram.org/bot{token}/sendMessage",
+            json={"chat_id": chat_id, "text": "✅ WEYN TOOLS — Telegram connection test successful!"},
+            timeout=10
+        )
+        body = resp.json()
+        if body.get('ok'):
+            return jsonify({'ok': True})
+        return jsonify({'ok': False, 'error': body.get('description', 'Unknown error')})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)})
 
 
 @app.route('/api/stats')
@@ -71,6 +140,8 @@ def stats():
         while True:
             m       = weyn._web_state.get('method') or '1'
             running = weyn._web_state.get('running', False)
+            tg_status = weyn._web_state.get('tg_status', '')
+            tg_error  = weyn._web_state.get('tg_error', '')
             if m == '1':
                 payload = {
                     'running'    : running,
@@ -84,6 +155,8 @@ def stats():
                     'total'      : weyn._m1_total,
                     'verified'   : 0,
                     'recent_hits': list(weyn._m1_found_emails[-20:]),
+                    'tg_status'  : tg_status,
+                    'tg_error'   : tg_error,
                 }
             else:
                 with weyn._web_lock:
@@ -99,6 +172,8 @@ def stats():
                         'total'      : 0,
                         'verified'   : weyn._web_state.get('verified', 0),
                         'recent_hits': list(weyn._web_state.get('recent_hits', []))[-20:],
+                        'tg_status'  : tg_status,
+                        'tg_error'   : tg_error,
                     }
             yield f"data: {json.dumps(payload)}\n\n"
             time.sleep(0.5)
