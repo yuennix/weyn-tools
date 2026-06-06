@@ -36,15 +36,15 @@ B     = Style.BRIGHT
 
 ID_RANGES = [
     (1,           100000000,  2010),
-    (100000001,   279760000,  2011),
-    (279760001,   900990000,  2012),
-    (900990001,   1629010000, 2013),
-    (1629010001,  2400000000, 2014),
-    (2400000001,  3200000000, 2015),
+    (100000001,   500000000,  2011),
+    (500000001,   1100000000, 2012),
+    (1100000001,  1800000000, 2013),
+    (1800000001,  2500000000, 2014),
+    (2500000001,  3200000000, 2015),
     (3200000001,  3900000000, 2016),
-    (3900000001,  4500000000, 2017),
-    (4500000001,  5000000000, 2018),
-    (5000000001,  6000000000, 2019),
+    (3900000001,  4600000000, 2017),
+    (4600000001,  5400000000, 2018),
+    (5400000001,  6500000000, 2019),
 ]
 
 def gdate(user_id):
@@ -912,6 +912,9 @@ def _m1_save_hit(username, user, token, chat_id):
         reset_text = _m1_rest_v1(username)
         about      = _m1_get_about_account(user_id, username)
         join_date  = about.get("join_date") or year_label
+        _yr = re.search(r'\b(20\d{2})\b', join_date)
+        if _yr:
+            year_label = _yr.group(1)
         country_nm = about.get("country") or "-"
         country_fl = _m1_get_country_flag(country_nm)
         country    = f"{country_nm} {country_fl}".strip() if country_fl else country_nm
