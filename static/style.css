@@ -207,6 +207,105 @@ body {
   opacity: 0.3;
   cursor: not-allowed;
 }
+.chat-id-row {
+  display: flex;
+  gap: 6px;
+}
+.chat-id-row input {
+  flex: 1;
+}
+.btn-find {
+  flex-shrink: 0;
+  padding: 0 10px;
+  font-size: 14px;
+  background: rgba(0,188,212,0.08);
+  border: 1px solid var(--cyan);
+  color: var(--cyan);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-find:hover:not(:disabled) {
+  background: rgba(0,188,212,0.2);
+}
+.btn-find:disabled { opacity: 0.3; cursor: not-allowed; }
+.chat-results {
+  margin-top: 6px;
+}
+.chat-result-info { font-size: 11px; color: var(--text-dim); }
+.chat-result-err  { font-size: 11px; color: var(--red); }
+.chat-result-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 4px;
+  padding: 6px 8px;
+  margin-top: 4px;
+  font-size: 11px;
+}
+.chat-result-name { color: var(--cyan); font-weight: 600; flex: 1; }
+.chat-result-type { color: var(--text-dim); font-size: 10px; }
+.chat-result-id   { color: var(--yellow); font-family: monospace; }
+.chat-use-btn {
+  background: rgba(0,230,118,0.1);
+  border: 1px solid var(--green);
+  color: var(--green);
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+  letter-spacing: 1px;
+}
+.chat-use-btn:hover { background: rgba(0,230,118,0.2); }
+.btn-test {
+  width: 100%;
+  margin-top: 8px;
+  background: rgba(0, 188, 212, 0.08);
+  border-color: var(--cyan);
+  color: var(--cyan);
+  font-size: 11px;
+}
+.btn-test:hover:not(:disabled) {
+  background: rgba(0, 188, 212, 0.18);
+  box-shadow: 0 0 10px rgba(0, 188, 212, 0.25);
+}
+.test-status {
+  font-size: 11px;
+  margin-top: 6px;
+  min-height: 16px;
+  text-align: center;
+  letter-spacing: 0.5px;
+  color: var(--text-dim);
+}
+.test-status.ok   { color: var(--green); }
+.test-status.fail { color: var(--red); }
+.tg-status-bar {
+  font-size: 11px;
+  min-height: 14px;
+  margin-top: 6px;
+  text-align: center;
+  letter-spacing: 0.5px;
+}
+.tg-status-bar.tg-err { color: var(--red); }
+.tg-status-bar.tg-ok  { color: var(--green); }
+.btn-download {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  text-align: center;
+  text-decoration: none;
+  background: rgba(170, 0, 255, 0.08);
+  border-color: var(--magenta);
+  color: var(--magenta);
+  font-size: 11px;
+  box-sizing: border-box;
+}
+.btn-download:hover {
+  background: rgba(170, 0, 255, 0.18);
+  box-shadow: 0 0 10px rgba(170, 0, 255, 0.25);
+}
 
 /* ─── Status bar ─── */
 .status-bar {
