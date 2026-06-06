@@ -24,33 +24,21 @@ def start():
         if weyn._web_state.get('running'):
             return jsonify({'error': 'Already running'}), 400
         data          = request.get_json()
-        method        = str(data.get('method', '1'))
         token         = (data.get('token') or '').strip()
         chat_id       = (data.get('chat_id') or '').strip()
         min_followers = int(data.get('min_followers', 0) or 0)
-        year_choice   = None
 
         if not token or not chat_id:
             return jsonify({'error': 'Bot Token and Chat ID are required'}), 400
 
-        targets = {
-            '1': weyn.run_method1_web,
-            '2': weyn.run_method2_web,
-            '3': weyn.run_method3_web,
-            '4': weyn.run_method4_web,
-        }
-        fn = targets.get(method)
-        if not fn:
-            return jsonify({'error': 'Invalid method'}), 400
-
         _stop_event = threading.Event()
         _job_thread = threading.Thread(
-            target=fn,
-            args=(token, chat_id, year_choice, min_followers, _stop_event),
+            target=weyn.run_method1_web,
+            args=(token, chat_id, None, min_followers, _stop_event),
             daemon=True
         )
         _job_thread.start()
-    return jsonify({'status': 'started', 'method': method})
+    return jsonify({'status': 'started', 'method': '1'})
 
 
 @app.route('/api/stop', methods=['POST'])
