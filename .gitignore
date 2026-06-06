@@ -1,0 +1,10 @@
+tokens.txt
+google.txt
+weyn_hits.txt
+@weyn_hits.txt
+*.txt
+__pycache__/
+*.pyc
+*.pyo
+.cache/
+.pythonlibs/
