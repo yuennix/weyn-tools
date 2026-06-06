@@ -135,13 +135,11 @@ def format_hit(hit_num, username, email, followers, following, bio, year_label, 
 │  𝐅𝐨𝐥𝐥𝐨𝐰𝐞𝐫𝐬  ➤  {followers}
 │  𝐅𝐨𝐥𝐥𝐨𝐰𝐢𝐧𝐠  ➤  {following}
 │  𝐁𝐢𝐨        ➤  {bio}
-│  𝐘𝐞𝐚𝐫       ➤  {year_label}
 │  𝐑𝐞𝐬𝐞𝐭      ➤  {reset_text}
 │
 ├──〔 𝐀𝐁𝐎𝐔𝐓 𝐓𝐇𝐈𝐒 𝐀𝐂𝐂𝐎𝐔𝐍𝐓 〕───────────┤
 │
 ║ Date Joined    : {join_date}
-║ Account Year   : {year_label}
 ║ Country        : {country}
 │
 ├──〔 𝐏𝐑𝐎𝐅𝐈𝐋𝐄 𝐋𝐈𝐍𝐊 〕──────────────────┤
