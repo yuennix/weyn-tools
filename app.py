@@ -4,14 +4,19 @@ import time
 import threading
 from datetime import timedelta
 from flask import Flask, render_template, request, jsonify, Response, session, redirect, url_for
+from werkzeug.middleware.proxy_fix import ProxyFix
 import weyn
 import auth
 
 app = Flask(__name__)
-app.secret_key = os.environ.get('SESSION_SECRET', os.environ.get('SECRET_KEY', 'weyn-tools-secret-8x2k9p'))
+app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+
+app.secret_key = os.environ.get('SESSION_SECRET', 'weyn-tools-secret-8x2k9p')
+
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=365)
-app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_HTTPONLY']    = True
+app.config['SESSION_COOKIE_SAMESITE']   = 'Lax'
+app.config['SESSION_COOKIE_SECURE']     = False  # Flask runs behind HTTPS proxy; cookie itself is HTTP-internal
 
 auth.init_db()
 
