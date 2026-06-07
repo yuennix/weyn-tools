@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WEYN TOOLS — Admin</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  <style>
+    body { padding: 24px 16px; }
+
+    .admin-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .admin-title { font-size: 22px; letter-spacing: 4px; color: var(--cyan); }
+    .admin-sub   { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+    .admin-logout {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-family: inherit;
+      font-size: 11px;
+      letter-spacing: 2px;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: color .2s, border-color .2s;
+    }
+    .admin-logout:hover { color: var(--red); border-color: var(--red); }
+
+    .back-link {
+      font-size: 11px;
+      letter-spacing: 2px;
+      color: var(--muted);
+      text-decoration: none;
+      transition: color .2s;
+      margin-right: 12px;
+    }
+    .back-link:hover { color: var(--cyan); }
+
+    .filter-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    .filter-btn {
+      padding: 6px 16px;
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-family: inherit;
+      font-size: 11px;
+      letter-spacing: 2px;
+      border-radius: 20px;
+      cursor: pointer;
+      transition: all .2s;
+    }
+    .filter-btn.active, .filter-btn:hover {
+      background: var(--cyan);
+      color: var(--bg);
+      border-color: var(--cyan);
+    }
+
+    .keys-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .keys-table th {
+      text-align: left;
+      font-size: 10px;
+      letter-spacing: 2px;
+      color: var(--muted);
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .keys-table td {
+      padding: 12px 12px;
+      border-bottom: 1px solid rgba(255,255,255,.04);
+      font-size: 13px;
+      vertical-align: middle;
+    }
+
+    .keys-table tr:hover td { background: rgba(255,255,255,.02); }
+
+    .key-mono {
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      color: var(--cyan);
+      letter-spacing: 1px;
+    }
+
+    .badge-status {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 10px;
+      letter-spacing: 1px;
+      font-weight: 700;
+    }
+    .badge-pending  { background: rgba(255,200,0,.15); color: #ffc800; }
+    .badge-approved { background: rgba(0,255,128,.15); color: var(--green); }
+    .badge-expired  { background: rgba(255,255,255,.08); color: var(--muted); }
+    .badge-revoked  { background: rgba(255,60,60,.15); color: var(--red); }
+
+    .action-row {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .btn-sm {
+      padding: 5px 12px;
+      font-size: 11px;
+      letter-spacing: 1px;
+      border-radius: 5px;
+      border: none;
+      cursor: pointer;
+      font-family: inherit;
+      transition: opacity .2s;
+    }
+    .btn-sm:hover { opacity: .8; }
+    .btn-approve { background: var(--green); color: #000; }
+    .btn-revoke  { background: var(--red);   color: #fff; }
+    .btn-delete  { background: #333; color: var(--muted); }
+
+    .dur-input {
+      width: 60px;
+      background: var(--input-bg);
+      border: 1px solid var(--border);
+      color: var(--fg);
+      font-family: inherit;
+      font-size: 12px;
+      padding: 5px 8px;
+      border-radius: 5px;
+      outline: none;
+    }
+    .dur-input:focus { border-color: var(--cyan); }
+
+    .dur-unit {
+      background: var(--input-bg);
+      border: 1px solid var(--border);
+      color: var(--fg);
+      font-family: inherit;
+      font-size: 12px;
+      padding: 5px 8px;
+      border-radius: 5px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 48px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .section-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .section-card-head {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .count-badge {
+      background: rgba(0,230,255,.15);
+      color: var(--cyan);
+      font-size: 11px;
+      padding: 2px 10px;
+      border-radius: 20px;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      color: var(--fg);
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-size: 13px;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: all .3s;
+      z-index: 9999;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .toast.ok   { border-color: var(--green); color: var(--green); }
+    .toast.fail { border-color: var(--red);   color: var(--red); }
+
+    @media (max-width: 700px) {
+      .keys-table thead { display: none; }
+      .keys-table td { display: block; padding: 4px 12px; }
+      .keys-table td:first-child { padding-top: 12px; }
+      .keys-table td:last-child  { padding-bottom: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="admin-header">
+    <div>
+      <div class="admin-title">⚙ ADMIN PANEL</div>
+      <div class="admin-sub">WEYN TOOLS — Key Management</div>
+    </div>
+    <div>
+      <a class="back-link" href="/">← BACK TO APP</a>
+      <button class="admin-logout" onclick="adminLogout()">LOGOUT</button>
+    </div>
+  </div>
+
+  <div class="filter-row">
+    <button class="filter-btn active" onclick="filterKeys('all',this)">ALL</button>
+    <button class="filter-btn" onclick="filterKeys('pending',this)">PENDING</button>
+    <button class="filter-btn" onclick="filterKeys('approved',this)">APPROVED</button>
+    <button class="filter-btn" onclick="filterKeys('expired',this)">EXPIRED</button>
+    <button class="filter-btn" onclick="filterKeys('revoked',this)">REVOKED</button>
+  </div>
+
+  <div class="section-card">
+    <div class="section-card-head">
+      <span class="section-title" style="margin:0">ACCESS KEYS</span>
+      <span class="count-badge" id="countBadge">0</span>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="keys-table" id="keysTable">
+        <thead>
+          <tr>
+            <th>KEY</th>
+            <th>NAME</th>
+            <th>STATUS</th>
+            <th>EXPIRES</th>
+            <th>DEVICE BOUND</th>
+            <th>ACTIONS</th>
+          </tr>
+        </thead>
+        <tbody id="keysTbody"></tbody>
+      </table>
+      <div class="empty-state" id="emptyState" style="display:none;">No keys found.</div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    let allKeys = [];
+    let currentFilter = 'all';
+
+    async function loadKeys() {
+      const res  = await fetch('/admin/api/keys');
+      const data = await res.json();
+      allKeys = data.keys || [];
+      renderKeys();
+    }
+
+    function filterKeys(f, btn) {
+      currentFilter = f;
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderKeys();
+    }
+
+    function renderKeys() {
+      const keys = currentFilter === 'all'
+        ? allKeys
+        : allKeys.filter(k => k.status === currentFilter);
+
+      document.getElementById('countBadge').textContent = keys.length;
+
+      const tbody = document.getElementById('keysTbody');
+      const empty = document.getElementById('emptyState');
+
+      if (!keys.length) {
+        tbody.innerHTML = '';
+        empty.style.display = 'block';
+        return;
+      }
+      empty.style.display = 'none';
+
+      tbody.innerHTML = keys.map(k => {
+        const statusBadge = `<span class="badge-status badge-${k.status}">${k.status.toUpperCase()}</span>`;
+        const expires = k.expires_at
+          ? formatExpiry(k.expires_at, k.status)
+          : '<span style="color:var(--muted)">—</span>';
+        const device = k.device_id
+          ? `<span style="color:var(--green);font-size:11px;">● BOUND</span>`
+          : `<span style="color:var(--muted);font-size:11px;">○ free</span>`;
+
+        const actions = buildActions(k);
+        return `<tr data-key="${esc(k.key)}" data-status="${k.status}">
+          <td><span class="key-mono">${esc(k.key)}</span></td>
+          <td>${esc(k.name)}</td>
+          <td>${statusBadge}</td>
+          <td>${expires}</td>
+          <td>${device}</td>
+          <td>${actions}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    function buildActions(k) {
+      let html = '<div class="action-row">';
+      if (k.status === 'pending' || k.status === 'revoked' || k.status === 'expired') {
+        html += `
+          <input class="dur-input" type="number" min="1" value="60" id="dur_${esc(k.key)}" />
+          <select class="dur-unit" id="unit_${esc(k.key)}">
+            <option value="1">mins</option>
+            <option value="60">hours</option>
+          </select>
+          <button class="btn-sm btn-approve" onclick="approveKey('${esc(k.key)}')">APPROVE</button>`;
+      }
+      if (k.status === 'approved') {
+        html += `<button class="btn-sm btn-revoke" onclick="revokeKey('${esc(k.key)}')">REVOKE</button>`;
+      }
+      html += `<button class="btn-sm btn-delete" onclick="deleteKey('${esc(k.key)}')">DELETE</button>`;
+      html += '</div>';
+      return html;
+    }
+
+    function formatExpiry(isoStr, status) {
+      const d = new Date(isoStr + 'Z');
+      const now = new Date();
+      const diff = d - now;
+      if (status === 'approved' && diff > 0) {
+        const mins = Math.floor(diff / 60000);
+        const hrs  = Math.floor(mins / 60);
+        const rem  = mins % 60;
+        const label = hrs > 0 ? `${hrs}h ${rem}m left` : `${mins}m left`;
+        return `<span style="color:var(--green);font-size:12px;">${label}</span>`;
+      }
+      return `<span style="color:var(--muted);font-size:12px;">${d.toLocaleString()}</span>`;
+    }
+
+    async function approveKey(key) {
+      const durEl  = document.getElementById('dur_' + key);
+      const unitEl = document.getElementById('unit_' + key);
+      const mins   = parseInt(durEl.value) * parseInt(unitEl.value);
+      if (!mins || mins < 1) { showToast('Enter a valid duration', 'fail'); return; }
+
+      const res  = await fetch('/admin/api/approve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key, duration_minutes: mins })
+      });
+      const data = await res.json();
+      if (data.ok) { showToast('Key approved ✓', 'ok'); loadKeys(); }
+      else showToast('Error: ' + data.error, 'fail');
+    }
+
+    async function revokeKey(key) {
+      if (!confirm('Revoke this key? The user will lose access immediately.')) return;
+      const res  = await fetch('/admin/api/revoke', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key })
+      });
+      const data = await res.json();
+      if (data.ok) { showToast('Key revoked', 'ok'); loadKeys(); }
+      else showToast('Error: ' + data.error, 'fail');
+    }
+
+    async function deleteKey(key) {
+      if (!confirm('Permanently delete this key?')) return;
+      const res  = await fetch('/admin/api/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key })
+      });
+      const data = await res.json();
+      if (data.ok) { showToast('Key deleted', 'ok'); loadKeys(); }
+      else showToast('Error: ' + data.error, 'fail');
+    }
+
+    async function adminLogout() {
+      await fetch('/admin/logout', { method: 'POST' });
+      window.location.href = '/admin';
+    }
+
+    function showToast(msg, type) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.className = 'toast show ' + (type || '');
+      setTimeout(() => t.className = 'toast', 2800);
+    }
+
+    function esc(s) {
+      return String(s)
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+        .replace(/'/g,'&#39;');
+    }
+
+    loadKeys();
+    setInterval(loadKeys, 10000);
+  </script>
+</body>
+</html>

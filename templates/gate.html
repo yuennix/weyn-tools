@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WEYN TOOLS — Access</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  <style>
+    body { display:flex; align-items:center; justify-content:center; min-height:100vh; }
+
+    .gate-wrap {
+      width: 100%;
+      max-width: 440px;
+      padding: 0 16px;
+    }
+
+    .gate-header {
+      text-align: center;
+      margin-bottom: 36px;
+    }
+
+    .gate-label {
+      font-size: 11px;
+      letter-spacing: 4px;
+      color: var(--cyan);
+      margin-bottom: 10px;
+    }
+
+    .gate-title {
+      font-size: 56px;
+      font-weight: 900;
+      letter-spacing: 6px;
+      color: var(--fg);
+      line-height: 1;
+      margin-bottom: 12px;
+    }
+
+    .gate-sub {
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .gate-admin-link {
+      display: inline-block;
+      margin-top: 12px;
+      font-size: 11px;
+      letter-spacing: 2px;
+      color: var(--muted);
+      text-decoration: none;
+      transition: color .2s;
+    }
+    .gate-admin-link:hover { color: var(--cyan); }
+
+    .tab-row {
+      display: flex;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+      margin-bottom: 20px;
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 12px;
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-family: inherit;
+      font-size: 12px;
+      letter-spacing: 2px;
+      cursor: pointer;
+      transition: background .2s, color .2s;
+    }
+    .tab-btn.active {
+      background: var(--cyan);
+      color: var(--bg);
+      font-weight: 700;
+    }
+
+    .gate-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 24px;
+    }
+
+    .gate-card label {
+      display: block;
+      font-size: 11px;
+      letter-spacing: 2px;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .gate-card input {
+      width: 100%;
+      box-sizing: border-box;
+      background: var(--input-bg);
+      border: 1px solid var(--border);
+      color: var(--fg);
+      font-family: 'Courier New', monospace;
+      font-size: 14px;
+      padding: 12px 14px;
+      border-radius: 6px;
+      outline: none;
+      transition: border-color .2s;
+      margin-bottom: 6px;
+    }
+    .gate-card input:focus { border-color: var(--cyan); }
+
+    .gate-msg {
+      font-size: 12px;
+      min-height: 18px;
+      margin-bottom: 16px;
+      padding: 0 2px;
+    }
+    .gate-msg.ok   { color: var(--green); }
+    .gate-msg.fail { color: var(--red); }
+    .gate-msg.info { color: var(--cyan); }
+
+    .btn-full {
+      width: 100%;
+      padding: 14px;
+      font-size: 13px;
+      letter-spacing: 2px;
+    }
+
+    .key-display {
+      background: var(--input-bg);
+      border: 1px solid var(--cyan);
+      border-radius: 6px;
+      padding: 14px;
+      text-align: center;
+      font-family: 'Courier New', monospace;
+      font-size: 16px;
+      color: var(--cyan);
+      letter-spacing: 2px;
+      margin-bottom: 8px;
+      word-break: break-all;
+    }
+
+    .key-note {
+      font-size: 11px;
+      color: var(--muted);
+      text-align: center;
+      line-height: 1.6;
+    }
+
+    .tab-pane { display: none; }
+    .tab-pane.active { display: block; }
+  </style>
+</head>
+<body>
+  <div class="gate-wrap">
+
+    <div class="gate-header">
+      <div class="gate-label">ACCESS REQUIRED</div>
+      <div class="gate-title">WEYN</div>
+      <div class="gate-sub">Enter your approved key or generate a new one below.</div>
+      <a class="gate-admin-link" href="/admin">ADMIN PANEL →</a>
+    </div>
+
+    <div class="tab-row">
+      <button class="tab-btn active" id="tabEnter" onclick="switchTab('enter')">ENTER KEY</button>
+      <button class="tab-btn" id="tabGen" onclick="switchTab('gen')">GENERATE KEY</button>
+    </div>
+
+    <!-- Enter Key -->
+    <div class="gate-card tab-pane active" id="paneEnter">
+      <label>ACCESS KEY</label>
+      <input type="text" id="keyInput" placeholder="WEYN-XXXX-XXXX-XXXX" autocomplete="off" spellcheck="false" />
+      <div class="gate-msg" id="enterMsg"></div>
+      <button class="btn btn-start btn-full" id="validateBtn" onclick="validateKey()">VALIDATE KEY</button>
+    </div>
+
+    <!-- Generate Key -->
+    <div class="gate-card tab-pane" id="paneGen">
+      <label>YOUR NAME</label>
+      <input type="text" id="nameInput" placeholder="Enter your name" autocomplete="off" maxlength="40" />
+      <div class="gate-msg" id="genMsg"></div>
+      <button class="btn btn-start btn-full" id="genBtn" onclick="generateKey()">GENERATE KEY</button>
+
+      <div id="genResult" style="display:none; margin-top:20px;">
+        <div class="key-display" id="genKeyDisplay"></div>
+        <div class="key-note">⏳ Your key is pending admin approval.<br>Copy it and use it in the <strong>Enter Key</strong> tab once approved.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    function getDeviceId() {
+      let id = localStorage.getItem('weyn_device_id');
+      if (!id) {
+        id = 'DEV-' + Math.random().toString(36).slice(2,10).toUpperCase() + '-' + Date.now().toString(36).toUpperCase();
+        localStorage.setItem('weyn_device_id', id);
+      }
+      return id;
+    }
+
+    function switchTab(tab) {
+      document.getElementById('paneEnter').classList.toggle('active', tab === 'enter');
+      document.getElementById('paneGen').classList.toggle('active', tab === 'gen');
+      document.getElementById('tabEnter').classList.toggle('active', tab === 'enter');
+      document.getElementById('tabGen').classList.toggle('active', tab === 'gen');
+    }
+
+    async function validateKey() {
+      const key = document.getElementById('keyInput').value.trim().toUpperCase();
+      const msg = document.getElementById('enterMsg');
+      const btn = document.getElementById('validateBtn');
+      if (!key) { setMsg(msg, 'Enter your access key.', 'fail'); return; }
+
+      btn.disabled = true;
+      setMsg(msg, 'Validating…', 'info');
+
+      try {
+        const res  = await fetch('/api/validate_key', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key, device_id: getDeviceId() })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          setMsg(msg, '✓ Access granted! Loading…', 'ok');
+          setTimeout(() => window.location.href = '/', 600);
+        } else {
+          setMsg(msg, '✗ ' + data.error, 'fail');
+          btn.disabled = false;
+        }
+      } catch(e) {
+        setMsg(msg, '✗ Connection error', 'fail');
+        btn.disabled = false;
+      }
+    }
+
+    async function generateKey() {
+      const name = document.getElementById('nameInput').value.trim();
+      const msg  = document.getElementById('genMsg');
+      const btn  = document.getElementById('genBtn');
+      if (!name) { setMsg(msg, 'Enter your name first.', 'fail'); return; }
+
+      btn.disabled = true;
+      setMsg(msg, 'Generating…', 'info');
+
+      try {
+        const res  = await fetch('/api/generate_key', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          document.getElementById('genKeyDisplay').textContent = data.key;
+          document.getElementById('genResult').style.display = 'block';
+          setMsg(msg, '', '');
+        } else {
+          setMsg(msg, '✗ ' + data.error, 'fail');
+        }
+      } catch(e) {
+        setMsg(msg, '✗ Connection error', 'fail');
+      }
+      btn.disabled = false;
+    }
+
+    function setMsg(el, text, type) {
+      el.textContent = text;
+      el.className = 'gate-msg' + (type ? ' ' + type : '');
+    }
+
+    document.getElementById('keyInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') validateKey();
+    });
+    document.getElementById('nameInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') generateKey();
+    });
+  </script>
+</body>
+</html>

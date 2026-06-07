@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WEYN TOOLS — Admin Login</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  <style>
+    body { display:flex; align-items:center; justify-content:center; min-height:100vh; }
+
+    .login-wrap {
+      width: 100%;
+      max-width: 360px;
+      padding: 0 16px;
+    }
+
+    .login-header {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    .login-label {
+      font-size: 11px;
+      letter-spacing: 4px;
+      color: var(--cyan);
+      margin-bottom: 10px;
+    }
+
+    .login-title {
+      font-size: 32px;
+      font-weight: 900;
+      letter-spacing: 4px;
+      color: var(--fg);
+    }
+
+    .login-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 28px 24px;
+    }
+
+    .login-card label {
+      display: block;
+      font-size: 11px;
+      letter-spacing: 2px;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .login-card input {
+      width: 100%;
+      box-sizing: border-box;
+      background: var(--input-bg);
+      border: 1px solid var(--border);
+      color: var(--fg);
+      font-family: 'Courier New', monospace;
+      font-size: 14px;
+      padding: 12px 14px;
+      border-radius: 6px;
+      outline: none;
+      transition: border-color .2s;
+      margin-bottom: 8px;
+    }
+    .login-card input:focus { border-color: var(--cyan); }
+
+    .login-err {
+      font-size: 12px;
+      color: var(--red);
+      margin-bottom: 14px;
+      min-height: 18px;
+    }
+
+    .btn-full {
+      width: 100%;
+      padding: 14px;
+      font-size: 13px;
+      letter-spacing: 2px;
+    }
+
+    .back-link {
+      display: block;
+      text-align: center;
+      margin-top: 16px;
+      font-size: 11px;
+      letter-spacing: 2px;
+      color: var(--muted);
+      text-decoration: none;
+      transition: color .2s;
+    }
+    .back-link:hover { color: var(--cyan); }
+  </style>
+</head>
+<body>
+  <div class="login-wrap">
+    <div class="login-header">
+      <div class="login-label">RESTRICTED</div>
+      <div class="login-title">⚙ ADMIN</div>
+    </div>
+
+    <div class="login-card">
+      <form method="POST" action="/admin">
+        <label>PASSWORD</label>
+        <input type="password" name="password" placeholder="Enter admin password" autofocus autocomplete="off" />
+        <div class="login-err">{% if error %}✗ {{ error }}{% endif %}</div>
+        <button type="submit" class="btn btn-start btn-full">LOGIN</button>
+      </form>
+    </div>
+
+    <a class="back-link" href="/gate">← BACK TO GATE</a>
+  </div>
+</body>
+</html>

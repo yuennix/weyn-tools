@@ -2,23 +2,155 @@ import os
 import json
 import time
 import threading
-from flask import Flask, render_template, request, jsonify, Response
+from flask import Flask, render_template, request, jsonify, Response, session, redirect, url_for
 import weyn
+import auth
 
 app = Flask(__name__)
+app.secret_key = os.environ.get('SECRET_KEY', 'weyn-tools-secret-8x2k9p')
+
+auth.init_db()
 
 _job_thread = None
 _stop_event = None
 _job_lock   = threading.Lock()
 
+ADMIN_PASSWORD = 'yuennix'
+
+
+# ── Auth helpers ─────────────────────────────────────────────────────────────
+
+def is_authenticated():
+    key   = session.get('auth_key')
+    token = session.get('auth_token')
+    return auth.verify_session(key, token)
+
+
+def is_admin():
+    return session.get('admin_logged_in') is True
+
+
+# ── Gate / Auth routes ────────────────────────────────────────────────────────
+
+@app.route('/gate')
+def gate():
+    if is_authenticated():
+        return redirect('/')
+    return render_template('gate.html')
+
+
+@app.route('/api/generate_key', methods=['POST'])
+def api_generate_key():
+    data = request.get_json()
+    name = (data.get('name') or '').strip()
+    if not name:
+        return jsonify({'ok': False, 'error': 'Name is required'})
+    if len(name) > 40:
+        return jsonify({'ok': False, 'error': 'Name too long'})
+    key = auth.generate_key(name)
+    return jsonify({'ok': True, 'key': key})
+
+
+@app.route('/api/validate_key', methods=['POST'])
+def api_validate_key():
+    data      = request.get_json()
+    key       = (data.get('key') or '').strip().upper()
+    device_id = (data.get('device_id') or '').strip()
+    if not key or not device_id:
+        return jsonify({'ok': False, 'error': 'Missing key or device ID'})
+    ok, result = auth.validate_key(key, device_id)
+    if ok:
+        session['auth_key']   = key
+        session['auth_token'] = result
+        return jsonify({'ok': True})
+    return jsonify({'ok': False, 'error': result})
+
+
+@app.route('/api/logout', methods=['POST'])
+def api_logout():
+    session.pop('auth_key', None)
+    session.pop('auth_token', None)
+    return jsonify({'ok': True})
+
+
+# ── Admin routes ──────────────────────────────────────────────────────────────
+
+@app.route('/admin', methods=['GET', 'POST'])
+def admin():
+    if request.method == 'POST':
+        pw = (request.form.get('password') or '').strip()
+        if pw == ADMIN_PASSWORD:
+            session['admin_logged_in'] = True
+            return redirect('/admin')
+        return render_template('admin_login.html', error='Wrong password')
+    if not is_admin():
+        return render_template('admin_login.html', error=None)
+    return render_template('admin.html')
+
+
+@app.route('/admin/logout', methods=['POST'])
+def admin_logout():
+    session.pop('admin_logged_in', None)
+    return jsonify({'ok': True})
+
+
+@app.route('/admin/api/keys')
+def admin_api_keys():
+    if not is_admin():
+        return jsonify({'error': 'Unauthorized'}), 403
+    return jsonify({'keys': auth.get_all_keys()})
+
+
+@app.route('/admin/api/approve', methods=['POST'])
+def admin_api_approve():
+    if not is_admin():
+        return jsonify({'error': 'Unauthorized'}), 403
+    data = request.get_json()
+    key  = (data.get('key') or '').strip()
+    mins = int(data.get('duration_minutes', 60))
+    if not key or mins < 1:
+        return jsonify({'ok': False, 'error': 'Invalid input'})
+    auth.approve_key(key, mins)
+    return jsonify({'ok': True})
+
+
+@app.route('/admin/api/revoke', methods=['POST'])
+def admin_api_revoke():
+    if not is_admin():
+        return jsonify({'error': 'Unauthorized'}), 403
+    data = request.get_json()
+    key  = (data.get('key') or '').strip()
+    if not key:
+        return jsonify({'ok': False, 'error': 'Key required'})
+    auth.revoke_key(key)
+    return jsonify({'ok': True})
+
+
+@app.route('/admin/api/delete', methods=['POST'])
+def admin_api_delete():
+    if not is_admin():
+        return jsonify({'error': 'Unauthorized'}), 403
+    data = request.get_json()
+    key  = (data.get('key') or '').strip()
+    if not key:
+        return jsonify({'ok': False, 'error': 'Key required'})
+    auth.delete_key(key)
+    return jsonify({'ok': True})
+
+
+# ── Main app routes (protected) ───────────────────────────────────────────────
 
 @app.route('/')
 def index():
+    if not is_authenticated():
+        return redirect('/gate')
     return render_template('index.html')
 
 
 @app.route('/api/start', methods=['POST'])
 def start():
+    if not is_authenticated():
+        return jsonify({'error': 'Unauthorized'}), 403
     global _job_thread, _stop_event
     with _job_lock:
         if weyn._web_state.get('running'):
@@ -43,6 +175,8 @@ def start():
 
 @app.route('/api/stop', methods=['POST'])
 def stop():
+    if not is_authenticated():
+        return jsonify({'error': 'Unauthorized'}), 403
     global _stop_event
     with _job_lock:
         if _stop_event:
@@ -54,7 +188,8 @@ def stop():
 
 @app.route('/api/download_hits')
 def download_hits():
-    import os
+    if not is_authenticated():
+        return redirect('/gate')
     path = weyn.HITS_FILE
     if not os.path.exists(path):
         return ('No hits have been saved yet.', 404)
@@ -68,6 +203,8 @@ def download_hits():
 
 @app.route('/api/find_chat_id', methods=['POST'])
 def find_chat_id():
+    if not is_authenticated():
+        return jsonify({'ok': False, 'error': 'Unauthorized'}), 403
     data  = request.get_json()
     token = (data.get('token') or '').strip()
     if not token:
@@ -101,10 +238,13 @@ def find_chat_id():
 
 @app.route('/api/stats')
 def stats():
+    if not is_authenticated():
+        return jsonify({'error': 'Unauthorized'}), 403
+
     def generate():
         while True:
-            m       = weyn._web_state.get('method') or '1'
-            running = weyn._web_state.get('running', False)
+            m         = weyn._web_state.get('method') or '1'
+            running   = weyn._web_state.get('running', False)
             tg_status = weyn._web_state.get('tg_status', '')
             tg_error  = weyn._web_state.get('tg_error', '')
             if m == '1':
