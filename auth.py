@@ -1,5 +1,4 @@
 import sqlite3
-import secrets
 import string
 import random
 from datetime import datetime, timedelta
@@ -17,14 +16,13 @@ def init_db():
     conn = get_db()
     conn.execute('''
         CREATE TABLE IF NOT EXISTS access_keys (
-            key           TEXT PRIMARY KEY,
-            name          TEXT NOT NULL,
-            status        TEXT NOT NULL DEFAULT 'pending',
-            created_at    TEXT NOT NULL,
-            approved_at   TEXT,
-            expires_at    TEXT,
-            device_id     TEXT,
-            session_token TEXT
+            key         TEXT PRIMARY KEY,
+            name        TEXT NOT NULL,
+            status      TEXT NOT NULL DEFAULT 'pending',
+            created_at  TEXT NOT NULL,
+            approved_at TEXT,
+            expires_at  TEXT,
+            device_id   TEXT
         )
     ''')
     conn.commit()
@@ -79,31 +77,28 @@ def validate_key(key, device_id):
             conn.close()
             return False, 'Key is already bound to another device'
 
-        session_token = secrets.token_hex(32)
         conn.execute(
-            'UPDATE access_keys SET device_id=?, session_token=? WHERE key=?',
-            (device_id, session_token, key)
+            'UPDATE access_keys SET device_id=? WHERE key=?',
+            (device_id, key)
         )
         conn.commit()
         conn.close()
-        return True, session_token
+        return True, None
 
     conn.close()
     return False, 'Unknown key state'
 
 
-def verify_session(key, session_token):
-    if not key or not session_token:
+def check_key_valid(key):
+    """Used on every request — just checks the key is still approved & not expired."""
+    if not key:
         return False
     conn = get_db()
-    row = conn.execute(
-        'SELECT * FROM access_keys WHERE key=? AND session_token=?',
-        (key, session_token)
-    ).fetchone()
+    row = conn.execute('SELECT * FROM access_keys WHERE key=?', (key,)).fetchone()
     if not row:
         conn.close()
         return False
-    if row['status'] in ('revoked', 'expired'):
+    if row['status'] in ('revoked', 'pending', 'expired'):
         conn.close()
         return False
     if row['expires_at']:
@@ -136,7 +131,7 @@ def approve_key(key, duration_minutes):
     expires_at = (datetime.utcnow() + timedelta(minutes=duration_minutes)).isoformat()
     conn = get_db()
     conn.execute(
-        'UPDATE access_keys SET status=?, approved_at=?, expires_at=?, device_id=NULL, session_token=NULL WHERE key=?',
+        'UPDATE access_keys SET status=?, approved_at=?, expires_at=?, device_id=NULL WHERE key=?',
         ('approved', datetime.utcnow().isoformat(), expires_at, key)
     )
     conn.commit()
@@ -145,10 +140,7 @@ def approve_key(key, duration_minutes):
 
 def revoke_key(key):
     conn = get_db()
-    conn.execute(
-        'UPDATE access_keys SET status=?, session_token=NULL WHERE key=?',
-        ('revoked', key)
-    )
+    conn.execute('UPDATE access_keys SET status=? WHERE key=?', ('revoked', key))
     conn.commit()
     conn.close()
 

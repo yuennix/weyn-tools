@@ -2,12 +2,16 @@ import os
 import json
 import time
 import threading
+from datetime import timedelta
 from flask import Flask, render_template, request, jsonify, Response, session, redirect, url_for
 import weyn
 import auth
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'weyn-tools-secret-8x2k9p')
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=365)
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_HTTPONLY'] = True
 
 auth.init_db()
 
@@ -21,9 +25,7 @@ ADMIN_PASSWORD = 'yuennix'
 # ── Auth helpers ─────────────────────────────────────────────────────────────
 
 def is_authenticated():
-    key   = session.get('auth_key')
-    token = session.get('auth_token')
-    return auth.verify_session(key, token)
+    return auth.check_key_valid(session.get('auth_key'))
 
 
 def is_admin():
@@ -60,8 +62,8 @@ def api_validate_key():
         return jsonify({'ok': False, 'error': 'Missing key or device ID'})
     ok, result = auth.validate_key(key, device_id)
     if ok:
-        session['auth_key']   = key
-        session['auth_token'] = result
+        session.permanent = True
+        session['auth_key'] = key
         return jsonify({'ok': True})
     return jsonify({'ok': False, 'error': result})
 
@@ -69,7 +71,6 @@ def api_validate_key():
 @app.route('/api/logout', methods=['POST'])
 def api_logout():
     session.pop('auth_key', None)
-    session.pop('auth_token', None)
     return jsonify({'ok': True})
 
 
