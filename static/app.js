@@ -1,26 +1,35 @@
 (() => {
-  const selectedMethod = '1';
+  let selectedMethod = '1';
   let evtSource      = null;
   let knownHits      = new Set();
   let totalHits      = 0;
   let countdownTimer = null;
   let _myKey         = '';
 
-  // ── DOM refs ──
   const startBtn    = document.getElementById('startBtn');
   const stopBtn     = document.getElementById('stopBtn');
   const findChatBtn = document.getElementById('findChatBtn');
   const chatResults = document.getElementById('chatResults');
   const statusBar   = document.getElementById('statusBar');
-  const methodBadge = document.getElementById('methodBadge');
   const hitsFeed    = document.getElementById('hitsFeed');
   const hitsCount   = document.getElementById('hitsCount');
   const tgStatusEl  = document.getElementById('tgStatus');
   const countdownEl = document.getElementById('keyCountdown');
+  const methodBadge = document.getElementById('methodBadge');
+  const yearBadge   = document.getElementById('yearBadge');
+  const minFollowersGroup = document.getElementById('minFollowersGroup');
+
+  const M1_STAT_LABELS = {
+    hits: 'HITS', good: 'GOOD INSTA', bad_insta: 'BAD INSTA',
+    bad_email: 'BAD EMAIL', taken: 'TAKEN', limit: 'RATE LIMIT', total: 'TOTAL SCANNED'
+  };
+  const M2_STAT_LABELS = {
+    hits: 'HITS', good: '', bad_insta: 'BAD LOGIN',
+    bad_email: 'IP BLOCK', taken: '', limit: '', total: 'TOTAL SCANNED'
+  };
 
   const statIds = ['hits','good','bad_insta','bad_email','taken','limit','total'];
 
-  // ── Persist token & chat_id ──
   const tokenEl  = document.getElementById('token');
   const chatIdEl = document.getElementById('chat_id');
   if (localStorage.getItem('tg_token'))   tokenEl.value  = localStorage.getItem('tg_token');
@@ -33,6 +42,40 @@
   chatIdEl.addEventListener('input',  saveChatId);
   chatIdEl.addEventListener('change', saveChatId);
   chatIdEl.addEventListener('paste',  () => setTimeout(saveChatId, 50));
+
+  // ── Method selector ──
+  window.selectMethod = function(m) {
+    selectedMethod = m;
+    document.querySelectorAll('.method-btn').forEach(b => b.classList.remove('active'));
+    const btn = document.getElementById('methodBtn' + m);
+    if (btn) btn.classList.add('active');
+    if (methodBadge) methodBadge.textContent = 'M' + m;
+    if (yearBadge) {
+      yearBadge.textContent = m === '2' ? 'Locked • 2010 – 2013' : 'Random • 2013 – 2019';
+    }
+    if (minFollowersGroup) {
+      minFollowersGroup.style.display = m === '2' ? 'none' : '';
+    }
+    updateStatLabels(m);
+  };
+
+  function updateStatLabels(m) {
+    const labels = m === '2' ? M2_STAT_LABELS : M1_STAT_LABELS;
+    statIds.forEach(key => {
+      const card = document.getElementById('s-' + key);
+      if (!card) return;
+      const labelEl = card.closest('.stat-card') && card.closest('.stat-card').querySelector('.stat-label');
+      if (!labelEl) return;
+      const lbl = labels[key];
+      const cardEl = card.closest('.stat-card');
+      if (m === '2' && !lbl) {
+        cardEl.style.display = 'none';
+      } else {
+        cardEl.style.display = '';
+        labelEl.textContent = lbl || M1_STAT_LABELS[key];
+      }
+    });
+  }
 
   // ── Tab switching ──
   window.switchTab = function(tab) {
@@ -77,7 +120,6 @@
     countdownTimer = setInterval(tick, 1000);
   }
 
-  // ── Copy key ──
   window.copyKey = function() {
     if (!_myKey) return;
     const btn = document.getElementById('copyKeyBtn');
@@ -91,7 +133,6 @@
     });
   };
 
-  // ── Revoke device ──
   window.revokeDevice = async function() {
     const btn = document.getElementById('revokeBtn');
     if (!confirm('This will unbind your key from this device. You will be logged out and can log in from a different device. Continue?')) return;
@@ -116,25 +157,23 @@
     }
   };
 
-  // ── Logout ──
   window.logout = async function() {
     localStorage.removeItem('weyn_auth_key');
     await fetch('/api/logout', { method: 'POST' });
     window.location.href = '/gate';
   };
 
-  // ── SSE stream (always running — updates DOM regardless of active tab) ──
+  // ── SSE ──
   function startSSE() {
     if (evtSource) evtSource.close();
     evtSource = new EventSource('/api/stats');
     evtSource.onmessage = (e) => {
-      const d = JSON.parse(e.data);
-      updateStats(d);
-      updateHits(d.recent_hits || []);
-      setRunning(d.running);
-    };
-    evtSource.onerror = () => {
-      // browser handles reconnect automatically
+      try {
+        const d = JSON.parse(e.data);
+        updateStats(d);
+        updateHits(d.recent_hits || []);
+        setRunning(d.running);
+      } catch (_) {}
     };
   }
 
@@ -157,35 +196,33 @@
       el.textContent = newVal;
       if (newVal > oldVal) {
         const card = el.closest('.stat-card');
-        card.classList.add('bump');
-        setTimeout(() => card.classList.remove('bump'), 300);
+        if (card) { card.classList.add('bump'); setTimeout(() => card.classList.remove('bump'), 300); }
       }
     });
-    methodBadge.textContent = 'M1';
-    // Flash the LIVE STATS tab when running and stats change
+    if (methodBadge) methodBadge.textContent = 'M' + (d.method || selectedMethod);
     const statsTab = document.getElementById('tabStats');
     if (d.running && statsTab && !statsTab.classList.contains('active')) {
       statsTab.classList.add('live');
-    } else {
-      statsTab && statsTab.classList.remove('live');
+    } else if (statsTab) {
+      statsTab.classList.remove('live');
     }
   }
 
   function updateHits(hits) {
     if (!hits || hits.length === 0) return;
-    hits.forEach(email => {
-      if (knownHits.has(email)) return;
-      knownHits.add(email);
+    hits.forEach(entry => {
+      if (knownHits.has(entry)) return;
+      knownHits.add(entry);
       totalHits++;
       hitsCount.textContent = totalHits;
-      const username = email.includes('@') ? email.split('@')[0] : email;
+      const username = entry.includes('@') ? entry.split('@')[0] : entry;
       const empty = hitsFeed.querySelector('.hits-empty');
       if (empty) empty.remove();
       const card = document.createElement('div');
       card.className = 'hit-card';
       card.innerHTML = `
         <div class="hit-username">@${escHtml(username)}</div>
-        <div class="hit-email">${escHtml(email)}</div>
+        <div class="hit-email">${escHtml(entry)}</div>
         <div class="hit-meta">
           <a href="https://www.instagram.com/${escHtml(username)}" target="_blank"
              style="color:var(--cyan);text-decoration:none;">instagram.com/${escHtml(username)}</a>
@@ -217,7 +254,7 @@
   startBtn.addEventListener('click', async () => {
     const token         = tokenEl.value.trim();
     const chat_id       = chatIdEl.value.trim();
-    const min_followers = document.getElementById('min_followers').value;
+    const min_followers = document.getElementById('min_followers') ? document.getElementById('min_followers').value : 0;
     if (!token || !chat_id) { alert('Bot Token and Chat ID are required.'); return; }
 
     knownHits.clear(); totalHits = 0;
@@ -278,7 +315,6 @@
     findChatBtn.disabled = false;
   });
 
-  // ── Load revoke device visibility (global setting AND per-user permission) ──
   async function loadRevokeVisibility() {
     try {
       const [s, k] = await Promise.all([
@@ -291,6 +327,7 @@
   }
 
   // ── Init ──
+  selectMethod('1');
   startSSE();
   loadKeyInfo();
   loadRevokeVisibility();

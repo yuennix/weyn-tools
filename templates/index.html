@@ -50,11 +50,20 @@
       </div>
 
       <div class="form-group">
-        <label>YEAR RANGE</label>
-        <div class="year-badge">Random • 2013 – 2019</div>
+        <label>METHOD</label>
+        <div class="method-selector">
+          <button id="methodBtn1" class="method-btn active" onclick="selectMethod('1')">METHOD 1</button>
+          <button id="methodBtn2" class="method-btn" onclick="selectMethod('2')">METHOD 2</button>
+          <span id="methodBadge" class="method-badge">M1</span>
+        </div>
       </div>
 
       <div class="form-group">
+        <label>YEAR RANGE</label>
+        <div id="yearBadge" class="year-badge">Random • 2013 – 2019</div>
+      </div>
+
+      <div class="form-group" id="minFollowersGroup">
         <label>MIN FOLLOWERS</label>
         <input type="number" id="min_followers" value="0" min="0" />
       </div>

@@ -207,19 +207,27 @@ def start():
         data          = request.get_json()
         token         = (data.get('token') or '').strip()
         chat_id       = (data.get('chat_id') or '').strip()
+        method        = str(data.get('method', '1')).strip()
         min_followers = int(data.get('min_followers', 0) or 0)
 
         if not token or not chat_id:
             return jsonify({'error': 'Bot Token and Chat ID are required'}), 400
 
         _stop_event = threading.Event()
-        _job_thread = threading.Thread(
-            target=weyn.run_method1_web,
-            args=(token, chat_id, None, min_followers, _stop_event),
-            daemon=True
-        )
+        if method == '2':
+            _job_thread = threading.Thread(
+                target=weyn.run_method2_web,
+                args=(token, chat_id, _stop_event),
+                daemon=True
+            )
+        else:
+            _job_thread = threading.Thread(
+                target=weyn.run_method1_web,
+                args=(token, chat_id, None, min_followers, _stop_event),
+                daemon=True
+            )
         _job_thread.start()
-    return jsonify({'status': 'started', 'method': '1'})
+    return jsonify({'status': 'started', 'method': method})
 
 
 @app.route('/api/stop', methods=['POST'])
@@ -324,21 +332,39 @@ def stats():
     def generate():
         while True:
             running   = weyn._web_state.get('running', False)
+            method    = weyn._web_state.get('method', '1')
             tg_status = weyn._web_state.get('tg_status', '')
             tg_error  = weyn._web_state.get('tg_error', '')
-            payload = {
-                'running'    : running,
-                'hits'       : weyn._m1_hits,
-                'good'       : weyn._m1_good_insta,
-                'bad_insta'  : weyn._m1_bad_insta,
-                'bad_email'  : weyn._m1_bad_email,
-                'taken'      : weyn._m1_taken,
-                'limit'      : weyn._m1_limit,
-                'total'      : weyn._m1_total,
-                'recent_hits': list(weyn._m1_found_emails[-20:]),
-                'tg_status'  : tg_status,
-                'tg_error'   : tg_error,
-            }
+            if method == '2':
+                payload = {
+                    'running'    : running,
+                    'method'     : '2',
+                    'hits'       : weyn._m2_hits,
+                    'good'       : 0,
+                    'bad_insta'  : weyn._m2_bad,
+                    'bad_email'  : weyn._m2_retry,
+                    'taken'      : 0,
+                    'limit'      : 0,
+                    'total'      : weyn._m2_total,
+                    'recent_hits': list(weyn._m2_found_emails[-20:]),
+                    'tg_status'  : tg_status,
+                    'tg_error'   : tg_error,
+                }
+            else:
+                payload = {
+                    'running'    : running,
+                    'method'     : '1',
+                    'hits'       : weyn._m1_hits,
+                    'good'       : weyn._m1_good_insta,
+                    'bad_insta'  : weyn._m1_bad_insta,
+                    'bad_email'  : weyn._m1_bad_email,
+                    'taken'      : weyn._m1_taken,
+                    'limit'      : weyn._m1_limit,
+                    'total'      : weyn._m1_total,
+                    'recent_hits': list(weyn._m1_found_emails[-20:]),
+                    'tg_status'  : tg_status,
+                    'tg_error'   : tg_error,
+                }
             yield f"data: {json.dumps(payload)}\n\n"
             time.sleep(0.5)
 
