@@ -291,11 +291,16 @@ def key_info():
         return jsonify({'error': 'Unauthorized'}), 403
     key = session.get('auth_key')
     conn = auth.get_db()
-    row = conn.execute('SELECT name, expires_at FROM access_keys WHERE key=?', (key,)).fetchone()
+    row = conn.execute('SELECT name, expires_at, can_revoke_device FROM access_keys WHERE key=?', (key,)).fetchone()
     conn.close()
     if not row:
-        return jsonify({'name': 'Unknown', 'expires_at': None, 'key': key})
-    return jsonify({'name': row['name'], 'expires_at': row['expires_at'], 'key': key})
+        return jsonify({'name': 'Unknown', 'expires_at': None, 'key': key, 'can_revoke_device': True})
+    return jsonify({
+        'name': row['name'],
+        'expires_at': row['expires_at'],
+        'key': key,
+        'can_revoke_device': bool(row['can_revoke_device'])
+    })
 
 
 @app.route('/api/revoke_device', methods=['POST'])

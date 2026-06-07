@@ -373,9 +373,23 @@
           <button class="btn-sm btn-approve" onclick="approveKey('${esc(k.key)}')">APPROVE</button>`;
       }
       if (k.status === 'approved') {
-        html += `<button class="btn-sm btn-revoke" onclick="revokeKey('${esc(k.key)}')">REVOKE</button>`;
+        html += `
+          <input class="dur-input" type="number" min="1" value="24" id="ext_${esc(k.key)}" />
+          <select class="dur-unit" id="extunit_${esc(k.key)}">
+            <option value="60">hrs</option>
+            <option value="1">mins</option>
+          </select>
+          <button class="btn-sm btn-approve" onclick="extendKey('${esc(k.key)}')">+EXTEND</button>
+          <button class="btn-sm btn-revoke" onclick="revokeKey('${esc(k.key)}')">REVOKE</button>`;
       }
       html += `<button class="btn-sm btn-delete" onclick="deleteKey('${esc(k.key)}')">DELETE</button>`;
+      // Per-user revoke device toggle
+      const canRevoke = k.can_revoke_device !== false && k.can_revoke_device !== 0;
+      html += `<label class="toggle-switch" title="${canRevoke ? 'Revoke Device: ON — click to disable' : 'Revoke Device: OFF — click to enable'}" style="margin-left:6px;vertical-align:middle;">
+        <input type="checkbox" ${canRevoke ? 'checked' : ''} onchange="setUserRevoke('${esc(k.key)}',this.checked)" />
+        <span class="toggle-slider"></span>
+      </label>
+      <span style="font-size:10px;color:var(--muted);letter-spacing:1px;vertical-align:middle;">REVOKE</span>`;
       html += '</div>';
       return html;
     }
@@ -432,6 +446,32 @@
       const data = await res.json();
       if (data.ok) { showToast('Key deleted', 'ok'); loadKeys(); }
       else showToast('Error: ' + data.error, 'fail');
+    }
+
+    async function extendKey(key) {
+      const durEl  = document.getElementById('ext_' + key);
+      const unitEl = document.getElementById('extunit_' + key);
+      const mins   = parseInt(durEl.value) * parseInt(unitEl.value);
+      if (!mins || mins < 1) { showToast('Enter a valid duration', 'fail'); return; }
+      const res  = await fetch('/admin/api/extend', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key, extra_minutes: mins })
+      });
+      const data = await res.json();
+      if (data.ok) { showToast('Key extended ✓', 'ok'); loadKeys(); }
+      else showToast('Error: ' + (data.error || 'Failed'), 'fail');
+    }
+
+    async function setUserRevoke(key, enabled) {
+      const res  = await fetch('/admin/api/set_revoke_device', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key, enabled })
+      });
+      const data = await res.json();
+      if (data.ok) showToast(enabled ? '🔓 Revoke enabled for user' : '🔒 Revoke disabled for user', 'ok');
+      else showToast('Error: ' + (data.error || 'Failed'), 'fail');
     }
 
     async function adminLogout() {

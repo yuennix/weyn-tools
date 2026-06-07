@@ -278,13 +278,15 @@
     findChatBtn.disabled = false;
   });
 
-  // ── Load revoke device visibility ──
+  // ── Load revoke device visibility (global setting AND per-user permission) ──
   async function loadRevokeVisibility() {
     try {
-      const res  = await fetch('/api/settings');
-      const data = await res.json();
+      const [s, k] = await Promise.all([
+        fetch('/api/settings').then(r => r.json()),
+        fetch('/api/key_info').then(r => r.json())
+      ]);
       const wrap = document.getElementById('revokeDeviceWrap');
-      if (wrap) wrap.style.display = data.revoke_device_enabled ? '' : 'none';
+      if (wrap) wrap.style.display = (s.revoke_device_enabled && k.can_revoke_device) ? '' : 'none';
     } catch (_) {}
   }
 
