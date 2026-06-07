@@ -237,6 +237,19 @@ def find_chat_id():
         return jsonify({'ok': False, 'error': str(e)})
 
 
+@app.route('/api/key_info')
+def key_info():
+    if not is_authenticated():
+        return jsonify({'error': 'Unauthorized'}), 403
+    key = session.get('auth_key')
+    conn = auth.get_db()
+    row = conn.execute('SELECT name, expires_at FROM access_keys WHERE key=?', (key,)).fetchone()
+    conn.close()
+    if not row:
+        return jsonify({'name': 'Unknown', 'expires_at': None})
+    return jsonify({'name': row['name'], 'expires_at': row['expires_at']})
+
+
 @app.route('/api/stats')
 def stats():
     if not is_authenticated():
