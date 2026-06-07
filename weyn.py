@@ -977,24 +977,10 @@ def _m1_save_hit(username, user, token, chat_id):
         year_label = str(gdate(user_id))
         reset_text = _m1_rest_v1(username)
         about      = _m1_get_about_account(user_id, username)
-        about_date = about.get("join_date")
-        if about_date:
-            _yr = re.search(r'\b(20\d{2})\b', about_date)
-            if _yr:
-                about_year = int(_yr.group(1))
-                est_year   = int(year_label)
-                # Instagram "About This Account" sometimes shows the monitoring-start
-                # date (2018-2019) rather than the real creation date for older accounts.
-                # Always prefer the EARLIER year — it is closer to the actual join date.
-                if about_year <= est_year:
-                    join_date  = about_date
-                    year_label = str(about_year)
-                else:
-                    join_date  = year_label   # trust ID-range estimate over API
-            else:
-                join_date = about_date
-        else:
-            join_date = year_label
+        join_date  = about.get("join_date") or year_label
+        _yr = re.search(r'\b(20\d{2})\b', join_date)
+        if _yr:
+            year_label = _yr.group(1)
         country_nm = about.get("country") or "-"
         country_fl = _m1_get_country_flag(country_nm)
         country    = f"{country_nm} {country_fl}".strip() if country_fl else country_nm
