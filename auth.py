@@ -16,15 +16,21 @@ def init_db():
     conn = get_db()
     conn.execute('''
         CREATE TABLE IF NOT EXISTS access_keys (
-            key         TEXT PRIMARY KEY,
-            name        TEXT NOT NULL,
-            status      TEXT NOT NULL DEFAULT 'pending',
-            created_at  TEXT NOT NULL,
-            approved_at TEXT,
-            expires_at  TEXT,
-            device_id   TEXT
+            key                 TEXT PRIMARY KEY,
+            name                TEXT NOT NULL,
+            status              TEXT NOT NULL DEFAULT 'pending',
+            created_at          TEXT NOT NULL,
+            approved_at         TEXT,
+            expires_at          TEXT,
+            device_id           TEXT,
+            can_revoke_device   INTEGER NOT NULL DEFAULT 1
         )
     ''')
+    # Migrate: add can_revoke_device if it doesn't exist yet
+    try:
+        conn.execute('ALTER TABLE access_keys ADD COLUMN can_revoke_device INTEGER NOT NULL DEFAULT 1')
+    except Exception:
+        pass
     conn.execute('''
         CREATE TABLE IF NOT EXISTS settings (
             key   TEXT PRIMARY KEY,
@@ -157,6 +163,35 @@ def approve_key(key, duration_minutes):
     conn.execute(
         'UPDATE access_keys SET status=?, approved_at=?, expires_at=?, device_id=NULL WHERE key=?',
         ('approved', datetime.utcnow().isoformat(), expires_at, key)
+    )
+    conn.commit()
+    conn.close()
+
+
+def extend_key(key, extra_minutes):
+    conn = get_db()
+    row = conn.execute('SELECT expires_at FROM access_keys WHERE key=?', (key,)).fetchone()
+    if not row:
+        conn.close()
+        return
+    current = row['expires_at']
+    base = datetime.fromisoformat(current) if current else datetime.utcnow()
+    if base < datetime.utcnow():
+        base = datetime.utcnow()
+    new_expires = (base + timedelta(minutes=extra_minutes)).isoformat()
+    conn.execute(
+        'UPDATE access_keys SET expires_at=?, status=? WHERE key=?',
+        (new_expires, 'approved', key)
+    )
+    conn.commit()
+    conn.close()
+
+
+def set_key_revoke_device(key, enabled):
+    conn = get_db()
+    conn.execute(
+        'UPDATE access_keys SET can_revoke_device=? WHERE key=?',
+        (1 if enabled else 0, key)
     )
     conn.commit()
     conn.close()

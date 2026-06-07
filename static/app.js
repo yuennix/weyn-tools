@@ -18,7 +18,7 @@
   const tgStatusEl  = document.getElementById('tgStatus');
   const countdownEl = document.getElementById('keyCountdown');
 
-  const statIds = ['hits','good','bad_insta','bad_email','taken','limit','total','verified'];
+  const statIds = ['hits','good','bad_insta','bad_email','taken','limit','total'];
 
   // ── Persist token & chat_id ──
   const tokenEl  = document.getElementById('token');
@@ -161,10 +161,7 @@
         setTimeout(() => card.classList.remove('bump'), 300);
       }
     });
-    if (d.method) {
-      const labels = { '1':'M1','2':'M2','3':'M3','4':'M4 ★' };
-      methodBadge.textContent = labels[d.method] || d.method;
-    }
+    methodBadge.textContent = 'M1';
     // Flash the LIVE STATS tab when running and stats change
     const statsTab = document.getElementById('tabStats');
     if (d.running && statsTab && !statsTab.classList.contains('active')) {

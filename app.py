@@ -139,6 +139,32 @@ def admin_api_delete():
     return jsonify({'ok': True})
 
 
+@app.route('/admin/api/extend', methods=['POST'])
+def admin_api_extend():
+    if not is_admin():
+        return jsonify({'error': 'Unauthorized'}), 403
+    data = request.get_json()
+    key  = (data.get('key') or '').strip()
+    mins = int(data.get('extra_minutes', 0) or 0)
+    if not key or mins < 1:
+        return jsonify({'ok': False, 'error': 'Invalid input'})
+    auth.extend_key(key, mins)
+    return jsonify({'ok': True})
+
+
+@app.route('/admin/api/set_revoke_device', methods=['POST'])
+def admin_api_set_revoke_device():
+    if not is_admin():
+        return jsonify({'error': 'Unauthorized'}), 403
+    data    = request.get_json()
+    key     = (data.get('key') or '').strip()
+    enabled = data.get('enabled', True)
+    if not key:
+        return jsonify({'ok': False, 'error': 'Key required'})
+    auth.set_key_revoke_device(key, enabled)
+    return jsonify({'ok': True})
+
+
 @app.route('/admin/api/settings', methods=['GET'])
 def admin_api_settings_get():
     if not is_admin():
@@ -292,43 +318,22 @@ def stats():
 
     def generate():
         while True:
-            m         = weyn._web_state.get('method') or '1'
             running   = weyn._web_state.get('running', False)
             tg_status = weyn._web_state.get('tg_status', '')
             tg_error  = weyn._web_state.get('tg_error', '')
-            if m == '1':
-                payload = {
-                    'running'    : running,
-                    'method'     : '1',
-                    'hits'       : weyn._m1_hits,
-                    'good'       : weyn._m1_good_insta,
-                    'bad_insta'  : weyn._m1_bad_insta,
-                    'bad_email'  : weyn._m1_bad_email,
-                    'taken'      : weyn._m1_taken,
-                    'limit'      : weyn._m1_limit,
-                    'total'      : weyn._m1_total,
-                    'verified'   : 0,
-                    'recent_hits': list(weyn._m1_found_emails[-20:]),
-                    'tg_status'  : tg_status,
-                    'tg_error'   : tg_error,
-                }
-            else:
-                with weyn._web_lock:
-                    payload = {
-                        'running'    : running,
-                        'method'     : m,
-                        'hits'       : weyn._web_state.get('hits', 0),
-                        'good'       : weyn._web_state.get('good', 0),
-                        'bad_insta'  : weyn._web_state.get('bad_insta', 0),
-                        'bad_email'  : 0,
-                        'taken'      : weyn._web_state.get('taken', 0),
-                        'limit'      : weyn._web_state.get('limit', 0),
-                        'total'      : 0,
-                        'verified'   : weyn._web_state.get('verified', 0),
-                        'recent_hits': list(weyn._web_state.get('recent_hits', []))[-20:],
-                        'tg_status'  : tg_status,
-                        'tg_error'   : tg_error,
-                    }
+            payload = {
+                'running'    : running,
+                'hits'       : weyn._m1_hits,
+                'good'       : weyn._m1_good_insta,
+                'bad_insta'  : weyn._m1_bad_insta,
+                'bad_email'  : weyn._m1_bad_email,
+                'taken'      : weyn._m1_taken,
+                'limit'      : weyn._m1_limit,
+                'total'      : weyn._m1_total,
+                'recent_hits': list(weyn._m1_found_emails[-20:]),
+                'tg_status'  : tg_status,
+                'tg_error'   : tg_error,
+            }
             yield f"data: {json.dumps(payload)}\n\n"
             time.sleep(0.5)
 
