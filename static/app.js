@@ -7,8 +7,6 @@
   // ── DOM refs ──
   const startBtn    = document.getElementById('startBtn');
   const stopBtn     = document.getElementById('stopBtn');
-  const testBtn     = document.getElementById('testBtn');
-  const testStatus  = document.getElementById('testStatus');
   const findChatBtn = document.getElementById('findChatBtn');
   const chatResults = document.getElementById('chatResults');
   const statusBar   = document.getElementById('statusBar');
@@ -190,39 +188,6 @@
       chatResults.innerHTML = `<div class="chat-result-err">✗ ${escHtml(err.message)}</div>`;
     }
     findChatBtn.disabled = false;
-  });
-
-  // ── Test Telegram button ──
-  testBtn.addEventListener('click', async () => {
-    const token   = document.getElementById('token').value.trim();
-    const chat_id = document.getElementById('chat_id').value.trim();
-    if (!token || !chat_id) {
-      testStatus.textContent = '✗ Enter Bot Token and Chat ID first.';
-      testStatus.className = 'test-status fail';
-      return;
-    }
-    testBtn.disabled = true;
-    testStatus.textContent = 'Sending test message…';
-    testStatus.className = 'test-status';
-    try {
-      const res  = await fetch('/api/test_telegram', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, chat_id })
-      });
-      const data = await res.json();
-      if (data.ok) {
-        testStatus.textContent = '✓ Message sent! Check your group.';
-        testStatus.className = 'test-status ok';
-      } else {
-        testStatus.textContent = '✗ ' + (data.error || 'Failed');
-        testStatus.className = 'test-status fail';
-      }
-    } catch (err) {
-      testStatus.textContent = '✗ ' + err.message;
-      testStatus.className = 'test-status fail';
-    }
-    testBtn.disabled = false;
   });
 
   // ── Stop button ──

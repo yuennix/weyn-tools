@@ -99,27 +99,6 @@ def find_chat_id():
         return jsonify({'ok': False, 'error': str(e)})
 
 
-@app.route('/api/test_telegram', methods=['POST'])
-def test_telegram():
-    data    = request.get_json()
-    token   = (data.get('token') or '').strip()
-    chat_id = (data.get('chat_id') or '').strip()
-    if not token or not chat_id:
-        return jsonify({'ok': False, 'error': 'Bot Token and Chat ID are required'}), 400
-    try:
-        resp = __import__('requests').post(
-            f"https://api.telegram.org/bot{token}/sendMessage",
-            json={"chat_id": chat_id, "text": "✅ WEYN TOOLS — Telegram connection test successful!"},
-            timeout=10
-        )
-        body = resp.json()
-        if body.get('ok'):
-            return jsonify({'ok': True})
-        return jsonify({'ok': False, 'error': body.get('description', 'Unknown error')})
-    except Exception as e:
-        return jsonify({'ok': False, 'error': str(e)})
-
-
 @app.route('/api/stats')
 def stats():
     def generate():
