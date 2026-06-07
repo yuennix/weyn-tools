@@ -25,6 +25,30 @@ def init_db():
             device_id   TEXT
         )
     ''')
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS settings (
+            key   TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        )
+    ''')
+    conn.execute(
+        'INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)',
+        ('revoke_device_enabled', '1')
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_setting(key, default=None):
+    conn = get_db()
+    row = conn.execute('SELECT value FROM settings WHERE key=?', (key,)).fetchone()
+    conn.close()
+    return row['value'] if row else default
+
+
+def set_setting(key, value):
+    conn = get_db()
+    conn.execute('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', (key, value))
     conn.commit()
     conn.close()
 

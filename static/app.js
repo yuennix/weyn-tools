@@ -275,7 +275,18 @@
     findChatBtn.disabled = false;
   });
 
+  // ── Load revoke device visibility ──
+  async function loadRevokeVisibility() {
+    try {
+      const res  = await fetch('/api/settings');
+      const data = await res.json();
+      const wrap = document.getElementById('revokeDeviceWrap');
+      if (wrap) wrap.style.display = data.revoke_device_enabled ? '' : 'none';
+    } catch (_) {}
+  }
+
   // ── Init ──
   startSSE();
   loadKeyInfo();
+  loadRevokeVisibility();
 })();

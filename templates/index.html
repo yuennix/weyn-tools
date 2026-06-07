@@ -82,8 +82,10 @@
           <span class="key-info-value mono" id="keyValue">—</span>
         </div>
         <button class="btn-copy-key" id="copyKeyBtn" onclick="copyKey()">📋 &nbsp;COPY KEY</button>
-        <button class="btn-revoke-device" id="revokeBtn" onclick="revokeDevice()">🔓 &nbsp;REVOKE THIS DEVICE</button>
-        <div class="revoke-note">Revoking unbinds your key from this device so you can log in on another device.</div>
+        <div id="revokeDeviceWrap">
+          <button class="btn-revoke-device" id="revokeBtn" onclick="revokeDevice()">🔓 &nbsp;REVOKE THIS DEVICE</button>
+          <div class="revoke-note">Revoking unbinds your key from this device so you can log in on another device.</div>
+        </div>
       </div>
 
     </div>

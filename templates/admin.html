@@ -208,6 +208,39 @@
     .toast.ok   { border-color: var(--green); color: var(--green); }
     .toast.fail { border-color: var(--red);   color: var(--red); }
 
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 48px;
+      height: 26px;
+      flex-shrink: 0;
+    }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      inset: 0;
+      background: var(--border);
+      border-radius: 26px;
+      transition: background .2s;
+    }
+    .toggle-slider:before {
+      content: '';
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      left: 4px;
+      top: 4px;
+      background: var(--muted);
+      border-radius: 50%;
+      transition: transform .2s, background .2s;
+    }
+    .toggle-switch input:checked + .toggle-slider { background: rgba(0,230,255,.25); }
+    .toggle-switch input:checked + .toggle-slider:before {
+      transform: translateX(22px);
+      background: var(--cyan);
+    }
+
     @media (max-width: 700px) {
       .keys-table thead { display: none; }
       .keys-table td { display: block; padding: 4px 12px; }
@@ -226,6 +259,17 @@
       <a class="back-link" href="/">← BACK TO APP</a>
       <button class="admin-logout" onclick="adminLogout()">LOGOUT</button>
     </div>
+  </div>
+
+  <div class="section-card" style="margin-bottom:20px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
+    <div>
+      <div style="font-size:13px;letter-spacing:1px;color:var(--fg);">REVOKE DEVICE BUTTON</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:3px;">Show or hide the "Revoke This Device" button for users</div>
+    </div>
+    <label class="toggle-switch">
+      <input type="checkbox" id="revokeToggle" onchange="saveRevokeToggle(this.checked)" />
+      <span class="toggle-slider"></span>
+    </label>
   </div>
 
   <div class="filter-row">
@@ -409,7 +453,25 @@
         .replace(/'/g,'&#39;');
     }
 
+    async function loadSettings() {
+      const res  = await fetch('/admin/api/settings');
+      const data = await res.json();
+      document.getElementById('revokeToggle').checked = !!data.revoke_device_enabled;
+    }
+
+    async function saveRevokeToggle(enabled) {
+      const res  = await fetch('/admin/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ revoke_device_enabled: enabled })
+      });
+      const data = await res.json();
+      if (data.ok) showToast(enabled ? 'Revoke button enabled' : 'Revoke button hidden', 'ok');
+      else showToast('Failed to save setting', 'fail');
+    }
+
     loadKeys();
+    loadSettings();
     setInterval(loadKeys, 10000);
   </script>
 </body>

@@ -139,6 +139,28 @@ def admin_api_delete():
     return jsonify({'ok': True})
 
 
+@app.route('/admin/api/settings', methods=['GET'])
+def admin_api_settings_get():
+    if not is_admin():
+        return jsonify({'error': 'Unauthorized'}), 403
+    return jsonify({'revoke_device_enabled': auth.get_setting('revoke_device_enabled', '1') == '1'})
+
+
+@app.route('/admin/api/settings', methods=['POST'])
+def admin_api_settings_set():
+    if not is_admin():
+        return jsonify({'error': 'Unauthorized'}), 403
+    data = request.get_json()
+    enabled = data.get('revoke_device_enabled', True)
+    auth.set_setting('revoke_device_enabled', '1' if enabled else '0')
+    return jsonify({'ok': True})
+
+
+@app.route('/api/settings')
+def api_settings_public():
+    return jsonify({'revoke_device_enabled': auth.get_setting('revoke_device_enabled', '1') == '1'})
+
+
 # ── Main app routes (protected) ───────────────────────────────────────────────
 
 @app.route('/')
