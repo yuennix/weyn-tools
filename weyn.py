@@ -582,6 +582,76 @@ def _m1_rest_bloks(email):
     except Exception:
         return None
 
+def _m1_has_phone(username):
+    """Return True if the Instagram account has a phone number bound to it."""
+    max_retries = 2
+    for attempt in range(max_retries):
+        try:
+            client = httpx.Client(http2=True, follow_redirects=True)
+            try:
+                client.get(_M1_BASE_URL, headers={
+                    "User-Agent": _M1_UA_WEB,
+                    "Accept": "text/html,application/xhtml+xml,*/*;q=0.9",
+                    "Accept-Language": "tr-TR,tr;q=0.9",
+                    "sec-fetch-dest": "document",
+                    "sec-fetch-mode": "navigate",
+                    "sec-fetch-site": "none",
+                })
+            except Exception:
+                client.close()
+                if attempt < max_retries - 1:
+                    continue
+                return False
+            csrf = ""
+            for c in client.cookies.jar:
+                if c.name == "csrftoken":
+                    csrf = c.value
+                    break
+            if not csrf:
+                client.close()
+                if attempt < max_retries - 1:
+                    continue
+                return False
+            headers = {
+                "User-Agent"       : _M1_UA_APP,
+                "Accept"           : "*/*",
+                "Accept-Language"  : "tr-TR,tr;q=0.9",
+                "Accept-Encoding"  : "gzip, deflate, br",
+                "Content-Type"     : "application/x-www-form-urlencoded",
+                "Origin"           : _M1_BASE_URL,
+                "Referer"          : _M1_RESET_URL,
+                "X-CSRFToken"      : csrf,
+                "X-IG-App-ID"      : "936619743392459",
+                "X-Requested-With" : "XMLHttpRequest",
+                "X-Instagram-AJAX" : "1",
+                "X-ASBD-ID"        : "129477",
+                "sec-fetch-dest"   : "empty",
+                "sec-fetch-mode"   : "cors",
+                "sec-fetch-site"   : "same-origin",
+            }
+            data = urllib.parse.urlencode({"email_or_username": username})
+            r    = client.post(_M1_SEND_AJAX_URL, content=data.encode(), headers=headers)
+            client.close()
+            result = r.json()
+            # Any of these keys signal a phone number is bound
+            phone_keys = ("obfuscated_phone", "phone_number", "masked_phone",
+                          "phone_number_hint", "obfuscated_mobile")
+            for key in phone_keys:
+                if result.get(key):
+                    return True
+            # contact_point that looks like a phone (starts with + or contains only digits/spaces/dashes)
+            cp = result.get("contact_point", "")
+            if cp and re.search(r'[\+\*\d][\d\s\-\*]{4,}', cp):
+                # Looks like a masked phone number rather than an email
+                if "@" not in cp:
+                    return True
+            return False
+        except Exception:
+            if attempt < max_retries - 1:
+                continue
+            return False
+    return False
+
 def _m1_lookup_instagram(email):
     if _m1_rest_web_check_email(email):
         return True
@@ -985,6 +1055,9 @@ def _m1_cgmail(email, token, chat_id, user, loc_session):
                 params=params, cookies=cookies, headers=headers, data=data
             )
             if '"gf.uar",1' in resp.text:
+                if _m1_has_phone(usr):
+                    _m1_bad_insta += 1
+                    return
                 _m1_save_hit(usr, user, token, chat_id)
                 return
         except Exception:
@@ -1024,6 +1097,9 @@ def _m1_cgmail(email, token, chat_id, user, loc_session):
             }
             resp2 = _m1__session.post(url2, params=params2, data=data2, headers=hdrs2, timeout=20)
             if '"gf.uar",1' in resp2.text:
+                if _m1_has_phone(usr):
+                    _m1_bad_insta += 1
+                    return
                 _m1_save_hit(usr, user, token, chat_id)
                 return
             else:
