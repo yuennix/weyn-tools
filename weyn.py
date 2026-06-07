@@ -709,11 +709,10 @@ def _m1_get_masked(query):
     try:
         response = requests.post(url, data=payload, headers=headers, timeout=8)
         contact_points = response.json()["data"]["caa_ar_ig_account_search"]["contact_points"]
-        has_phone = any(i["type"] == "PHONE" for i in contact_points)
         email = next((i["contact_point"] for i in contact_points if i["type"] == "EMAIL"), None)
-        return email, has_phone
+        return email
     except Exception:
-        return None, False
+        return None
 
 def _m1_get_country_flag(country_name):
     if not country_name or country_name in ["-", "Paylaşılmadı", "None", ""]:
@@ -898,11 +897,6 @@ def _m1_gtokens():
 
 def _m1_save_hit(username, user, token, chat_id):
     global _m1_hits, _m1_total, _m1_found_emails
-
-    # Check phone binding before doing anything — skip accounts with a phone bound
-    masked, has_phone = _m1_get_masked(username)
-    if has_phone:
-        return
 
     with _m1_hit_lock:
         _m1_hits  += 1
