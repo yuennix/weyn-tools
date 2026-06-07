@@ -3,7 +3,7 @@ import json
 import time
 import threading
 from datetime import timedelta
-from flask import Flask, render_template, request, jsonify, Response, session, redirect, url_for
+from flask import Flask, render_template, request, jsonify, Response, session, redirect, url_for, make_response
 from werkzeug.middleware.proxy_fix import ProxyFix
 import weyn
 import auth
@@ -29,8 +29,32 @@ ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'yuennix')
 
 # ── Auth helpers ─────────────────────────────────────────────────────────────
 
+_KEY_COOKIE      = 'weyn_key'
+_KEY_COOKIE_AGE  = 365 * 24 * 3600  # 1 year in seconds
+
+def _set_key_cookie(response, key):
+    response.set_cookie(
+        _KEY_COOKIE, key,
+        max_age=_KEY_COOKIE_AGE,
+        httponly=True,
+        samesite='Lax',
+        secure=False,
+    )
+
+def _clear_key_cookie(response):
+    response.delete_cookie(_KEY_COOKIE)
+
 def is_authenticated():
-    return auth.check_key_valid(session.get('auth_key'))
+    key = session.get('auth_key')
+    if auth.check_key_valid(key):
+        return True
+    # Fallback: persistent cookie survives server restarts
+    cookie_key = request.cookies.get(_KEY_COOKIE)
+    if cookie_key and auth.check_key_valid(cookie_key):
+        session.permanent = True
+        session['auth_key'] = cookie_key
+        return True
+    return False
 
 
 def is_admin():
@@ -69,14 +93,18 @@ def api_validate_key():
     if ok:
         session.permanent = True
         session['auth_key'] = key
-        return jsonify({'ok': True})
+        resp = make_response(jsonify({'ok': True}))
+        _set_key_cookie(resp, key)
+        return resp
     return jsonify({'ok': False, 'error': result})
 
 
 @app.route('/api/logout', methods=['POST'])
 def api_logout():
     session.pop('auth_key', None)
-    return jsonify({'ok': True})
+    resp = make_response(jsonify({'ok': True}))
+    _clear_key_cookie(resp)
+    return resp
 
 
 # ── Admin routes ──────────────────────────────────────────────────────────────
@@ -313,13 +341,15 @@ def key_info():
 def revoke_device():
     if not is_authenticated():
         return jsonify({'error': 'Unauthorized'}), 403
-    key = session.get('auth_key')
+    key = session.get('auth_key') or request.cookies.get(_KEY_COOKIE)
     conn = auth.get_db()
     conn.execute('UPDATE access_keys SET device_id=NULL WHERE key=?', (key,))
     conn.commit()
     conn.close()
     session.pop('auth_key', None)
-    return jsonify({'ok': True})
+    resp = make_response(jsonify({'ok': True}))
+    _clear_key_cookie(resp)
+    return resp
 
 
 @app.route('/api/stats')
