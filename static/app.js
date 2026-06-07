@@ -1,5 +1,4 @@
 (() => {
-  let selectedMethod = '1';
   let evtSource      = null;
   let knownHits      = new Set();
   let totalHits      = 0;
@@ -15,18 +14,6 @@
   const hitsCount   = document.getElementById('hitsCount');
   const tgStatusEl  = document.getElementById('tgStatus');
   const countdownEl = document.getElementById('keyCountdown');
-  const methodBadge = document.getElementById('methodBadge');
-  const yearBadge   = document.getElementById('yearBadge');
-  const minFollowersGroup = document.getElementById('minFollowersGroup');
-
-  const M1_STAT_LABELS = {
-    hits: 'HITS', good: 'GOOD INSTA', bad_insta: 'BAD INSTA',
-    bad_email: 'BAD EMAIL', taken: 'TAKEN', limit: 'RATE LIMIT', total: 'TOTAL SCANNED'
-  };
-  const M2_STAT_LABELS = {
-    hits: 'HITS', good: '', bad_insta: 'BAD LOGIN',
-    bad_email: 'IP BLOCK', taken: '', limit: '', total: 'TOTAL SCANNED'
-  };
 
   const statIds = ['hits','good','bad_insta','bad_email','taken','limit','total'];
 
@@ -42,40 +29,6 @@
   chatIdEl.addEventListener('input',  saveChatId);
   chatIdEl.addEventListener('change', saveChatId);
   chatIdEl.addEventListener('paste',  () => setTimeout(saveChatId, 50));
-
-  // ── Method selector ──
-  window.selectMethod = function(m) {
-    selectedMethod = m;
-    document.querySelectorAll('.method-btn').forEach(b => b.classList.remove('active'));
-    const btn = document.getElementById('methodBtn' + m);
-    if (btn) btn.classList.add('active');
-    if (methodBadge) methodBadge.textContent = 'M' + m;
-    if (yearBadge) {
-      yearBadge.textContent = m === '2' ? 'Locked • 2010 – 2013' : 'Random • 2013 – 2019';
-    }
-    if (minFollowersGroup) {
-      minFollowersGroup.style.display = m === '2' ? 'none' : '';
-    }
-    updateStatLabels(m);
-  };
-
-  function updateStatLabels(m) {
-    const labels = m === '2' ? M2_STAT_LABELS : M1_STAT_LABELS;
-    statIds.forEach(key => {
-      const card = document.getElementById('s-' + key);
-      if (!card) return;
-      const labelEl = card.closest('.stat-card') && card.closest('.stat-card').querySelector('.stat-label');
-      if (!labelEl) return;
-      const lbl = labels[key];
-      const cardEl = card.closest('.stat-card');
-      if (m === '2' && !lbl) {
-        cardEl.style.display = 'none';
-      } else {
-        cardEl.style.display = '';
-        labelEl.textContent = lbl || M1_STAT_LABELS[key];
-      }
-    });
-  }
 
   // ── Tab switching ──
   window.switchTab = function(tab) {
@@ -199,7 +152,6 @@
         if (card) { card.classList.add('bump'); setTimeout(() => card.classList.remove('bump'), 300); }
       }
     });
-    if (methodBadge) methodBadge.textContent = 'M' + (d.method || selectedMethod);
     const statsTab = document.getElementById('tabStats');
     if (d.running && statsTab && !statsTab.classList.contains('active')) {
       statsTab.classList.add('live');
@@ -266,7 +218,7 @@
       const res  = await fetch('/api/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ method: selectedMethod, token, chat_id, min_followers })
+        body: JSON.stringify({ token, chat_id, min_followers })
       });
       const data = await res.json();
       if (!res.ok) { alert(data.error || 'Failed to start.'); return; }
@@ -327,7 +279,6 @@
   }
 
   // ── Init ──
-  selectMethod('1');
   startSSE();
   loadKeyInfo();
   loadRevokeVisibility();

