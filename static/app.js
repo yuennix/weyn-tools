@@ -25,8 +25,14 @@
   const chatIdEl = document.getElementById('chat_id');
   if (localStorage.getItem('tg_token'))   tokenEl.value  = localStorage.getItem('tg_token');
   if (localStorage.getItem('tg_chat_id')) chatIdEl.value = localStorage.getItem('tg_chat_id');
-  tokenEl.addEventListener('input',  () => localStorage.setItem('tg_token',   tokenEl.value));
-  chatIdEl.addEventListener('input', () => localStorage.setItem('tg_chat_id', chatIdEl.value));
+  function saveToken()  { localStorage.setItem('tg_token',   tokenEl.value); }
+  function saveChatId() { localStorage.setItem('tg_chat_id', chatIdEl.value); }
+  tokenEl.addEventListener('input',  saveToken);
+  tokenEl.addEventListener('change', saveToken);
+  tokenEl.addEventListener('paste',  () => setTimeout(saveToken,  50));
+  chatIdEl.addEventListener('input',  saveChatId);
+  chatIdEl.addEventListener('change', saveChatId);
+  chatIdEl.addEventListener('paste',  () => setTimeout(saveChatId, 50));
 
   // ── Tab switching ──
   window.switchTab = function(tab) {
