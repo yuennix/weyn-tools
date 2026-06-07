@@ -1,4 +1,4 @@
-modules = ["web", "nodejs-20", "bash", "python-3.11"]
+modules = ["python-3.11", "web", "nodejs-20", "bash"]
 [agent]
 expertMode = true
 stack = "FLASK_VANILLA_JS"
@@ -23,21 +23,17 @@ args = "Start application"
 name = "Start application"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "python app.py"
-waitForPort = 5000
-
 [workflows.workflow.metadata]
 outputType = "webview"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "gunicorn --bind 0.0.0.0:5000 --reuse-port --reload main:app"
+waitForPort = 5000
 
 [[ports]]
 localPort = 5000
 externalPort = 80
-
-[[ports]]
-localPort = 5001
-externalPort = 3000
 
 [deployment]
 deploymentTarget = "autoscale"
