@@ -16,7 +16,7 @@ app.secret_key = os.environ.get('SESSION_SECRET')
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=365)
 app.config['SESSION_COOKIE_HTTPONLY']    = True
 app.config['SESSION_COOKIE_SAMESITE']   = 'Lax'
-app.config['SESSION_COOKIE_SECURE']     = False  # Flask runs behind HTTPS proxy; cookie itself is HTTP-internal
+app.config['SESSION_COOKIE_SECURE']     = True
 
 auth.init_db()
 
@@ -30,6 +30,7 @@ ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'yuennix')
 # ── Auth helpers ─────────────────────────────────────────────────────────────
 
 _KEY_COOKIE      = 'weyn_key'
+_ADMIN_COOKIE    = 'weyn_admin'
 _KEY_COOKIE_AGE  = 365 * 24 * 3600  # 1 year in seconds
 
 def _set_key_cookie(response, key):
@@ -38,11 +39,23 @@ def _set_key_cookie(response, key):
         max_age=_KEY_COOKIE_AGE,
         httponly=True,
         samesite='Lax',
-        secure=False,
+        secure=True,
     )
 
 def _clear_key_cookie(response):
     response.delete_cookie(_KEY_COOKIE)
+
+def _set_admin_cookie(response):
+    response.set_cookie(
+        _ADMIN_COOKIE, '1',
+        max_age=_KEY_COOKIE_AGE,
+        httponly=True,
+        samesite='Lax',
+        secure=True,
+    )
+
+def _clear_admin_cookie(response):
+    response.delete_cookie(_ADMIN_COOKIE)
 
 def is_authenticated():
     key = session.get('auth_key')
@@ -58,7 +71,14 @@ def is_authenticated():
 
 
 def is_admin():
-    return session.get('admin_logged_in') is True
+    if session.get('admin_logged_in') is True:
+        return True
+    # Fallback: persistent cookie survives server restarts
+    if request.cookies.get(_ADMIN_COOKIE) == '1':
+        session.permanent = True
+        session['admin_logged_in'] = True
+        return True
+    return False
 
 
 # ── Gate / Auth routes ────────────────────────────────────────────────────────
@@ -114,8 +134,11 @@ def admin():
     if request.method == 'POST':
         pw = (request.form.get('password') or '').strip()
         if pw == ADMIN_PASSWORD:
+            session.permanent = True
             session['admin_logged_in'] = True
-            return redirect('/admin')
+            resp = make_response(redirect('/admin'))
+            _set_admin_cookie(resp)
+            return resp
         return render_template('admin_login.html', error='Wrong password')
     if not is_admin():
         return render_template('admin_login.html', error=None)
@@ -125,7 +148,9 @@ def admin():
 @app.route('/admin/logout', methods=['POST'])
 def admin_logout():
     session.pop('admin_logged_in', None)
-    return jsonify({'ok': True})
+    resp = make_response(jsonify({'ok': True}))
+    _clear_admin_cookie(resp)
+    return resp
 
 
 @app.route('/admin/api/keys')
