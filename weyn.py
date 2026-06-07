@@ -35,25 +35,26 @@ RESET = Style.RESET_ALL
 B     = Style.BRIGHT
 
 ID_RANGES = [
-    (1,           100000000,  2010),
-    (100000001,   500000000,  2011),
-    (500000001,   1100000000, 2012),
-    (1100000001,  1800000000, 2013),
-    (1800000001,  2500000000, 2014),
-    (2500000001,  3200000000, 2015),
-    (3200000001,  3900000000, 2016),
-    (3900000001,  4600000000, 2017),
-    (4600000001,  5400000000, 2018),
-    (5400000001,  6500000000, 2019),
+    (1,            100_000_000,   2010),
+    (100_000_001,  500_000_000,   2011),
+    (500_000_001,  1_100_000_000, 2012),
+    (1_100_000_001,1_900_000_000, 2013),
+    (1_900_000_001,2_800_000_000, 2014),
+    (2_800_000_001,3_600_000_000, 2015),
+    (3_600_000_001,4_500_000_000, 2016),
+    (4_500_000_001,6_000_000_000, 2017),
+    (6_000_000_001,8_500_000_000, 2018),
+    (8_500_000_001,13_000_000_000,2019),
 ]
 
 def gdate(user_id):
     try:
-        user_id = int(user_id)
+        uid = int(user_id)
         for lower, upper, year in ID_RANGES:
-            if lower <= user_id <= upper:
+            if lower <= uid <= upper:
                 return year
-        return 2019
+        # IDs above 13B are 2020+; below 1 default to 2010
+        return 2020 if uid > 13_000_000_000 else 2010
     except Exception:
         return 2019
 
@@ -379,7 +380,8 @@ def _m1_about_refresh_tokens(cookie_str=None, username="instagram"):
                 "Accept-Encoding": "gzip, deflate",
                 "Cookie": _cookie,
                 "Referer": "https://www.instagram.com/",
-            }
+            },
+            timeout=5,
         )
         html = resp.text
         m      = re.search(r'"f":"([^"]+)"', html)
@@ -452,7 +454,7 @@ def _m1_try_get_about(user_id, username):
             "sec-fetch-dest": "empty",
             "sec-fetch-mode": "cors",
             "sec-fetch-site": "same-origin",
-        }, data=urllib.parse.urlencode(post_params))
+        }, data=urllib.parse.urlencode(post_params), timeout=6)
         raw = resp.text
         if raw.startswith("for (;;);"):
             raw = raw[9:]
@@ -911,10 +913,24 @@ def _m1_save_hit(username, user, token, chat_id):
         year_label = str(gdate(user_id))
         reset_text = _m1_rest_v1(username)
         about      = _m1_get_about_account(user_id, username)
-        join_date  = about.get("join_date") or year_label
-        _yr = re.search(r'\b(20\d{2})\b', join_date)
-        if _yr:
-            year_label = _yr.group(1)
+        about_date = about.get("join_date")
+        if about_date:
+            _yr = re.search(r'\b(20\d{2})\b', about_date)
+            if _yr:
+                about_year = int(_yr.group(1))
+                est_year   = int(year_label)
+                # Instagram "About This Account" sometimes shows the monitoring-start
+                # date (2018-2019) rather than the real creation date for older accounts.
+                # Always prefer the EARLIER year — it is closer to the actual join date.
+                if about_year <= est_year:
+                    join_date  = about_date
+                    year_label = str(about_year)
+                else:
+                    join_date  = year_label   # trust ID-range estimate over API
+            else:
+                join_date = about_date
+        else:
+            join_date = year_label
         country_nm = about.get("country") or "-"
         country_fl = _m1_get_country_flag(country_nm)
         country    = f"{country_nm} {country_fl}".strip() if country_fl else country_nm
