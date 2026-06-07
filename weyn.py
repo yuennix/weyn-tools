@@ -1058,9 +1058,6 @@ def _m1_cgmail(email, token, chat_id, user, loc_session):
                 if _m1_has_phone(usr):
                     _m1_bad_insta += 1
                     return
-                if not _m1_is_only_gmail(usr):
-                    _m1_bad_insta += 1
-                    return
                 _m1_save_hit(usr, user, token, chat_id)
                 return
         except Exception:
@@ -1101,9 +1098,6 @@ def _m1_cgmail(email, token, chat_id, user, loc_session):
             resp2 = _m1__session.post(url2, params=params2, data=data2, headers=hdrs2, timeout=20)
             if '"gf.uar",1' in resp2.text:
                 if _m1_has_phone(usr):
-                    _m1_bad_insta += 1
-                    return
-                if not _m1_is_only_gmail(usr):
                     _m1_bad_insta += 1
                     return
                 _m1_save_hit(usr, user, token, chat_id)
