@@ -1,9 +1,10 @@
 (() => {
   const selectedMethod = '1';
-  let evtSource  = null;
-  let knownHits  = new Set();
-  let totalHits  = 0;
+  let evtSource      = null;
+  let knownHits      = new Set();
+  let totalHits      = 0;
   let countdownTimer = null;
+  let _myKey         = '';
 
   // ── DOM refs ──
   const startBtn    = document.getElementById('startBtn');
@@ -27,22 +28,23 @@
   tokenEl.addEventListener('input',  () => localStorage.setItem('tg_token',   tokenEl.value));
   chatIdEl.addEventListener('input', () => localStorage.setItem('tg_chat_id', chatIdEl.value));
 
-  // ── Main tab switching ──
-  window.switchMainTab = function(tab) {
+  // ── Tab switching ──
+  window.switchTab = function(tab) {
     document.getElementById('paneConfig').classList.toggle('active', tab === 'config');
     document.getElementById('paneStats').classList.toggle('active', tab === 'stats');
     document.getElementById('tabConfig').classList.toggle('active', tab === 'config');
     document.getElementById('tabStats').classList.toggle('active', tab === 'stats');
   };
 
-  // ── Key expiry countdown ──
+  // ── Key info + countdown ──
   async function loadKeyInfo() {
     try {
       const res  = await fetch('/api/key_info');
       const data = await res.json();
-      if (data.expires_at) {
-        startCountdown(new Date(data.expires_at + 'Z'));
-      }
+      _myKey = data.key || '';
+      if (document.getElementById('keyName'))  document.getElementById('keyName').textContent  = data.name || '—';
+      if (document.getElementById('keyValue')) document.getElementById('keyValue').textContent = _myKey || '—';
+      if (data.expires_at) startCountdown(new Date(data.expires_at + 'Z'));
     } catch (_) {}
   }
 
@@ -54,15 +56,14 @@
         countdownEl.textContent = '⚠ Key expired — redirecting…';
         countdownEl.className = 'key-countdown expired';
         clearInterval(countdownTimer);
+        localStorage.removeItem('weyn_auth_key');
         setTimeout(() => { window.location.href = '/gate'; }, 3000);
         return;
       }
       const h = Math.floor(diff / 3600000);
       const m = Math.floor((diff % 3600000) / 60000);
       const s = Math.floor((diff % 60000) / 1000);
-      const label = h > 0
-        ? `${h}h ${m}m ${s}s`
-        : m > 0 ? `${m}m ${s}s` : `${s}s`;
+      const label = h > 0 ? `${h}h ${m}m ${s}s` : m > 0 ? `${m}m ${s}s` : `${s}s`;
       countdownEl.textContent = `⏱ Key expires in: ${label}`;
       countdownEl.className = 'key-countdown' + (diff < 600000 ? ' warning' : '');
     }
@@ -70,7 +71,53 @@
     countdownTimer = setInterval(tick, 1000);
   }
 
-  // ── SSE stream ──
+  // ── Copy key ──
+  window.copyKey = function() {
+    if (!_myKey) return;
+    const btn = document.getElementById('copyKeyBtn');
+    navigator.clipboard.writeText(_myKey).then(() => {
+      btn.textContent = '✓  COPIED!';
+      btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = '📋 \u00a0COPY KEY'; btn.classList.remove('copied'); }, 2000);
+    }).catch(() => {
+      btn.textContent = '✗  Copy failed';
+      setTimeout(() => { btn.textContent = '📋 \u00a0COPY KEY'; }, 2000);
+    });
+  };
+
+  // ── Revoke device ──
+  window.revokeDevice = async function() {
+    const btn = document.getElementById('revokeBtn');
+    if (!confirm('This will unbind your key from this device. You will be logged out and can log in from a different device. Continue?')) return;
+    btn.disabled = true;
+    btn.textContent = 'Revoking…';
+    try {
+      const res = await fetch('/api/revoke_device', { method: 'POST' });
+      const data = await res.json();
+      if (data.ok) {
+        localStorage.removeItem('weyn_auth_key');
+        localStorage.removeItem('weyn_device_id');
+        window.location.href = '/gate';
+      } else {
+        alert(data.error || 'Failed to revoke device.');
+        btn.disabled = false;
+        btn.textContent = '🔓 \u00a0REVOKE THIS DEVICE';
+      }
+    } catch (e) {
+      alert('Connection error: ' + e.message);
+      btn.disabled = false;
+      btn.textContent = '🔓 \u00a0REVOKE THIS DEVICE';
+    }
+  };
+
+  // ── Logout ──
+  window.logout = async function() {
+    localStorage.removeItem('weyn_auth_key');
+    await fetch('/api/logout', { method: 'POST' });
+    window.location.href = '/gate';
+  };
+
+  // ── SSE stream (always running — updates DOM regardless of active tab) ──
   function startSSE() {
     if (evtSource) evtSource.close();
     evtSource = new EventSource('/api/stats');
@@ -79,6 +126,9 @@
       updateStats(d);
       updateHits(d.recent_hits || []);
       setRunning(d.running);
+    };
+    evtSource.onerror = () => {
+      // browser handles reconnect automatically
     };
   }
 
@@ -108,6 +158,13 @@
     if (d.method) {
       const labels = { '1':'M1','2':'M2','3':'M3','4':'M4 ★' };
       methodBadge.textContent = labels[d.method] || d.method;
+    }
+    // Flash the LIVE STATS tab when running and stats change
+    const statsTab = document.getElementById('tabStats');
+    if (d.running && statsTab && !statsTab.classList.contains('active')) {
+      statsTab.classList.add('live');
+    } else {
+      statsTab && statsTab.classList.remove('live');
     }
   }
 
@@ -141,11 +198,9 @@
     if (running) {
       statusBar.textContent = '● SCANNING...';
       statusBar.classList.add('running');
-      document.getElementById('tabStats').textContent = '◈  LIVE STATS ●';
     } else {
       statusBar.textContent = 'IDLE';
       statusBar.classList.remove('running');
-      document.getElementById('tabStats').textContent = '◈  LIVE STATS';
     }
   }
 
@@ -176,7 +231,6 @@
       const data = await res.json();
       if (!res.ok) { alert(data.error || 'Failed to start.'); return; }
       setRunning(true);
-      switchMainTab('stats');
     } catch (err) { alert('Connection error: ' + err.message); }
   });
 
