@@ -3,20 +3,15 @@ import json
 import time
 import threading
 from datetime import timedelta
-from flask import Flask, render_template, request, jsonify, Response, session, redirect, url_for, make_response
-from werkzeug.middleware.proxy_fix import ProxyFix
+from flask import Flask, render_template, request, jsonify, Response, session, redirect, url_for
 import weyn
 import auth
 
 app = Flask(__name__)
-app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
-
 app.secret_key = os.environ.get('SESSION_SECRET')
-
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=365)
-app.config['SESSION_COOKIE_HTTPONLY']    = True
-app.config['SESSION_COOKIE_SAMESITE']   = 'Lax'
-app.config['SESSION_COOKIE_SECURE']     = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_HTTPONLY'] = True
 
 auth.init_db()
 
@@ -24,61 +19,17 @@ _job_thread = None
 _stop_event = None
 _job_lock   = threading.Lock()
 
-ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'yuennix')
+ADMIN_PASSWORD = 'yuennix'
 
 
 # ── Auth helpers ─────────────────────────────────────────────────────────────
 
-_KEY_COOKIE      = 'weyn_key'
-_ADMIN_COOKIE    = 'weyn_admin'
-_KEY_COOKIE_AGE  = 365 * 24 * 3600  # 1 year in seconds
-
-def _set_key_cookie(response, key):
-    response.set_cookie(
-        _KEY_COOKIE, key,
-        max_age=_KEY_COOKIE_AGE,
-        httponly=True,
-        samesite='Lax',
-        secure=True,
-    )
-
-def _clear_key_cookie(response):
-    response.delete_cookie(_KEY_COOKIE)
-
-def _set_admin_cookie(response):
-    response.set_cookie(
-        _ADMIN_COOKIE, '1',
-        max_age=_KEY_COOKIE_AGE,
-        httponly=True,
-        samesite='Lax',
-        secure=True,
-    )
-
-def _clear_admin_cookie(response):
-    response.delete_cookie(_ADMIN_COOKIE)
-
 def is_authenticated():
-    key = session.get('auth_key')
-    if auth.check_key_valid(key):
-        return True
-    # Fallback: persistent cookie survives server restarts
-    cookie_key = request.cookies.get(_KEY_COOKIE)
-    if cookie_key and auth.check_key_valid(cookie_key):
-        session.permanent = True
-        session['auth_key'] = cookie_key
-        return True
-    return False
+    return auth.check_key_valid(session.get('auth_key'))
 
 
 def is_admin():
-    if session.get('admin_logged_in') is True:
-        return True
-    # Fallback: persistent cookie survives server restarts
-    if request.cookies.get(_ADMIN_COOKIE) == '1':
-        session.permanent = True
-        session['admin_logged_in'] = True
-        return True
-    return False
+    return session.get('admin_logged_in') is True
 
 
 # ── Gate / Auth routes ────────────────────────────────────────────────────────
@@ -113,18 +64,14 @@ def api_validate_key():
     if ok:
         session.permanent = True
         session['auth_key'] = key
-        resp = make_response(jsonify({'ok': True}))
-        _set_key_cookie(resp, key)
-        return resp
+        return jsonify({'ok': True})
     return jsonify({'ok': False, 'error': result})
 
 
 @app.route('/api/logout', methods=['POST'])
 def api_logout():
     session.pop('auth_key', None)
-    resp = make_response(jsonify({'ok': True}))
-    _clear_key_cookie(resp)
-    return resp
+    return jsonify({'ok': True})
 
 
 # ── Admin routes ──────────────────────────────────────────────────────────────
@@ -134,11 +81,8 @@ def admin():
     if request.method == 'POST':
         pw = (request.form.get('password') or '').strip()
         if pw == ADMIN_PASSWORD:
-            session.permanent = True
             session['admin_logged_in'] = True
-            resp = make_response(redirect('/admin'))
-            _set_admin_cookie(resp)
-            return resp
+            return redirect('/admin')
         return render_template('admin_login.html', error='Wrong password')
     if not is_admin():
         return render_template('admin_login.html', error=None)
@@ -148,9 +92,7 @@ def admin():
 @app.route('/admin/logout', methods=['POST'])
 def admin_logout():
     session.pop('admin_logged_in', None)
-    resp = make_response(jsonify({'ok': True}))
-    _clear_admin_cookie(resp)
-    return resp
+    return jsonify({'ok': True})
 
 
 @app.route('/admin/api/keys')
@@ -197,54 +139,6 @@ def admin_api_delete():
     return jsonify({'ok': True})
 
 
-@app.route('/admin/api/extend', methods=['POST'])
-def admin_api_extend():
-    if not is_admin():
-        return jsonify({'error': 'Unauthorized'}), 403
-    data = request.get_json()
-    key  = (data.get('key') or '').strip()
-    mins = int(data.get('extra_minutes', 0) or 0)
-    if not key or mins < 1:
-        return jsonify({'ok': False, 'error': 'Invalid input'})
-    auth.extend_key(key, mins)
-    return jsonify({'ok': True})
-
-
-@app.route('/admin/api/set_revoke_device', methods=['POST'])
-def admin_api_set_revoke_device():
-    if not is_admin():
-        return jsonify({'error': 'Unauthorized'}), 403
-    data    = request.get_json()
-    key     = (data.get('key') or '').strip()
-    enabled = data.get('enabled', True)
-    if not key:
-        return jsonify({'ok': False, 'error': 'Key required'})
-    auth.set_key_revoke_device(key, enabled)
-    return jsonify({'ok': True})
-
-
-@app.route('/admin/api/settings', methods=['GET'])
-def admin_api_settings_get():
-    if not is_admin():
-        return jsonify({'error': 'Unauthorized'}), 403
-    return jsonify({'revoke_device_enabled': auth.get_setting('revoke_device_enabled', '1') == '1'})
-
-
-@app.route('/admin/api/settings', methods=['POST'])
-def admin_api_settings_set():
-    if not is_admin():
-        return jsonify({'error': 'Unauthorized'}), 403
-    data = request.get_json()
-    enabled = data.get('revoke_device_enabled', True)
-    auth.set_setting('revoke_device_enabled', '1' if enabled else '0')
-    return jsonify({'ok': True})
-
-
-@app.route('/api/settings')
-def api_settings_public():
-    return jsonify({'revoke_device_enabled': auth.get_setting('revoke_device_enabled', '1') == '1'})
-
-
 # ── Main app routes (protected) ───────────────────────────────────────────────
 
 @app.route('/')
@@ -265,7 +159,6 @@ def start():
         data          = request.get_json()
         token         = (data.get('token') or '').strip()
         chat_id       = (data.get('chat_id') or '').strip()
-        method        = str(data.get('method', '1')).strip()
         min_followers = int(data.get('min_followers', 0) or 0)
 
         if not token or not chat_id:
@@ -301,14 +194,12 @@ def download_hits():
     path = weyn.HITS_FILE
     if not os.path.exists(path):
         return ('No hits have been saved yet.', 404)
-    with open(path, 'r', encoding='utf-8') as f:
-        content = f.read()
-    if not content.strip():
-        return ('No hits have been saved yet.', 404)
-    resp = make_response(content)
-    resp.headers['Content-Type'] = 'text/plain; charset=utf-8'
-    resp.headers['Content-Disposition'] = 'attachment; filename=weyn_hits.txt'
-    return resp
+    return __import__('flask').send_file(
+        os.path.abspath(path),
+        as_attachment=True,
+        download_name='weyn_hits.txt',
+        mimetype='text/plain'
+    )
 
 
 @app.route('/api/find_chat_id', methods=['POST'])
@@ -352,31 +243,11 @@ def key_info():
         return jsonify({'error': 'Unauthorized'}), 403
     key = session.get('auth_key')
     conn = auth.get_db()
-    row = conn.execute('SELECT name, expires_at, can_revoke_device FROM access_keys WHERE key=?', (key,)).fetchone()
+    row = conn.execute('SELECT name, expires_at FROM access_keys WHERE key=?', (key,)).fetchone()
     conn.close()
     if not row:
-        return jsonify({'name': 'Unknown', 'expires_at': None, 'key': key, 'can_revoke_device': True})
-    return jsonify({
-        'name': row['name'],
-        'expires_at': row['expires_at'],
-        'key': key,
-        'can_revoke_device': bool(row['can_revoke_device'])
-    })
-
-
-@app.route('/api/revoke_device', methods=['POST'])
-def revoke_device():
-    if not is_authenticated():
-        return jsonify({'error': 'Unauthorized'}), 403
-    key = session.get('auth_key') or request.cookies.get(_KEY_COOKIE)
-    conn = auth.get_db()
-    conn.execute('UPDATE access_keys SET device_id=NULL WHERE key=?', (key,))
-    conn.commit()
-    conn.close()
-    session.pop('auth_key', None)
-    resp = make_response(jsonify({'ok': True}))
-    _clear_key_cookie(resp)
-    return resp
+        return jsonify({'name': 'Unknown', 'expires_at': None})
+    return jsonify({'name': row['name'], 'expires_at': row['expires_at']})
 
 
 @app.route('/api/stats')
@@ -386,23 +257,43 @@ def stats():
 
     def generate():
         while True:
+            m         = weyn._web_state.get('method') or '1'
             running   = weyn._web_state.get('running', False)
             tg_status = weyn._web_state.get('tg_status', '')
             tg_error  = weyn._web_state.get('tg_error', '')
-            payload = {
-                'running'    : running,
-                'method'     : '1',
-                'hits'       : weyn._m1_hits,
-                'good'       : weyn._m1_good_insta,
-                'bad_insta'  : weyn._m1_bad_insta,
-                'bad_email'  : weyn._m1_bad_email,
-                'taken'      : weyn._m1_taken,
-                'limit'      : weyn._m1_limit,
-                'total'      : weyn._m1_total,
-                'recent_hits': list(weyn._m1_found_emails[-20:]),
-                'tg_status'  : tg_status,
-                'tg_error'   : tg_error,
-            }
+            if m == '1':
+                payload = {
+                    'running'    : running,
+                    'method'     : '1',
+                    'hits'       : weyn._m1_hits,
+                    'good'       : weyn._m1_good_insta,
+                    'bad_insta'  : weyn._m1_bad_insta,
+                    'bad_email'  : weyn._m1_bad_email,
+                    'taken'      : weyn._m1_taken,
+                    'limit'      : weyn._m1_limit,
+                    'total'      : weyn._m1_total,
+                    'verified'   : 0,
+                    'recent_hits': list(weyn._m1_found_emails[-20:]),
+                    'tg_status'  : tg_status,
+                    'tg_error'   : tg_error,
+                }
+            else:
+                with weyn._web_lock:
+                    payload = {
+                        'running'    : running,
+                        'method'     : m,
+                        'hits'       : weyn._web_state.get('hits', 0),
+                        'good'       : weyn._web_state.get('good', 0),
+                        'bad_insta'  : weyn._web_state.get('bad_insta', 0),
+                        'bad_email'  : 0,
+                        'taken'      : weyn._web_state.get('taken', 0),
+                        'limit'      : weyn._web_state.get('limit', 0),
+                        'total'      : 0,
+                        'verified'   : weyn._web_state.get('verified', 0),
+                        'recent_hits': list(weyn._web_state.get('recent_hits', []))[-20:],
+                        'tg_status'  : tg_status,
+                        'tg_error'   : tg_error,
+                    }
             yield f"data: {json.dumps(payload)}\n\n"
             time.sleep(0.5)
 
