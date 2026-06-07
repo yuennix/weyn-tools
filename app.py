@@ -11,7 +11,7 @@ import auth
 app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
-app.secret_key = os.environ.get('SESSION_SECRET', 'weyn-tools-secret-8x2k9p')
+app.secret_key = os.environ.get('SESSION_SECRET')
 
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=365)
 app.config['SESSION_COOKIE_HTTPONLY']    = True
@@ -24,7 +24,7 @@ _job_thread = None
 _stop_event = None
 _job_lock   = threading.Lock()
 
-ADMIN_PASSWORD = 'yuennix'
+ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'yuennix')
 
 
 # ── Auth helpers ─────────────────────────────────────────────────────────────
