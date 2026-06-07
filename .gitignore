@@ -1,3 +1,5 @@
+keys.db
+*.db
 tokens.txt
 google.txt
 weyn_hits.txt
