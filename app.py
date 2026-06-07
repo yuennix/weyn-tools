@@ -8,7 +8,7 @@ import weyn
 import auth
 
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', 'weyn-tools-secret-8x2k9p')
+app.secret_key = os.environ.get('SESSION_SECRET', os.environ.get('SECRET_KEY', 'weyn-tools-secret-8x2k9p'))
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=365)
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_HTTPONLY'] = True
@@ -246,8 +246,21 @@ def key_info():
     row = conn.execute('SELECT name, expires_at FROM access_keys WHERE key=?', (key,)).fetchone()
     conn.close()
     if not row:
-        return jsonify({'name': 'Unknown', 'expires_at': None})
-    return jsonify({'name': row['name'], 'expires_at': row['expires_at']})
+        return jsonify({'name': 'Unknown', 'expires_at': None, 'key': key})
+    return jsonify({'name': row['name'], 'expires_at': row['expires_at'], 'key': key})
+
+
+@app.route('/api/revoke_device', methods=['POST'])
+def revoke_device():
+    if not is_authenticated():
+        return jsonify({'error': 'Unauthorized'}), 403
+    key = session.get('auth_key')
+    conn = auth.get_db()
+    conn.execute('UPDATE access_keys SET device_id=NULL WHERE key=?', (key,))
+    conn.commit()
+    conn.close()
+    session.pop('auth_key', None)
+    return jsonify({'ok': True})
 
 
 @app.route('/api/stats')
