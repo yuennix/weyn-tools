@@ -13,4 +13,5 @@ dependencies = [
     "psycopg2-binary>=2.9.12",
     "pytelegrambotapi>=4.34.0",
     "requests>=2.34.2",
+    "werkzeug>=3.1.8",
 ]
