@@ -720,7 +720,7 @@ def _m1_rest_v1(username):
                         return val
                 return "-"
             elif status == "fail":
-                return "Fail: " + result.get("message", "")
+                return "-"
             if attempt < max_retries - 1:
                 continue
             return "-"

@@ -301,12 +301,14 @@ def download_hits():
     path = weyn.HITS_FILE
     if not os.path.exists(path):
         return ('No hits have been saved yet.', 404)
-    return __import__('flask').send_file(
-        os.path.abspath(path),
-        as_attachment=True,
-        download_name='weyn_hits.txt',
-        mimetype='text/plain'
-    )
+    with open(path, 'r', encoding='utf-8') as f:
+        content = f.read()
+    if not content.strip():
+        return ('No hits have been saved yet.', 404)
+    resp = make_response(content)
+    resp.headers['Content-Type'] = 'text/plain; charset=utf-8'
+    resp.headers['Content-Disposition'] = 'attachment; filename=weyn_hits.txt'
+    return resp
 
 
 @app.route('/api/find_chat_id', methods=['POST'])
