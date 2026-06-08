@@ -1,4 +1,4 @@
-modules = ["python-3.11", "web", "nodejs-20", "bash"]
+modules = ["web", "nodejs-20", "bash", "python-3.11"]
 [agent]
 expertMode = true
 stack = "FLASK_VANILLA_JS"
@@ -28,7 +28,7 @@ outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = ".pythonlibs/bin/gunicorn --bind 0.0.0.0:5000 --reuse-port --reload --worker-class=gthread --workers=2 --threads=8 main:app"
+args = "python -m gunicorn --bind 0.0.0.0:5000 --reuse-port --reload main:app"
 waitForPort = 5000
 
 [[ports]]
@@ -36,5 +36,5 @@ localPort = 5000
 externalPort = 80
 
 [deployment]
-deploymentTarget = "vm"
-run = [".pythonlibs/bin/gunicorn", "--bind=0.0.0.0:5000", "--reuse-port", "--worker-class=gthread", "--workers=2", "--threads=8", "main:app"]
+deploymentTarget = "autoscale"
+run = ["gunicorn", "--bind", "0.0.0.0:5000", "main:app"]
