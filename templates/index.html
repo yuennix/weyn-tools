@@ -18,6 +18,7 @@
         </div>
         <a href="/admin" class="admin-toggle-btn">⚙ ADMIN</a>
       </div>
+      <div class="banner-expiry" id="bannerExpiry">key expires at <span id="bannerExpiryTime">--:--</span></div>
       <pre class="banner">
  ██╗    ██╗███████╗██╗   ██╗███╗   ██╗
  ██║    ██║██╔════╝╚██╗ ██╔╝████╗  ██║
@@ -69,15 +70,6 @@
         <div id="tgStatus" class="tg-status-bar"></div>
         <div id="statusBar" class="status-bar">IDLE</div>
 
-        <!-- ── Key Expiry Timer ── -->
-        <div class="expiry-card" id="expiryCard">
-          <div class="expiry-label">KEY EXPIRES IN</div>
-          <div class="expiry-countdown" id="expiryCountdown">--:--:--</div>
-          <div class="expiry-bar-track">
-            <div class="expiry-bar-fill" id="expiryBarFill"></div>
-          </div>
-          <div class="expiry-key-name" id="expiryKeyName"></div>
-        </div>
 
       </section>
 
@@ -112,8 +104,12 @@
             <div class="stat-label">RATE LIMIT</div>
           </div>
           <div class="stat-card cyan">
+            <div class="stat-value" id="s-scanned">0</div>
+            <div class="stat-label">SCANNED IDs</div>
+          </div>
+          <div class="stat-card cyan">
             <div class="stat-value" id="s-total">0</div>
-            <div class="stat-label">TOTAL SCANNED</div>
+            <div class="stat-label">TOTAL HITS</div>
           </div>
         </div>
 
@@ -132,9 +128,11 @@
   <script src="/static/app.js"></script>
   <script>
     // ── Key expiry countdown ──────────────────────────────
-    let _keyExpiry    = null;
-    let _keyApproved  = null;
-    let _redirecting  = false;
+    let _keyExpiry   = null;
+    let _redirecting = false;
+
+    const _bannerTime = document.getElementById('bannerExpiryTime');
+    const _bannerWrap = document.getElementById('bannerExpiry');
 
     async function loadKeyInfo() {
       try {
@@ -147,15 +145,12 @@
         if (data.name) {
           nameEl.textContent = data.name.toUpperCase();
           sepEl.style.display = '';
-          document.getElementById('expiryKeyName').textContent = data.name.toUpperCase();
         }
-        _keyExpiry   = data.expires_at   ? new Date(data.expires_at   + 'Z') : null;
-        _keyApproved = data.approved_at  ? new Date(data.approved_at  + 'Z') : null;
+        _keyExpiry = data.expires_at ? new Date(data.expires_at + 'Z') : null;
 
         if (!_keyExpiry) {
-          document.getElementById('expiryCountdown').textContent = 'PENDING';
-          document.getElementById('keyTimer').textContent = 'PENDING APPROVAL';
-          document.getElementById('keyTimer').className   = 'key-info-timer warning';
+          _bannerTime.textContent = 'pending';
+          _bannerWrap.className   = 'banner-expiry warning';
         }
       } catch(e) {}
     }
@@ -163,55 +158,28 @@
     function redirectExpired() {
       if (_redirecting) return;
       _redirecting = true;
-      const card = document.getElementById('expiryCard');
-      card.className = 'expiry-card danger';
-      document.getElementById('expiryCountdown').textContent = 'EXPIRED';
-      document.getElementById('expiryBarFill').style.width = '0%';
-      document.getElementById('keyTimer').textContent = 'EXPIRED';
-      document.getElementById('keyTimer').className   = 'key-info-timer danger';
+      _bannerTime.textContent = 'expired';
+      _bannerWrap.className   = 'banner-expiry danger';
       setTimeout(() => { window.location.href = '/gate'; }, 2500);
     }
 
     function updateTimer() {
       if (!_keyExpiry) return;
-      const now  = Date.now();
-      const diff = _keyExpiry - now;
+      const diff = _keyExpiry - Date.now();
       if (diff <= 0) { redirectExpired(); return; }
 
+      const pad = n => String(n).padStart(2, '0');
       const h   = Math.floor(diff / 3600000);
       const m   = Math.floor((diff % 3600000) / 60000);
       const s   = Math.floor((diff % 60000)   / 1000);
-      const pad = n => String(n).padStart(2, '0');
-      const txt = `${pad(h)}:${pad(m)}:${pad(s)}`;
+      _bannerTime.textContent = h > 0 ? `${pad(h)}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
 
-      // small header timer
-      const headerEl = document.getElementById('keyTimer');
-      headerEl.textContent = `EXPIRES IN ${txt}`;
-
-      // big sidebar countdown
-      const countdown = document.getElementById('expiryCountdown');
-      const card      = document.getElementById('expiryCard');
-      const bar       = document.getElementById('expiryBarFill');
-      countdown.textContent = txt;
-
-      // progress bar
-      const total    = _keyApproved ? (_keyExpiry - _keyApproved) : diff;
-      const pct      = Math.max(0, Math.min(100, (diff / total) * 100));
-      bar.style.width = pct + '%';
-
-      // colour states
       if (diff < 5 * 60 * 1000) {
-        card.className = 'expiry-card danger';
-        countdown.className = 'expiry-countdown danger';
-        headerEl.className  = 'key-info-timer danger';
+        _bannerWrap.className = 'banner-expiry danger';
       } else if (diff < 30 * 60 * 1000) {
-        card.className = 'expiry-card warning';
-        countdown.className = 'expiry-countdown warning';
-        headerEl.className  = 'key-info-timer warning';
+        _bannerWrap.className = 'banner-expiry warning';
       } else {
-        card.className = 'expiry-card';
-        countdown.className = 'expiry-countdown';
-        headerEl.className  = 'key-info-timer';
+        _bannerWrap.className = 'banner-expiry';
       }
     }
 
