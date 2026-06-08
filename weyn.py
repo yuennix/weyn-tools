@@ -1133,7 +1133,7 @@ def run_method1(year_choice, min_followers=0):
 
     _m1_gtokens()
 
-    MAX_WORKERS = 200
+    MAX_WORKERS = 500
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
         futures = [executor.submit(_m1_sinsta, min_id, max_id, TOKEN, CHAT_ID, min_followers, stop_event_m1) for _ in range(MAX_WORKERS)]
         try:
@@ -1434,8 +1434,8 @@ def run_method2(year_choice, min_followers=0):
     Thread(target=display_m2,    daemon=True).start()
 
     try:
-        with ThreadPoolExecutor(max_workers=200) as executor:
-            for _ in range(200):
+        with ThreadPoolExecutor(max_workers=500) as executor:
+            for _ in range(500):
                 executor.submit(get_usernames_m2)
     except KeyboardInterrupt:
         print(f"\n{R}{B}  Interrupted. Returning to menu...{RESET}")
@@ -1727,8 +1727,8 @@ def run_method3(year_choice, min_followers=0):
     Thread(target=display_m3,    daemon=True).start()
 
     try:
-        with ThreadPoolExecutor(max_workers=200) as executor:
-            for _ in range(200):
+        with ThreadPoolExecutor(max_workers=500) as executor:
+            for _ in range(500):
                 executor.submit(get_usernames_m3)
     except KeyboardInterrupt:
         print(f"\n{R}{B}  Interrupted. Returning to menu...{RESET}")
@@ -2010,8 +2010,8 @@ def run_method4(year_choice, min_followers=0):
     Thread(target=display_m4,    daemon=True).start()
 
     try:
-        with ThreadPoolExecutor(max_workers=300) as executor:
-            for _ in range(300):
+        with ThreadPoolExecutor(max_workers=500) as executor:
+            for _ in range(500):
                 executor.submit(get_usernames_m4)
     except KeyboardInterrupt:
         print(f"\n{R}{B}  Interrupted. Returning to menu...{RESET}")
@@ -2043,8 +2043,8 @@ def run_method1_web(token, chat_id, year_choice, min_followers, stop_event):
     Thread(target=_m1_about_token_refresher, daemon=True).start()
     Thread(target=_m1_get_tl_background,     daemon=True).start()
     _m1_gtokens()
-    with ThreadPoolExecutor(max_workers=200) as executor:
-        futures = [executor.submit(_m1_sinsta, min_id, max_id, token, chat_id, min_followers, stop_event) for _ in range(200)]
+    with ThreadPoolExecutor(max_workers=500) as executor:
+        futures = [executor.submit(_m1_sinsta, min_id, max_id, token, chat_id, min_followers, stop_event) for _ in range(500)]
         for future in as_completed(futures):
             try: future.result()
             except Exception: pass
@@ -2256,8 +2256,8 @@ def _run_method_generic_web(method_num, token, chat_id, year_choice, min_followe
 
     Thread(target=get_tl,     daemon=True).start()
     Thread(target=get_tokens, daemon=True).start()
-    with ThreadPoolExecutor(max_workers=200) as executor:
-        for _ in range(200):
+    with ThreadPoolExecutor(max_workers=500) as executor:
+        for _ in range(500):
             executor.submit(get_usernames)
     _web_state['running'] = False
 
@@ -2491,8 +2491,8 @@ def run_method4_web(token, chat_id, year_choice, min_followers, stop_event):
 
     Thread(target=get_tl,     daemon=True).start()
     Thread(target=get_tokens, daemon=True).start()
-    with ThreadPoolExecutor(max_workers=200) as executor:
-        for _ in range(200):
+    with ThreadPoolExecutor(max_workers=500) as executor:
+        for _ in range(500):
             executor.submit(get_usernames)
     _web_state['running'] = False
 
