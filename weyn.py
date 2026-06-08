@@ -137,11 +137,6 @@ def format_hit(hit_num, username, email, followers, following, bio, year_label, 
 │  𝐁𝐢𝐨        ➤  {bio}
 │  𝐑𝐞𝐬𝐞𝐭      ➤  {reset_text}
 │
-├──〔 𝐀𝐁𝐎𝐔𝐓 𝐓𝐇𝐈𝐒 𝐀𝐂𝐂𝐎𝐔𝐍𝐓 〕───────────┤
-│
-║ Date Joined    : {join_date}
-║ Country        : {country}
-│
 ├──〔 𝐏𝐑𝐎𝐅𝐈𝐋𝐄 𝐋𝐈𝐍𝐊 〕──────────────────┤
 │
 │  https://www.instagram.com/{username}
@@ -713,10 +708,12 @@ def _m1_get_masked(query):
     }
     try:
         response = requests.post(url, data=payload, headers=headers, timeout=20)
-        email = next((i["contact_point"] for i in response.json()["data"]["caa_ar_ig_account_search"]["contact_points"] if i["type"] == "EMAIL"), None)
-        return email
+        contact_points = response.json()["data"]["caa_ar_ig_account_search"]["contact_points"]
+        has_phone = any(i["type"] == "PHONE" for i in contact_points)
+        email = next((i["contact_point"] for i in contact_points if i["type"] == "EMAIL"), None)
+        return email, has_phone
     except Exception:
-        return None
+        return None, False
 
 def _m1_get_country_flag(country_name):
     if not country_name or country_name in ["-", "Paylaşılmadı", "None", ""]:
@@ -918,7 +915,9 @@ def _m1_save_hit(username, user, token, chat_id):
         country_nm = about.get("country") or "-"
         country_fl = _m1_get_country_flag(country_nm)
         country    = f"{country_nm} {country_fl}".strip() if country_fl else country_nm
-        masked     = _m1_get_masked(username)
+        masked, has_phone = _m1_get_masked(username)
+        if has_phone:
+            return
         email_str  = f"{username}@gmail.com"
         if masked:
             reset_text = masked

@@ -183,6 +183,7 @@
 
       <div id="genResult" style="display:none; margin-top:20px;">
         <div class="key-display" id="genKeyDisplay"></div>
+        <button class="btn btn-start btn-full" id="copyBtn" onclick="copyKey()" style="margin-top:10px; margin-bottom:10px;">COPY KEY</button>
         <div class="key-note">⏳ Your key is pending admin approval.<br>Copy it and use it in the <strong>Enter Key</strong> tab once approved.</div>
       </div>
     </div>
@@ -262,6 +263,18 @@
         setMsg(msg, '✗ Connection error', 'fail');
       }
       btn.disabled = false;
+    }
+
+    function copyKey() {
+      const key = document.getElementById('genKeyDisplay').textContent.trim();
+      const btn = document.getElementById('copyBtn');
+      navigator.clipboard.writeText(key).then(() => {
+        btn.textContent = '✓ COPIED!';
+        setTimeout(() => { btn.textContent = 'COPY KEY'; }, 2000);
+      }).catch(() => {
+        btn.textContent = 'COPY FAILED';
+        setTimeout(() => { btn.textContent = 'COPY KEY'; }, 2000);
+      });
     }
 
     function setMsg(el, text, type) {
