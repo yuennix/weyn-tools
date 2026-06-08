@@ -1,4 +1,5 @@
 (() => {
+ (() => {
   const selectedMethod = '1';
   let evtSource        = null;
   let knownHits      = new Set();
@@ -14,7 +15,7 @@
   const hitsFeed    = document.getElementById('hitsFeed');
   const hitsCount   = document.getElementById('hitsCount');
 
-  const statIds = ['hits','good','bad_insta','bad_email','taken','limit','total','verified'];
+  const statIds = ['hits','good','bad_insta','bad_email','taken','limit','total'];
 
   // ── Persist token & chat_id across refreshes ──
   const tokenEl  = document.getElementById('token');
@@ -68,8 +69,7 @@
       }
     });
     if (d.method) {
-      const labels = { '1':'M1','2':'M2','3':'M3','4':'M4 ★' };
-      methodBadge.textContent = labels[d.method] || d.method;
+      methodBadge.textContent = 'M1';
     }
   }
 
