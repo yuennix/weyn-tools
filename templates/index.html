@@ -10,6 +10,14 @@
   <div class="app">
 
     <header class="header">
+      <div class="header-topbar">
+        <div class="key-info-bar">
+          <span class="key-info-name" id="keyName"></span>
+          <span class="key-info-sep" id="keyInfoSep" style="display:none">·</span>
+          <span class="key-info-timer" id="keyTimer"></span>
+        </div>
+        <a href="/admin" class="admin-toggle-btn">⚙ ADMIN</a>
+      </div>
       <pre class="banner">
  ██╗    ██╗███████╗██╗   ██╗███╗   ██╗
  ██║    ██║██╔════╝╚██╗ ██╔╝████╗  ██║
@@ -115,5 +123,55 @@
   </div>
 
   <script src="/static/app.js"></script>
+  <script>
+    // ── Key expiry countdown ──────────────────────────────
+    let _keyExpiry = null;
+
+    async function loadKeyInfo() {
+      try {
+        const res  = await fetch('/api/key_info');
+        const data = await res.json();
+        const nameEl  = document.getElementById('keyName');
+        const sepEl   = document.getElementById('keyInfoSep');
+        const timerEl = document.getElementById('keyTimer');
+
+        if (data.name) {
+          nameEl.textContent = data.name.toUpperCase();
+          sepEl.style.display = '';
+        }
+        _keyExpiry = data.expires_at ? new Date(data.expires_at + 'Z') : null;
+        if (!_keyExpiry) {
+          timerEl.textContent = 'PENDING APPROVAL';
+          timerEl.className   = 'key-info-timer warning';
+        }
+      } catch(e) {}
+    }
+
+    function updateTimer() {
+      const el = document.getElementById('keyTimer');
+      if (!_keyExpiry) return;
+      const diff = _keyExpiry - Date.now();
+      if (diff <= 0) {
+        el.textContent = 'KEY EXPIRED';
+        el.className   = 'key-info-timer danger';
+        return;
+      }
+      const h   = Math.floor(diff / 3600000);
+      const m   = Math.floor((diff % 3600000) / 60000);
+      const s   = Math.floor((diff % 60000) / 1000);
+      const pad = n => String(n).padStart(2, '0');
+      el.textContent = `EXPIRES IN ${pad(h)}:${pad(m)}:${pad(s)}`;
+      if (diff < 5 * 60 * 1000) {
+        el.className = 'key-info-timer danger';
+      } else if (diff < 30 * 60 * 1000) {
+        el.className = 'key-info-timer warning';
+      } else {
+        el.className = 'key-info-timer';
+      }
+    }
+
+    loadKeyInfo();
+    setInterval(updateTimer, 1000);
+  </script>
 </body>
 </html>

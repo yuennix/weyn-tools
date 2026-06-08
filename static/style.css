@@ -60,6 +60,60 @@ body {
   text-shadow: 0 0 10px var(--magenta);
 }
 
+/* ─── Header topbar ─── */
+.header-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.key-info-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+}
+.key-info-name {
+  color: var(--cyan);
+  letter-spacing: 1px;
+}
+.key-info-sep {
+  color: var(--muted);
+}
+.key-info-timer {
+  color: var(--green);
+  letter-spacing: 1px;
+}
+.key-info-timer.warning {
+  color: var(--yellow);
+}
+.key-info-timer.danger {
+  color: var(--red);
+  animation: blink 1s step-start infinite;
+}
+@keyframes blink {
+  50% { opacity: 0.3; }
+}
+
+.admin-toggle-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-family: var(--font);
+  font-size: 11px;
+  letter-spacing: 2px;
+  padding: 5px 14px;
+  border-radius: 6px;
+  text-decoration: none;
+  transition: color .2s, border-color .2s;
+  white-space: nowrap;
+}
+.admin-toggle-btn:hover {
+  color: var(--cyan);
+  border-color: var(--cyan);
+}
+
 /* ─── Main grid ─── */
 .main {
   display: grid;
