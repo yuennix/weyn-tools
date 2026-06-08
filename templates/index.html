@@ -147,13 +147,23 @@
       } catch(e) {}
     }
 
+    let _redirecting = false;
+
+    function redirectExpired() {
+      if (_redirecting) return;
+      _redirecting = true;
+      const el = document.getElementById('keyTimer');
+      el.textContent = 'KEY EXPIRED — REDIRECTING…';
+      el.className   = 'key-info-timer danger';
+      setTimeout(() => { window.location.href = '/gate'; }, 2000);
+    }
+
     function updateTimer() {
       const el = document.getElementById('keyTimer');
       if (!_keyExpiry) return;
       const diff = _keyExpiry - Date.now();
       if (diff <= 0) {
-        el.textContent = 'KEY EXPIRED';
-        el.className   = 'key-info-timer danger';
+        redirectExpired();
         return;
       }
       const h   = Math.floor(diff / 3600000);
@@ -170,8 +180,25 @@
       }
     }
 
+    // Also re-check the server every 60s to catch revocations
+    async function checkKeyStillValid() {
+      try {
+        const res  = await fetch('/api/key_info');
+        const data = await res.json();
+        if (data.error) { redirectExpired(); return; }
+        if (data.expires_at) {
+          const newExpiry = new Date(data.expires_at + 'Z');
+          if (newExpiry <= new Date()) { redirectExpired(); return; }
+          _keyExpiry = newExpiry;
+        } else if (_keyExpiry === null) {
+          // still pending, no change
+        }
+      } catch(e) {}
+    }
+
     loadKeyInfo();
     setInterval(updateTimer, 1000);
+    setInterval(checkKeyStillValid, 60000);
   </script>
 </body>
 </html>
