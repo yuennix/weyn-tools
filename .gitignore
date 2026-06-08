@@ -1,12 +1,12 @@
-keys.db
-*.db
 tokens.txt
 google.txt
 weyn_hits.txt
 @weyn_hits.txt
 *.txt
+*.db
 __pycache__/
 *.pyc
 *.pyo
 .cache/
 .pythonlibs/
+.local/
