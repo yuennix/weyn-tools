@@ -228,6 +228,7 @@ _m1_good_insta      = 0
 _m1_total           = 0
 _m1_taken           = 0
 _m1_limit           = 0
+_m1_scanned         = 0
 _m1_found_emails    = []
 _m1_found_lock      = Lock()
 _m1_hit_lock        = Lock()
@@ -591,7 +592,7 @@ def _m1_rest_bloks_v2(email):
         'x-pigeon-session-id': f"UFS-{uid4_4}-0",
     }
     try:
-        response = requests.post(url, data=payload, headers=headers, timeout=20)
+        response = requests.post(url, data=payload, headers=headers, timeout=8)
         if email in response.text:
             return email
         elif 'SOMETHING, GOT F3CKED' in response.text:
@@ -619,7 +620,7 @@ def _m1_rest_bloks(email):
             "search_query": email,
             "bloks_versioning_id": "dbfb0f84b6481f4ec0a033d7947fb45db546b8cee18dde220c4c1eefd3bb3dcb"
         }
-        with httpx.Client(http2=True) as client:
+        with httpx.Client(http2=True, timeout=8) as client:
             r = client.post(
                 "https://i.instagram.com/api/v1/bloks/async_action/com.bloks.www.caa.ar.search.async/",
                 data=data, headers=headers
@@ -1067,7 +1068,7 @@ def _m1_cgmail(email, token, chat_id, user, loc_session):
                 'accept-language': "en-IN,en-GB;q=0.9,en-US;q=0.8,en;q=0.7",
                 'Cookie': "__Host-GAPS=1:6oR-TWX06t3JKSEu3DqYRT_IWnQLlw:Rc9Z7lHTPNW6qMCN"
             }
-            resp2 = _m1__session.post(url2, params=params2, data=data2, headers=hdrs2, timeout=20)
+            resp2 = _m1__session.post(url2, params=params2, data=data2, headers=hdrs2, timeout=8)
             if '"gf.uar",1' in resp2.text:
                 _m1_save_hit(usr, user, token, chat_id)
                 return
@@ -1125,11 +1126,13 @@ def _m1_sinsta(min_id, max_id, token, chat_id, min_followers=0, stop_event=None)
             }
             resp = loc_session.post(_M1_CONFIG["insta_graphql"], headers=headers, data=data, timeout=5)
             if resp.status_code == 429:
-                time.sleep(3)
+                time.sleep(1)
                 continue
             if resp.status_code != 200:
                 time.sleep(0.1)
                 continue
+            global _m1_scanned
+            _m1_scanned += 1
             user = resp.json().get('data', {}).get('user')
             if user and user.get('username'):
                 followers = user.get('follower_count', 0)
@@ -1148,9 +1151,9 @@ def _m1_sinsta(min_id, max_id, token, chat_id, min_followers=0, stop_event=None)
 
 def run_method1(year_choice, min_followers=0):
     global _m1_hits, _m1_bad_insta, _m1_bad_email, _m1_good_insta
-    global _m1_total, _m1_taken, _m1_limit, _m1_found_emails
+    global _m1_total, _m1_taken, _m1_limit, _m1_found_emails, _m1_scanned
     _m1_hits = _m1_bad_insta = _m1_bad_email = _m1_good_insta = 0
-    _m1_total = _m1_taken = _m1_limit = 0
+    _m1_total = _m1_taken = _m1_limit = _m1_scanned = 0
     _m1_found_emails = []
 
     if year_choice is not None:
@@ -1213,9 +1216,9 @@ def run_method1(year_choice, min_followers=0):
 
 def run_method1_web(token, chat_id, year_choice, min_followers, stop_event):
     global _m1_hits, _m1_bad_insta, _m1_bad_email, _m1_good_insta
-    global _m1_total, _m1_taken, _m1_limit, _m1_found_emails
+    global _m1_total, _m1_taken, _m1_limit, _m1_found_emails, _m1_scanned
     _m1_hits = _m1_bad_insta = _m1_bad_email = _m1_good_insta = 0
-    _m1_total = _m1_taken = _m1_limit = 0
+    _m1_total = _m1_taken = _m1_limit = _m1_scanned = 0
     _m1_found_emails = []
     _write_session_separator(1)
     _web_state.update({'running': True, 'method': '1', 'hits': 0, 'good': 0,
