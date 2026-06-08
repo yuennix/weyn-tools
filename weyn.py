@@ -707,7 +707,7 @@ def _m1_get_masked(query):
         'Cookie': "csrftoken=o_6jxh33ZvsQ2eFMyRaM_q; datr=YMnlaTJAraHY5ADdYH8UqsTG; ig_did=2046A480-DF50-4660-A5CD-DC58F57C7A1C; mid=aeXJYAABAAGoDWzGwrGALDqzE3Np; dpr=3.558248996734619; wd=774x749"
     }
     try:
-        response = requests.post(url, data=payload, headers=headers, timeout=20)
+        response = requests.post(url, data=payload, headers=headers, timeout=8)
         contact_points = response.json()["data"]["caa_ar_ig_account_search"]["contact_points"]
         has_phone = any(i["type"] == "PHONE" for i in contact_points)
         email = next((i["contact_point"] for i in contact_points if i["type"] == "EMAIL"), None)
@@ -971,7 +971,7 @@ def _m1_cgmail(email, token, chat_id, user, loc_session):
             )
             resp = loc_session.post(
                 f"{_M1_CONFIG['google_url']}/_/signup/usernameavailability",
-                params=params, cookies=cookies, headers=headers, data=data
+                params=params, cookies=cookies, headers=headers, data=data, timeout=8
             )
             if '"gf.uar",1' in resp.text:
                 _m1_save_hit(usr, user, token, chat_id)
@@ -1070,20 +1070,26 @@ def _m1_sinsta(min_id, max_id, token, chat_id, min_followers=0, stop_event=None)
                 'doc_id': '7717269488336001',
             }
             resp = loc_session.post(_M1_CONFIG["insta_graphql"], headers=headers, data=data, timeout=5)
-            if resp.status_code == 200:
-                user = resp.json().get('data', {}).get('user')
-                if user and user.get('username'):
-                    followers = user.get('follower_count', 0)
-                    uid       = user.get('pk', 0)
-                    user_year = gdate(uid)
-                    if _M1_VIP_CONFIG["vip_date_min"] and user_year < _M1_VIP_CONFIG["vip_date_min"]:
-                        continue
-                    if _M1_VIP_CONFIG["vip_date_max"] and user_year > _M1_VIP_CONFIG["vip_date_max"]:
-                        continue
-                    if min_followers > 0 and followers < min_followers:
-                        continue
-                    _m1_cinstagram(user['username'] + _M1_CONFIG["domain"], token, chat_id, user, loc_session)
+            if resp.status_code == 429:
+                time.sleep(3)
+                continue
+            if resp.status_code != 200:
+                time.sleep(0.1)
+                continue
+            user = resp.json().get('data', {}).get('user')
+            if user and user.get('username'):
+                followers = user.get('follower_count', 0)
+                uid       = user.get('pk', 0)
+                user_year = gdate(uid)
+                if _M1_VIP_CONFIG["vip_date_min"] and user_year < _M1_VIP_CONFIG["vip_date_min"]:
+                    continue
+                if _M1_VIP_CONFIG["vip_date_max"] and user_year > _M1_VIP_CONFIG["vip_date_max"]:
+                    continue
+                if min_followers > 0 and followers < min_followers:
+                    continue
+                _m1_cinstagram(user['username'] + _M1_CONFIG["domain"], token, chat_id, user, loc_session)
         except Exception:
+            time.sleep(0.05)
             continue
 
 def run_method1(year_choice, min_followers=0):
