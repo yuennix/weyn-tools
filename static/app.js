@@ -14,7 +14,7 @@
   const hitsFeed    = document.getElementById('hitsFeed');
   const hitsCount   = document.getElementById('hitsCount');
 
-  const statIds = ['hits','good','bad_insta','bad_email','taken','limit','total'];
+  const statIds = ['hits','good','bad_insta','bad_email','taken','limit','scanned','total'];
 
   // ── Persist token & chat_id across refreshes ──
   const tokenEl  = document.getElementById('token');
@@ -36,6 +36,10 @@
       updateHits(d.recent_hits || []);
       setRunning(d.running);
     };
+    evtSource.addEventListener('expired', () => {
+      evtSource.close();
+      window.location.href = '/gate';
+    });
     evtSource.onerror = () => {
       // reconnect handled automatically by browser
     };
