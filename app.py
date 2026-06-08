@@ -261,3 +261,8 @@ def stats():
                 'tg_status'  : tg_status,
                 'tg_error'   : tg_error,
             }
+            yield f"data: {json.dumps(payload)}\n\n"
+            time.sleep(1)
+
+    return Response(generate(), mimetype='text/event-stream',
+                    headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
