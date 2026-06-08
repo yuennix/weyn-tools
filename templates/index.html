@@ -68,6 +68,17 @@
 
         <div id="tgStatus" class="tg-status-bar"></div>
         <div id="statusBar" class="status-bar">IDLE</div>
+
+        <!-- ── Key Expiry Timer ── -->
+        <div class="expiry-card" id="expiryCard">
+          <div class="expiry-label">KEY EXPIRES IN</div>
+          <div class="expiry-countdown" id="expiryCountdown">--:--:--</div>
+          <div class="expiry-bar-track">
+            <div class="expiry-bar-fill" id="expiryBarFill"></div>
+          </div>
+          <div class="expiry-key-name" id="expiryKeyName"></div>
+        </div>
+
       </section>
 
       <!-- ── RIGHT PANEL: Stats + Hits ── -->
@@ -121,62 +132,89 @@
   <script src="/static/app.js"></script>
   <script>
     // ── Key expiry countdown ──────────────────────────────
-    let _keyExpiry = null;
+    let _keyExpiry    = null;
+    let _keyApproved  = null;
+    let _redirecting  = false;
 
     async function loadKeyInfo() {
       try {
         const res  = await fetch('/api/key_info');
         const data = await res.json();
-        const nameEl  = document.getElementById('keyName');
-        const sepEl   = document.getElementById('keyInfoSep');
-        const timerEl = document.getElementById('keyTimer');
+        if (data.error) { redirectExpired(); return; }
 
+        const nameEl = document.getElementById('keyName');
+        const sepEl  = document.getElementById('keyInfoSep');
         if (data.name) {
           nameEl.textContent = data.name.toUpperCase();
           sepEl.style.display = '';
+          document.getElementById('expiryKeyName').textContent = data.name.toUpperCase();
         }
-        _keyExpiry = data.expires_at ? new Date(data.expires_at + 'Z') : null;
+        _keyExpiry   = data.expires_at   ? new Date(data.expires_at   + 'Z') : null;
+        _keyApproved = data.approved_at  ? new Date(data.approved_at  + 'Z') : null;
+
         if (!_keyExpiry) {
-          timerEl.textContent = 'PENDING APPROVAL';
-          timerEl.className   = 'key-info-timer warning';
+          document.getElementById('expiryCountdown').textContent = 'PENDING';
+          document.getElementById('keyTimer').textContent = 'PENDING APPROVAL';
+          document.getElementById('keyTimer').className   = 'key-info-timer warning';
         }
       } catch(e) {}
     }
 
-    let _redirecting = false;
-
     function redirectExpired() {
       if (_redirecting) return;
       _redirecting = true;
-      const el = document.getElementById('keyTimer');
-      el.textContent = 'KEY EXPIRED — REDIRECTING…';
-      el.className   = 'key-info-timer danger';
-      setTimeout(() => { window.location.href = '/gate'; }, 2000);
+      const card = document.getElementById('expiryCard');
+      card.className = 'expiry-card danger';
+      document.getElementById('expiryCountdown').textContent = 'EXPIRED';
+      document.getElementById('expiryBarFill').style.width = '0%';
+      document.getElementById('keyTimer').textContent = 'EXPIRED';
+      document.getElementById('keyTimer').className   = 'key-info-timer danger';
+      setTimeout(() => { window.location.href = '/gate'; }, 2500);
     }
 
     function updateTimer() {
-      const el = document.getElementById('keyTimer');
       if (!_keyExpiry) return;
-      const diff = _keyExpiry - Date.now();
-      if (diff <= 0) {
-        redirectExpired();
-        return;
-      }
+      const now  = Date.now();
+      const diff = _keyExpiry - now;
+      if (diff <= 0) { redirectExpired(); return; }
+
       const h   = Math.floor(diff / 3600000);
       const m   = Math.floor((diff % 3600000) / 60000);
-      const s   = Math.floor((diff % 60000) / 1000);
+      const s   = Math.floor((diff % 60000)   / 1000);
       const pad = n => String(n).padStart(2, '0');
-      el.textContent = `EXPIRES IN ${pad(h)}:${pad(m)}:${pad(s)}`;
+      const txt = `${pad(h)}:${pad(m)}:${pad(s)}`;
+
+      // small header timer
+      const headerEl = document.getElementById('keyTimer');
+      headerEl.textContent = `EXPIRES IN ${txt}`;
+
+      // big sidebar countdown
+      const countdown = document.getElementById('expiryCountdown');
+      const card      = document.getElementById('expiryCard');
+      const bar       = document.getElementById('expiryBarFill');
+      countdown.textContent = txt;
+
+      // progress bar
+      const total    = _keyApproved ? (_keyExpiry - _keyApproved) : diff;
+      const pct      = Math.max(0, Math.min(100, (diff / total) * 100));
+      bar.style.width = pct + '%';
+
+      // colour states
       if (diff < 5 * 60 * 1000) {
-        el.className = 'key-info-timer danger';
+        card.className = 'expiry-card danger';
+        countdown.className = 'expiry-countdown danger';
+        headerEl.className  = 'key-info-timer danger';
       } else if (diff < 30 * 60 * 1000) {
-        el.className = 'key-info-timer warning';
+        card.className = 'expiry-card warning';
+        countdown.className = 'expiry-countdown warning';
+        headerEl.className  = 'key-info-timer warning';
       } else {
-        el.className = 'key-info-timer';
+        card.className = 'expiry-card';
+        countdown.className = 'expiry-countdown';
+        headerEl.className  = 'key-info-timer';
       }
     }
 
-    // Also re-check the server every 60s to catch revocations
     async function checkKeyStillValid() {
       try {
         const res  = await fetch('/api/key_info');
@@ -186,8 +224,6 @@
           const newExpiry = new Date(data.expires_at + 'Z');
           if (newExpiry <= new Date()) { redirectExpired(); return; }
           _keyExpiry = newExpiry;
-        } else if (_keyExpiry === null) {
-          // still pending, no change
         }
       } catch(e) {}
     }

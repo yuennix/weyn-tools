@@ -498,6 +498,68 @@ body {
   letter-spacing: 0.5px;
 }
 
+/* ─── Key Expiry Timer Card ─── */
+.expiry-card {
+  margin-top: 14px;
+  border: 1px solid var(--green);
+  background: rgba(0, 230, 118, 0.05);
+  padding: 14px 16px 12px;
+  text-align: center;
+  transition: border-color 0.4s, background 0.4s;
+}
+.expiry-card.warning {
+  border-color: var(--yellow);
+  background: rgba(255, 234, 0, 0.05);
+}
+.expiry-card.danger {
+  border-color: var(--red);
+  background: rgba(255, 23, 68, 0.07);
+  animation: pulse 1s infinite;
+}
+.expiry-label {
+  font-size: 9px;
+  letter-spacing: 3px;
+  color: var(--muted);
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.expiry-countdown {
+  font-size: 28px;
+  font-weight: bold;
+  letter-spacing: 3px;
+  color: var(--green);
+  font-family: var(--font);
+  transition: color 0.4s;
+  line-height: 1;
+}
+.expiry-countdown.warning { color: var(--yellow); }
+.expiry-countdown.danger  {
+  color: var(--red);
+  animation: blink 1s step-start infinite;
+}
+.expiry-bar-track {
+  margin: 10px 0 8px;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.expiry-bar-fill {
+  height: 100%;
+  width: 100%;
+  background: var(--green);
+  border-radius: 2px;
+  transition: width 1s linear, background 0.4s;
+}
+.expiry-card.warning .expiry-bar-fill { background: var(--yellow); }
+.expiry-card.danger  .expiry-bar-fill { background: var(--red); }
+.expiry-key-name {
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
 /* ─── Responsive ─── */
 @media (max-width: 900px) {
   .main { grid-template-columns: 1fr; }

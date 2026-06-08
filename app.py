@@ -86,7 +86,7 @@ def api_key_info():
     conn.close()
     if not row:
         return jsonify({'error': 'Key not found'}), 404
-    return jsonify({'name': row['name'], 'expires_at': row['expires_at'], 'status': row['status']})
+    return jsonify({'name': row['name'], 'expires_at': row['expires_at'], 'approved_at': row['approved_at'], 'status': row['status']})
 
 
 # ── Admin routes ──────────────────────────────────────────────────────────────
