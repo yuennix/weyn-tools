@@ -8,7 +8,7 @@ import weyn
 import auth
 
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', 'weyn-tools-secret-8x2k9p')
+app.secret_key = os.environ.get('SESSION_SECRET')
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=365)
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_HTTPONLY'] = True
