@@ -1,5 +1,4 @@
 (() => {
- (() => {
   const selectedMethod = '1';
   let evtSource        = null;
   let knownHits      = new Set();

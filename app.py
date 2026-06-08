@@ -74,6 +74,21 @@ def api_logout():
     return jsonify({'ok': True})
 
 
+@app.route('/api/key_info')
+def api_key_info():
+    key = session.get('auth_key')
+    if not key:
+        return jsonify({'error': 'Not authenticated'}), 403
+    import sqlite3
+    conn = sqlite3.connect(auth.DB)
+    conn.row_factory = sqlite3.Row
+    row = conn.execute('SELECT name, expires_at, status FROM access_keys WHERE key=?', (key,)).fetchone()
+    conn.close()
+    if not row:
+        return jsonify({'error': 'Key not found'}), 404
+    return jsonify({'name': row['name'], 'expires_at': row['expires_at'], 'status': row['status']})
+
+
 # ── Admin routes ──────────────────────────────────────────────────────────────
 
 @app.route('/admin', methods=['GET', 'POST'])
