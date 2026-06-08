@@ -147,25 +147,6 @@
       line-height: 1.6;
     }
 
-    .copy-btn {
-      display: block;
-      width: 100%;
-      margin: 8px 0 12px;
-      padding: 10px;
-      background: rgba(0, 229, 255, 0.08);
-      border: 1px solid var(--cyan);
-      color: var(--cyan);
-      font-family: inherit;
-      font-size: 13px;
-      font-weight: 700;
-      letter-spacing: 2px;
-      border-radius: 6px;
-      cursor: pointer;
-      transition: background .2s;
-    }
-    .copy-btn:hover { background: rgba(0, 229, 255, 0.18); }
-    .copy-btn.copied { background: rgba(0, 230, 118, 0.12); border-color: var(--green); color: var(--green); }
-
     .tab-pane { display: none; }
     .tab-pane.active { display: block; }
   </style>
@@ -202,8 +183,7 @@
 
       <div id="genResult" style="display:none; margin-top:20px;">
         <div class="key-display" id="genKeyDisplay"></div>
-        <button class="copy-btn" id="copyBtn" onclick="copyKey()">📋 &nbsp;COPY KEY</button>
-        <div class="key-note">⏳ Your key is pending admin approval.<br>Use it in the <strong>Enter Key</strong> tab once approved.</div>
+        <div class="key-note">⏳ Your key is pending admin approval.<br>Copy it and use it in the <strong>Enter Key</strong> tab once approved.</div>
       </div>
     </div>
 
@@ -218,26 +198,6 @@
       }
       return id;
     }
-
-    // Auto-login: try stored key silently on page load
-    (async function autoLogin() {
-      const savedKey = localStorage.getItem('weyn_auth_key');
-      if (!savedKey) return;
-      try {
-        const res  = await fetch('/api/validate_key', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ key: savedKey, device_id: getDeviceId() })
-        });
-        const data = await res.json();
-        if (data.ok) {
-          window.location.href = '/';
-        } else {
-          // Key expired or revoked — clear it so user sees the gate normally
-          localStorage.removeItem('weyn_auth_key');
-        }
-      } catch(_) {}
-    })();
 
     function switchTab(tab) {
       document.getElementById('paneEnter').classList.toggle('active', tab === 'enter');
@@ -263,11 +223,9 @@
         });
         const data = await res.json();
         if (data.ok) {
-          localStorage.setItem('weyn_auth_key', key);
           setMsg(msg, '✓ Access granted! Loading…', 'ok');
           setTimeout(() => window.location.href = '/', 600);
         } else {
-          localStorage.removeItem('weyn_auth_key');
           setMsg(msg, '✗ ' + data.error, 'fail');
           btn.disabled = false;
         }
@@ -304,22 +262,6 @@
         setMsg(msg, '✗ Connection error', 'fail');
       }
       btn.disabled = false;
-    }
-
-    function copyKey() {
-      const key = document.getElementById('genKeyDisplay').textContent;
-      const btn = document.getElementById('copyBtn');
-      navigator.clipboard.writeText(key).then(() => {
-        btn.textContent = '✓  COPIED!';
-        btn.classList.add('copied');
-        setTimeout(() => {
-          btn.textContent = '📋 \u00a0COPY KEY';
-          btn.classList.remove('copied');
-        }, 2000);
-      }).catch(() => {
-        btn.textContent = '✗  Copy failed';
-        setTimeout(() => { btn.textContent = '📋 \u00a0COPY KEY'; }, 2000);
-      });
     }
 
     function setMsg(el, text, type) {

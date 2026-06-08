@@ -137,6 +137,11 @@ def format_hit(hit_num, username, email, followers, following, bio, year_label, 
 │  𝐁𝐢𝐨        ➤  {bio}
 │  𝐑𝐞𝐬𝐞𝐭      ➤  {reset_text}
 │
+├──〔 𝐀𝐁𝐎𝐔𝐓 𝐓𝐇𝐈𝐒 𝐀𝐂𝐂𝐎𝐔𝐍𝐓 〕───────────┤
+│
+║ Date Joined    : {join_date}
+║ Country        : {country}
+│
 ├──〔 𝐏𝐑𝐎𝐅𝐈𝐋𝐄 𝐋𝐈𝐍𝐊 〕──────────────────┤
 │
 │  https://www.instagram.com/{username}
@@ -499,7 +504,7 @@ def _m1_get_about_account(user_id, username):
 
 def _m1_rest_web_check_email(email):
     try:
-        with httpx.Client(http2=True, timeout=4) as client:
+        with httpx.Client(http2=True, timeout=6) as client:
             response = client.post(
                 "https://i.instagram.com/api/v1/users/check_email/",
                 data={"email": email},
@@ -541,7 +546,7 @@ def _m1_rest_bloks_v2(email):
         'x-pigeon-session-id': f"UFS-{uuid.uuid4()}-0",
     }
     try:
-        response = requests.post(url, data=payload, headers=headers, timeout=8)
+        response = requests.post(url, data=payload, headers=headers, timeout=20)
         if f"{email}" in response.text:
             return email
         elif 'SOMETHING, GOT F3CKED' in response.text:
@@ -570,7 +575,7 @@ def _m1_rest_bloks(email):
             "search_query": email,
             "bloks_versioning_id": "dbfb0f84b6481f4ec0a033d7947fb45db546b8cee18dde220c4c1eefd3bb3dcb"
         }
-        with httpx.Client(http2=True, timeout=8) as client:
+        with httpx.Client(http2=True) as client:
             r = client.post(
                 "https://i.instagram.com/api/v1/bloks/async_action/com.bloks.www.caa.ar.search.async/",
                 data=data, headers=headers
@@ -595,7 +600,7 @@ def _m1_rest_v1(username):
     max_retries = 2
     for attempt in range(max_retries):
         try:
-            client = httpx.Client(http2=True, follow_redirects=True, timeout=8)
+            client = httpx.Client(http2=True, follow_redirects=True)
             try:
                 client.get(_M1_BASE_URL, headers={
                     "User-Agent": _M1_UA_WEB,
@@ -707,9 +712,8 @@ def _m1_get_masked(query):
         'Cookie': "csrftoken=o_6jxh33ZvsQ2eFMyRaM_q; datr=YMnlaTJAraHY5ADdYH8UqsTG; ig_did=2046A480-DF50-4660-A5CD-DC58F57C7A1C; mid=aeXJYAABAAGoDWzGwrGALDqzE3Np; dpr=3.558248996734619; wd=774x749"
     }
     try:
-        response = requests.post(url, data=payload, headers=headers, timeout=8)
-        contact_points = response.json()["data"]["caa_ar_ig_account_search"]["contact_points"]
-        email = next((i["contact_point"] for i in contact_points if i["type"] == "EMAIL"), None)
+        response = requests.post(url, data=payload, headers=headers, timeout=20)
+        email = next((i["contact_point"] for i in response.json()["data"]["caa_ar_ig_account_search"]["contact_points"] if i["type"] == "EMAIL"), None)
         return email
     except Exception:
         return None
@@ -897,7 +901,6 @@ def _m1_gtokens():
 
 def _m1_save_hit(username, user, token, chat_id):
     global _m1_hits, _m1_total, _m1_found_emails
-
     with _m1_hit_lock:
         _m1_hits  += 1
         _m1_total += 1
@@ -915,6 +918,7 @@ def _m1_save_hit(username, user, token, chat_id):
         country_nm = about.get("country") or "-"
         country_fl = _m1_get_country_flag(country_nm)
         country    = f"{country_nm} {country_fl}".strip() if country_fl else country_nm
+        masked     = _m1_get_masked(username)
         email_str  = f"{username}@gmail.com"
         if masked:
             reset_text = masked

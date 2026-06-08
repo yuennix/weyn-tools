@@ -18,121 +18,100 @@
  ╚███╔███╔╝███████╗   ██║   ██║ ╚████║
   ╚══╝╚══╝ ╚══════╝   ╚═╝   ╚═╝  ╚═══╝</pre>
       <div class="banner-sub">◈ &nbsp; T O O L S &nbsp; ◈</div>
-      <div class="header-meta">
-        <div class="key-countdown" id="keyCountdown"></div>
-        <a href="/admin" class="admin-toggle">⚙ ADMIN</a>
-      </div>
     </header>
 
-    <!-- ── Tab switcher ── -->
-    <div class="main-tabs">
-      <button class="main-tab active" id="tabConfig" onclick="switchTab('config')">⚙ &nbsp;CONFIG</button>
-      <button class="main-tab" id="tabStats" onclick="switchTab('stats')">◈ &nbsp;LIVE STATS</button>
-    </div>
+    <main class="main">
 
-    <!-- ── CONFIG pane ── -->
-    <div class="main-pane active" id="paneConfig">
+      <!-- ── LEFT PANEL: Config ── -->
+      <section class="panel config-panel">
 
-      <div class="section-title">CONFIGURATION</div>
+        <div class="section-title">CONFIGURATION</div>
 
-      <div class="form-group">
-        <label>BOT TOKEN</label>
-        <input type="password" id="token" placeholder="Enter Telegram bot token" autocomplete="off" />
-      </div>
-
-      <div class="form-group">
-        <label>CHAT ID</label>
-        <div class="chat-id-row">
-          <input type="text" id="chat_id" placeholder="Enter Telegram chat ID" autocomplete="off" />
-          <button id="findChatBtn" class="btn-find" title="Auto-detect group chat ID">🔍</button>
+        <div class="form-group">
+          <label>BOT TOKEN</label>
+          <input type="password" id="token" placeholder="Enter Telegram bot token" autocomplete="off" />
         </div>
-        <div id="chatResults" class="chat-results"></div>
-      </div>
 
-      <div class="form-group" id="minFollowersGroup">
-        <label>MIN FOLLOWERS</label>
-        <input type="number" id="min_followers" value="0" min="0" />
-      </div>
-
-      <div class="controls">
-        <button id="startBtn" class="btn btn-start">▶ &nbsp;START</button>
-        <button id="stopBtn"  class="btn btn-stop" disabled>■ &nbsp;STOP</button>
-      </div>
-
-      <a id="downloadBtn" class="btn btn-download" href="/api/download_hits" download>⬇ &nbsp;DOWNLOAD HITS LOG</a>
-
-      <div id="tgStatus" class="tg-status-bar"></div>
-      <div id="statusBar" class="status-bar">IDLE</div>
-
-      <!-- ── Key info section ── -->
-      <div class="section-title" style="margin-top:28px">YOUR ACCESS KEY</div>
-
-      <div class="key-info-card">
-        <div class="key-info-row">
-          <span class="key-info-label">NAME</span>
-          <span class="key-info-value" id="keyName">—</span>
+        <div class="form-group">
+          <label>CHAT ID</label>
+          <div class="chat-id-row">
+            <input type="text" id="chat_id" placeholder="Enter Telegram chat ID" autocomplete="off" />
+            <button id="findChatBtn" class="btn btn-find" title="Auto-detect group chat ID">🔍</button>
+          </div>
+          <div id="chatResults" class="chat-results"></div>
         </div>
-        <div class="key-info-row">
-          <span class="key-info-label">KEY</span>
-          <span class="key-info-value mono" id="keyValue">—</span>
-        </div>
-        <button class="btn-copy-key" id="copyKeyBtn" onclick="copyKey()">📋 &nbsp;COPY KEY</button>
-        <div id="revokeDeviceWrap">
-          <button class="btn-revoke-device" id="revokeBtn" onclick="revokeDevice()">🔓 &nbsp;REVOKE THIS DEVICE</button>
-          <div class="revoke-note">Revoking unbinds your key from this device so you can log in on another device.</div>
-        </div>
-      </div>
 
-    </div>
+        <div class="form-group">
+          <label>YEAR RANGE</label>
+          <div class="year-badge">Random • 2013 – 2019</div>
+        </div>
 
-    <!-- ── LIVE STATS pane ── -->
-    <div class="main-pane" id="paneStats">
+        <div class="form-group">
+          <label>MIN FOLLOWERS</label>
+          <input type="number" id="min_followers" value="0" min="0" />
+        </div>
 
-      <div class="section-title">
-        LIVE STATS
-      </div>
+        <div class="controls">
+          <button id="startBtn" class="btn btn-start">▶&nbsp; START</button>
+          <button id="stopBtn"  class="btn btn-stop" disabled>■&nbsp; STOP</button>
+        </div>
 
-      <div class="stats-grid" id="statsGrid">
-        <div class="stat-card green">
-          <div class="stat-value" id="s-hits">0</div>
-          <div class="stat-label">HITS</div>
-        </div>
-        <div class="stat-card cyan">
-          <div class="stat-value" id="s-good">0</div>
-          <div class="stat-label">GOOD INSTA</div>
-        </div>
-        <div class="stat-card red">
-          <div class="stat-value" id="s-bad_insta">0</div>
-          <div class="stat-label">BAD INSTA</div>
-        </div>
-        <div class="stat-card red">
-          <div class="stat-value" id="s-bad_email">0</div>
-          <div class="stat-label">BAD EMAIL</div>
-        </div>
-        <div class="stat-card yellow">
-          <div class="stat-value" id="s-taken">0</div>
-          <div class="stat-label">TAKEN</div>
-        </div>
-        <div class="stat-card yellow">
-          <div class="stat-value" id="s-limit">0</div>
-          <div class="stat-label">RATE LIMIT</div>
-        </div>
-        <div class="stat-card cyan">
-          <div class="stat-value" id="s-total">0</div>
-          <div class="stat-label">TOTAL SCANNED</div>
-        </div>
-      </div>
+        <a id="downloadBtn" class="btn btn-download" href="/api/download_hits" download>⬇ DOWNLOAD HITS LOG</a>
 
-      <div class="section-title" style="margin-top:28px">
-        RECENT HITS
-        <span class="hits-count" id="hitsCount">0</span>
-      </div>
-      <div class="hits-feed" id="hitsFeed">
-        <div class="hits-empty">No hits yet — start scanning to see results here.</div>
-      </div>
+        <div id="tgStatus" class="tg-status-bar"></div>
+        <div id="statusBar" class="status-bar">IDLE</div>
+      </section>
 
-    </div>
+      <!-- ── RIGHT PANEL: Stats + Hits ── -->
+      <section class="panel stats-panel">
 
+        <div class="section-title">LIVE STATS &nbsp;<span id="methodBadge" class="badge">—</span></div>
+
+        <div class="stats-grid" id="statsGrid">
+          <div class="stat-card green">
+            <div class="stat-value" id="s-hits">0</div>
+            <div class="stat-label">HITS</div>
+          </div>
+          <div class="stat-card cyan">
+            <div class="stat-value" id="s-good">0</div>
+            <div class="stat-label">GOOD INSTA</div>
+          </div>
+          <div class="stat-card red">
+            <div class="stat-value" id="s-bad_insta">0</div>
+            <div class="stat-label">BAD INSTA</div>
+          </div>
+          <div class="stat-card red">
+            <div class="stat-value" id="s-bad_email">0</div>
+            <div class="stat-label">BAD EMAIL</div>
+          </div>
+          <div class="stat-card yellow">
+            <div class="stat-value" id="s-taken">0</div>
+            <div class="stat-label">TAKEN</div>
+          </div>
+          <div class="stat-card yellow">
+            <div class="stat-value" id="s-limit">0</div>
+            <div class="stat-label">RATE LIMIT</div>
+          </div>
+          <div class="stat-card cyan">
+            <div class="stat-value" id="s-total">0</div>
+            <div class="stat-label">TOTAL SCANNED</div>
+          </div>
+          <div class="stat-card magenta">
+            <div class="stat-value" id="s-verified">0</div>
+            <div class="stat-label">VERIFIED (M4)</div>
+          </div>
+        </div>
+
+        <div class="section-title" style="margin-top:28px">
+          RECENT HITS
+          <span class="hits-count" id="hitsCount">0</span>
+        </div>
+        <div class="hits-feed" id="hitsFeed">
+          <div class="hits-empty">No hits yet — start a method to begin scanning.</div>
+        </div>
+
+      </section>
+    </main>
   </div>
 
   <script src="/static/app.js"></script>

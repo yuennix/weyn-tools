@@ -208,39 +208,6 @@
     .toast.ok   { border-color: var(--green); color: var(--green); }
     .toast.fail { border-color: var(--red);   color: var(--red); }
 
-    .toggle-switch {
-      position: relative;
-      display: inline-block;
-      width: 48px;
-      height: 26px;
-      flex-shrink: 0;
-    }
-    .toggle-switch input { opacity: 0; width: 0; height: 0; }
-    .toggle-slider {
-      position: absolute;
-      cursor: pointer;
-      inset: 0;
-      background: var(--border);
-      border-radius: 26px;
-      transition: background .2s;
-    }
-    .toggle-slider:before {
-      content: '';
-      position: absolute;
-      width: 18px;
-      height: 18px;
-      left: 4px;
-      top: 4px;
-      background: var(--muted);
-      border-radius: 50%;
-      transition: transform .2s, background .2s;
-    }
-    .toggle-switch input:checked + .toggle-slider { background: rgba(0,230,255,.25); }
-    .toggle-switch input:checked + .toggle-slider:before {
-      transform: translateX(22px);
-      background: var(--cyan);
-    }
-
     @media (max-width: 700px) {
       .keys-table thead { display: none; }
       .keys-table td { display: block; padding: 4px 12px; }
@@ -259,17 +226,6 @@
       <a class="back-link" href="/">← BACK TO APP</a>
       <button class="admin-logout" onclick="adminLogout()">LOGOUT</button>
     </div>
-  </div>
-
-  <div class="section-card" style="margin-bottom:20px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
-    <div>
-      <div style="font-size:13px;letter-spacing:1px;color:var(--fg);">REVOKE DEVICE BUTTON</div>
-      <div style="font-size:11px;color:var(--muted);margin-top:3px;">Show or hide the "Revoke This Device" button for users</div>
-    </div>
-    <label class="toggle-switch">
-      <input type="checkbox" id="revokeToggle" onchange="saveRevokeToggle(this.checked)" />
-      <span class="toggle-slider"></span>
-    </label>
   </div>
 
   <div class="filter-row">
@@ -373,23 +329,9 @@
           <button class="btn-sm btn-approve" onclick="approveKey('${esc(k.key)}')">APPROVE</button>`;
       }
       if (k.status === 'approved') {
-        html += `
-          <input class="dur-input" type="number" min="1" value="24" id="ext_${esc(k.key)}" />
-          <select class="dur-unit" id="extunit_${esc(k.key)}">
-            <option value="60">hrs</option>
-            <option value="1">mins</option>
-          </select>
-          <button class="btn-sm btn-approve" onclick="extendKey('${esc(k.key)}')">+EXTEND</button>
-          <button class="btn-sm btn-revoke" onclick="revokeKey('${esc(k.key)}')">REVOKE</button>`;
+        html += `<button class="btn-sm btn-revoke" onclick="revokeKey('${esc(k.key)}')">REVOKE</button>`;
       }
       html += `<button class="btn-sm btn-delete" onclick="deleteKey('${esc(k.key)}')">DELETE</button>`;
-      // Per-user revoke device toggle
-      const canRevoke = k.can_revoke_device !== false && k.can_revoke_device !== 0;
-      html += `<label class="toggle-switch" title="${canRevoke ? 'Revoke Device: ON — click to disable' : 'Revoke Device: OFF — click to enable'}" style="margin-left:6px;vertical-align:middle;">
-        <input type="checkbox" ${canRevoke ? 'checked' : ''} onchange="setUserRevoke('${esc(k.key)}',this.checked)" />
-        <span class="toggle-slider"></span>
-      </label>
-      <span style="font-size:10px;color:var(--muted);letter-spacing:1px;vertical-align:middle;">REVOKE</span>`;
       html += '</div>';
       return html;
     }
@@ -448,32 +390,6 @@
       else showToast('Error: ' + data.error, 'fail');
     }
 
-    async function extendKey(key) {
-      const durEl  = document.getElementById('ext_' + key);
-      const unitEl = document.getElementById('extunit_' + key);
-      const mins   = parseInt(durEl.value) * parseInt(unitEl.value);
-      if (!mins || mins < 1) { showToast('Enter a valid duration', 'fail'); return; }
-      const res  = await fetch('/admin/api/extend', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key, extra_minutes: mins })
-      });
-      const data = await res.json();
-      if (data.ok) { showToast('Key extended ✓', 'ok'); loadKeys(); }
-      else showToast('Error: ' + (data.error || 'Failed'), 'fail');
-    }
-
-    async function setUserRevoke(key, enabled) {
-      const res  = await fetch('/admin/api/set_revoke_device', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key, enabled })
-      });
-      const data = await res.json();
-      if (data.ok) showToast(enabled ? '🔓 Revoke enabled for user' : '🔒 Revoke disabled for user', 'ok');
-      else showToast('Error: ' + (data.error || 'Failed'), 'fail');
-    }
-
     async function adminLogout() {
       await fetch('/admin/logout', { method: 'POST' });
       window.location.href = '/admin';
@@ -493,25 +409,7 @@
         .replace(/'/g,'&#39;');
     }
 
-    async function loadSettings() {
-      const res  = await fetch('/admin/api/settings');
-      const data = await res.json();
-      document.getElementById('revokeToggle').checked = !!data.revoke_device_enabled;
-    }
-
-    async function saveRevokeToggle(enabled) {
-      const res  = await fetch('/admin/api/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ revoke_device_enabled: enabled })
-      });
-      const data = await res.json();
-      if (data.ok) showToast(enabled ? 'Revoke button enabled' : 'Revoke button hidden', 'ok');
-      else showToast('Failed to save setting', 'fail');
-    }
-
     loadKeys();
-    loadSettings();
     setInterval(loadKeys, 10000);
   </script>
 </body>

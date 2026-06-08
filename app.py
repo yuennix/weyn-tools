@@ -8,7 +8,7 @@ import weyn
 import auth
 
 app = Flask(__name__)
-app.secret_key = os.environ.get('SESSION_SECRET')
+app.secret_key = os.environ.get('SECRET_KEY', 'weyn-tools-secret-8x2k9p')
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=365)
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_HTTPONLY'] = True
@@ -235,19 +235,6 @@ def find_chat_id():
         return jsonify({'ok': True, 'chats': list(chats.values())})
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)})
-
-
-@app.route('/api/key_info')
-def key_info():
-    if not is_authenticated():
-        return jsonify({'error': 'Unauthorized'}), 403
-    key = session.get('auth_key')
-    conn = auth.get_db()
-    row = conn.execute('SELECT name, expires_at FROM access_keys WHERE key=?', (key,)).fetchone()
-    conn.close()
-    if not row:
-        return jsonify({'name': 'Unknown', 'expires_at': None})
-    return jsonify({'name': row['name'], 'expires_at': row['expires_at']})
 
 
 @app.route('/api/stats')
