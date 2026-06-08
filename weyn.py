@@ -831,6 +831,16 @@ def _m1_get_country_flag(country_name):
             return flags[key]
     return ""
 
+def _m1_gtokens_background():
+    """Periodically regenerate tokens.txt so the TL token never expires mid-scan."""
+    time.sleep(60)
+    while True:
+        try:
+            _m1_gtokens()
+        except Exception:
+            pass
+        time.sleep(90)
+
 def _m1_get_tl_background():
     while True:
         try:
@@ -1222,6 +1232,7 @@ def run_method1_web(token, chat_id, year_choice, min_followers, stop_event):
     _m1_about_refresh_tokens(_m1_ABOUT_COOKIE_STR)
     Thread(target=_m1_about_token_refresher, daemon=True).start()
     Thread(target=_m1_get_tl_background,     daemon=True).start()
+    Thread(target=_m1_gtokens_background,    daemon=True).start()
     _m1_gtokens()
     with ThreadPoolExecutor(max_workers=500) as executor:
         futures = [executor.submit(_m1_sinsta, min_id, max_id, token, chat_id, min_followers, stop_event) for _ in range(500)]
