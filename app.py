@@ -257,8 +257,13 @@ def stats():
     if not is_authenticated():
         return jsonify({'error': 'Unauthorized'}), 403
 
+    auth_key = session.get('auth_key')
+
     def generate():
         while True:
+            if not auth.check_key_valid(auth_key):
+                yield f"event: expired\ndata: {json.dumps({'expired': True})}\n\n"
+                return
             running   = weyn._web_state.get('running', False)
             tg_status = weyn._web_state.get('tg_status', '')
             tg_error  = weyn._web_state.get('tg_error', '')
@@ -272,6 +277,7 @@ def stats():
                 'taken'      : weyn._m1_taken,
                 'limit'      : weyn._m1_limit,
                 'total'      : weyn._m1_total,
+                'scanned'    : weyn._m1_scanned,
                 'recent_hits': list(weyn._m1_found_emails[-20:]),
                 'tg_status'  : tg_status,
                 'tg_error'   : tg_error,
