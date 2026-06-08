@@ -244,53 +244,20 @@ def stats():
 
     def generate():
         while True:
-            m         = weyn._web_state.get('method') or '1'
             running   = weyn._web_state.get('running', False)
             tg_status = weyn._web_state.get('tg_status', '')
             tg_error  = weyn._web_state.get('tg_error', '')
-            if m == '1':
-                payload = {
-                    'running'    : running,
-                    'method'     : '1',
-                    'hits'       : weyn._m1_hits,
-                    'good'       : weyn._m1_good_insta,
-                    'bad_insta'  : weyn._m1_bad_insta,
-                    'bad_email'  : weyn._m1_bad_email,
-                    'taken'      : weyn._m1_taken,
-                    'limit'      : weyn._m1_limit,
-                    'total'      : weyn._m1_total,
-                    'verified'   : 0,
-                    'recent_hits': list(weyn._m1_found_emails[-20:]),
-                    'tg_status'  : tg_status,
-                    'tg_error'   : tg_error,
-                }
-            else:
-                with weyn._web_lock:
-                    payload = {
-                        'running'    : running,
-                        'method'     : m,
-                        'hits'       : weyn._web_state.get('hits', 0),
-                        'good'       : weyn._web_state.get('good', 0),
-                        'bad_insta'  : weyn._web_state.get('bad_insta', 0),
-                        'bad_email'  : 0,
-                        'taken'      : weyn._web_state.get('taken', 0),
-                        'limit'      : weyn._web_state.get('limit', 0),
-                        'total'      : 0,
-                        'verified'   : weyn._web_state.get('verified', 0),
-                        'recent_hits': list(weyn._web_state.get('recent_hits', []))[-20:],
-                        'tg_status'  : tg_status,
-                        'tg_error'   : tg_error,
-                    }
-            yield f"data: {json.dumps(payload)}\n\n"
-            time.sleep(0.5)
-
-    return Response(
-        generate(),
-        mimetype='text/event-stream',
-        headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'}
-    )
-
-
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=False, threaded=True)
+            payload = {
+                'running'    : running,
+                'method'     : '1',
+                'hits'       : weyn._m1_hits,
+                'good'       : weyn._m1_good_insta,
+                'bad_insta'  : weyn._m1_bad_insta,
+                'bad_email'  : weyn._m1_bad_email,
+                'taken'      : weyn._m1_taken,
+                'limit'      : weyn._m1_limit,
+                'total'      : weyn._m1_total,
+                'recent_hits': list(weyn._m1_found_emails[-20:]),
+                'tg_status'  : tg_status,
+                'tg_error'   : tg_error,
+            }
