@@ -12,13 +12,16 @@
     <header class="header">
       <div class="header-topbar">
         <div class="key-info-bar">
-          <span class="key-info-name" id="keyName"></span>
-          <span class="key-info-sep" id="keyInfoSep" style="display:none">·</span>
-          <span class="key-info-timer" id="keyTimer"></span>
+          <span class="key-info-name" id="keyName">WEYN</span>
+          <span class="key-info-sep">/</span>
+          <span class="key-info-tools">TOOLS</span>
+          <div class="key-timer-badge" id="keyTimerBadge">
+            <span class="key-timer-icon">◷</span>
+            <span id="keyTimer">--</span>
+          </div>
         </div>
-        <a href="/admin" class="admin-toggle-btn">⚙ ADMIN</a>
+        <a href="/admin" class="admin-toggle-btn">ADMIN</a>
       </div>
-      <div class="banner-expiry" id="bannerExpiry">key expires at <span id="bannerExpiryTime">--:--</span></div>
       <pre class="banner">
  ██╗    ██╗███████╗██╗   ██╗███╗   ██╗
  ██║    ██║██╔════╝╚██╗ ██╔╝████╗  ██║
@@ -131,26 +134,18 @@
     let _keyExpiry   = null;
     let _redirecting = false;
 
-    const _bannerTime = document.getElementById('bannerExpiryTime');
-    const _bannerWrap = document.getElementById('bannerExpiry');
+    const _timerEl  = document.getElementById('keyTimer');
+    const _badgeEl  = document.getElementById('keyTimerBadge');
 
     async function loadKeyInfo() {
       try {
         const res  = await fetch('/api/key_info');
         const data = await res.json();
         if (data.error) { redirectExpired(); return; }
-
-        const nameEl = document.getElementById('keyName');
-        const sepEl  = document.getElementById('keyInfoSep');
-        if (data.name) {
-          nameEl.textContent = data.name.toUpperCase();
-          sepEl.style.display = '';
-        }
         _keyExpiry = data.expires_at ? new Date(data.expires_at + 'Z') : null;
-
         if (!_keyExpiry) {
-          _bannerTime.textContent = 'pending';
-          _bannerWrap.className   = 'banner-expiry warning';
+          _timerEl.textContent = 'PENDING';
+          _badgeEl.className   = 'key-timer-badge warning';
         }
       } catch(e) {}
     }
@@ -158,8 +153,8 @@
     function redirectExpired() {
       if (_redirecting) return;
       _redirecting = true;
-      _bannerTime.textContent = 'expired';
-      _bannerWrap.className   = 'banner-expiry danger';
+      _timerEl.textContent = 'EXPIRED';
+      _badgeEl.className   = 'key-timer-badge danger';
       setTimeout(() => { window.location.href = '/gate'; }, 2500);
     }
 
@@ -168,18 +163,17 @@
       const diff = _keyExpiry - Date.now();
       if (diff <= 0) { redirectExpired(); return; }
 
-      const pad = n => String(n).padStart(2, '0');
-      const h   = Math.floor(diff / 3600000);
-      const m   = Math.floor((diff % 3600000) / 60000);
-      const s   = Math.floor((diff % 60000)   / 1000);
-      _bannerTime.textContent = h > 0 ? `${pad(h)}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
+      const h = Math.floor(diff / 3600000);
+      const m = Math.floor((diff % 3600000) / 60000);
+      const s = Math.floor((diff % 60000)   / 1000);
+      _timerEl.textContent = `${h}h ${m}m ${s}s`;
 
       if (diff < 5 * 60 * 1000) {
-        _bannerWrap.className = 'banner-expiry danger';
+        _badgeEl.className = 'key-timer-badge danger';
       } else if (diff < 30 * 60 * 1000) {
-        _bannerWrap.className = 'banner-expiry warning';
+        _badgeEl.className = 'key-timer-badge warning';
       } else {
-        _bannerWrap.className = 'banner-expiry';
+        _badgeEl.className = 'key-timer-badge';
       }
     }
 

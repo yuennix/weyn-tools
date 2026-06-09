@@ -71,27 +71,55 @@ body {
 .key-info-bar {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   font-size: 11px;
 }
 .key-info-name {
   color: var(--cyan);
-  letter-spacing: 1px;
+  letter-spacing: 2px;
+  font-weight: bold;
 }
 .key-info-sep {
   color: var(--muted);
+  font-size: 13px;
 }
-.key-info-timer {
-  color: var(--green);
+.key-info-tools {
+  color: var(--muted);
+  letter-spacing: 2px;
+  font-size: 11px;
+}
+
+/* ─── Timer badge (topbar) ─── */
+.key-timer-badge {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--border);
+  background: var(--bg3);
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 11px;
   letter-spacing: 1px;
+  color: var(--white);
+  transition: border-color 0.3s, background 0.3s;
 }
-.key-info-timer.warning {
+.key-timer-badge.warning {
+  border-color: var(--yellow);
   color: var(--yellow);
 }
-.key-info-timer.danger {
+.key-timer-badge.danger {
+  border-color: var(--red);
   color: var(--red);
   animation: blink 1s step-start infinite;
 }
+.key-timer-icon {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1;
+}
+.key-timer-badge.warning .key-timer-icon { color: var(--yellow); }
+.key-timer-badge.danger  .key-timer-icon { color: var(--red); }
+
 @keyframes blink {
   50% { opacity: 0.3; }
 }
