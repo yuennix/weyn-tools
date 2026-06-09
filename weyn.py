@@ -969,8 +969,6 @@ def _m1_gtokens():
 def _m1_save_hit(username, user, token, chat_id):
     global _m1_hits, _m1_total, _m1_found_emails
     with _m1_hit_lock:
-        _m1_hits  += 1
-        _m1_total += 1
         user_id    = user.get('pk', 'Unknown')
         followers  = user.get('follower_count', 0)
         following  = user.get('following_count', 0)
@@ -988,6 +986,8 @@ def _m1_save_hit(username, user, token, chat_id):
         masked, has_phone = _m1_get_masked(username)
         if has_phone:
             return
+        _m1_hits  += 1
+        _m1_total += 1
         email_str = f"{username}@gmail.com"
         if masked:
             reset_text = masked
