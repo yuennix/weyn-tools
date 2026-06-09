@@ -995,7 +995,6 @@ dependencies = [
     { name = "psycopg2-binary" },
     { name = "pytelegrambotapi" },
     { name = "requests" },
-    { name = "werkzeug" },
 ]
 
 [package.metadata]
@@ -1009,7 +1008,6 @@ requires-dist = [
     { name = "psycopg2-binary", specifier = ">=2.9.12" },
     { name = "pytelegrambotapi", specifier = ">=4.34.0" },
     { name = "requests", specifier = ">=2.34.2" },
-    { name = "werkzeug", specifier = ">=3.1.8" },
 ]
 
 [[package]]
