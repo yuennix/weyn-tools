@@ -1127,6 +1127,8 @@ def _m1_sinsta(min_id, max_id, token, chat_id, min_followers=0, stop_event=None)
                 'server_timestamps': 'true',
                 'doc_id': '7717269488336001',
             }
+            global _m1_scanned
+            _m1_scanned += 1
             resp = loc_session.post(_M1_CONFIG["insta_graphql"], headers=headers, data=data, timeout=5)
             if resp.status_code == 429:
                 time.sleep(1)
@@ -1134,8 +1136,6 @@ def _m1_sinsta(min_id, max_id, token, chat_id, min_followers=0, stop_event=None)
             if resp.status_code != 200:
                 time.sleep(0.1)
                 continue
-            global _m1_scanned
-            _m1_scanned += 1
             user = resp.json().get('data', {}).get('user')
             if user and user.get('username'):
                 followers = user.get('follower_count', 0)
