@@ -748,10 +748,11 @@ def _m1_get_masked(query):
     try:
         response = requests.post(url, data=payload, headers=headers, timeout=8)
         contact_points = response.json()["data"]["caa_ar_ig_account_search"]["contact_points"]
+        has_phone = any(i.get("type") == "PHONE" for i in contact_points)
         email_val = next((i["contact_point"] for i in contact_points if i["type"] == "EMAIL"), None)
-        return email_val
+        return email_val, has_phone
     except Exception:
-        return None
+        return None, False
 
 def _m1_get_country_flag(country_name):
     if not country_name or country_name in ["-", "Payla\u015f\u0131lmad\u0131", "None", ""]:
@@ -984,7 +985,9 @@ def _m1_save_hit(username, user, token, chat_id):
         country_nm = about.get("country") or "-"
         country_fl = _m1_get_country_flag(country_nm)
         country    = f"{country_nm} {country_fl}".strip() if country_fl else country_nm
-        masked = _m1_get_masked(username)
+        masked, has_phone = _m1_get_masked(username)
+        if has_phone:
+            return
         email_str = f"{username}@gmail.com"
         if masked:
             reset_text = masked
