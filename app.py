@@ -261,13 +261,18 @@ def stats():
 
     def generate():
         _auth_check_counter = 0
+        _heartbeat_counter  = 0
         while True:
             _auth_check_counter += 1
+            _heartbeat_counter  += 1
             if _auth_check_counter >= 30:
                 _auth_check_counter = 0
                 if not auth.check_key_valid(auth_key):
                     yield f"event: expired\ndata: {json.dumps({'expired': True})}\n\n"
                     return
+            if _heartbeat_counter >= 15:
+                _heartbeat_counter = 0
+                yield ": keepalive\n\n"
             running   = weyn._web_state.get('running', False)
             tg_status = weyn._web_state.get('tg_status', '')
             tg_error  = weyn._web_state.get('tg_error', '')

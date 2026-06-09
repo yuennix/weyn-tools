@@ -991,6 +991,8 @@ def _m1_save_hit(username, user, token, chat_id):
         email_str = f"{username}@gmail.com"
         if masked:
             reset_text = masked
+        if not reset_text or reset_text == '-':
+            reset_text = email_str
         output = format_hit(
             hit_num    = _m1_hits,
             username   = username,

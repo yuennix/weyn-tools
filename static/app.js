@@ -27,8 +27,11 @@
   chatIdEl.addEventListener('input', () => localStorage.setItem('tg_chat_id', chatIdEl.value));
 
   // ── SSE stream ──
+  let _sseRetryTimer = null;
+
   function startSSE() {
-    if (evtSource) { evtSource.close(); }
+    if (evtSource) { evtSource.close(); evtSource = null; }
+    if (_sseRetryTimer)  { clearTimeout(_sseRetryTimer); _sseRetryTimer = null; }
     evtSource = new EventSource('/api/stats');
     evtSource.onmessage = (e) => {
       const d = JSON.parse(e.data);
@@ -41,7 +44,8 @@
       window.location.href = '/gate';
     });
     evtSource.onerror = () => {
-      // reconnect handled automatically by browser
+      if (evtSource) { evtSource.close(); evtSource = null; }
+      _sseRetryTimer = setTimeout(startSSE, 3000);
     };
   }
 
