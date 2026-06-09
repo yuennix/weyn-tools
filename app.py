@@ -82,7 +82,7 @@ def api_key_info():
     import sqlite3
     conn = sqlite3.connect(auth.DB)
     conn.row_factory = sqlite3.Row
-    row = conn.execute('SELECT name, expires_at, status FROM access_keys WHERE key=?', (key,)).fetchone()
+    row = conn.execute('SELECT name, expires_at, approved_at, status FROM access_keys WHERE key=?', (key,)).fetchone()
     conn.close()
     if not row:
         return jsonify({'error': 'Key not found'}), 404
