@@ -139,6 +139,10 @@
       return;
     }
 
+    startBtn.disabled = true;
+    statusBar.textContent = '● SCANNING...';
+    statusBar.classList.add('running');
+
     knownHits.clear();
     totalHits = 0;
     hitsCount.textContent = '0';
@@ -155,9 +159,14 @@
         body: JSON.stringify({ method: selectedMethod, token, chat_id, min_followers })
       });
       const data = await res.json();
-      if (!res.ok) { alert(data.error || 'Failed to start.'); return; }
+      if (!res.ok) {
+        setRunning(false);
+        alert(data.error || 'Failed to start.');
+        return;
+      }
       setRunning(true);
     } catch (err) {
+      setRunning(false);
       alert('Connection error: ' + err.message);
     }
   });
@@ -199,11 +208,15 @@
 
   // ── Stop button ──
   stopBtn.addEventListener('click', async () => {
+    stopBtn.disabled = true;
+    statusBar.textContent = 'IDLE';
+    statusBar.classList.remove('running');
     try {
       await fetch('/api/stop', { method: 'POST' });
       setRunning(false);
     } catch (err) {
       console.error(err);
+      setRunning(false);
     }
   });
 

@@ -1242,11 +1242,15 @@ def run_method1_web(token, chat_id, year_choice, min_followers, stop_event):
     Thread(target=_m1_get_tl_background,     daemon=True).start()
     Thread(target=_m1_gtokens_background,    daemon=True).start()
     _m1_gtokens()
-    with ThreadPoolExecutor(max_workers=500) as executor:
-        futures = [executor.submit(_m1_sinsta, min_id, max_id, token, chat_id, min_followers, stop_event) for _ in range(500)]
-        for future in as_completed(futures):
-            try: future.result()
-            except Exception: pass
+    NUM_WORKERS = 75
+    while not stop_event.is_set():
+        with ThreadPoolExecutor(max_workers=NUM_WORKERS) as executor:
+            futures = [executor.submit(_m1_sinsta, min_id, max_id, token, chat_id, min_followers, stop_event) for _ in range(NUM_WORKERS)]
+            for future in as_completed(futures):
+                try: future.result()
+                except Exception: pass
+        if not stop_event.is_set():
+            time.sleep(0.5)
     _web_state['running'] = False
 
 
