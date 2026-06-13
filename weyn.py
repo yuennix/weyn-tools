@@ -958,15 +958,17 @@ def _m1_save_hit(username, user, token, chat_id):
         year_label = str(gdate(user_id))
         reset_text = _m1_rest_v1(username)
 
+        # Helper: returns True if value is a real masked email (not a failure)
+        def _is_real_masked(v):
+            return bool(v and v not in ('-', '') and not v.startswith('Fail:') and '@' in v)
+
         # PRIMARY CHECK: Instagram password-reset endpoint.
-        # If it returns a real masked email (not '-' / 'Fail:...') and that
-        # masked email does NOT match username@gmail.com → not our target, skip.
-        if (reset_text
-                and reset_text not in ('-', '')
-                and not reset_text.startswith('Fail:')
-                and '@' in reset_text):
+        # If it returns a real masked email it must match username@gmail.com.
+        reset_confirmed = False
+        if _is_real_masked(reset_text):
             if not _m1_masked_matches_username(username, reset_text):
                 return
+            reset_confirmed = True
 
         about      = _m1_get_about_account(user_id, username)
         join_date  = about.get("join_date") or year_label
@@ -985,18 +987,25 @@ def _m1_save_hit(username, user, token, chat_id):
             return
 
         # SECONDARY CHECK: GraphQL masked email.
-        # Same logic — if it's present and doesn't match, skip.
+        # If present it must match; if it matches it counts as confirmation.
+        graphql_confirmed = False
         if masked:
             if not _m1_masked_matches_username(username, masked):
                 return
+            graphql_confirmed = True
+
+        # REQUIRE at least one confirmed match so we never save a hit where
+        # neither endpoint could verify that the email is username@gmail.com.
+        if not reset_confirmed and not graphql_confirmed:
+            return
 
         _m1_hits  += 1
         _m1_total += 1
         email_str = f"{username}@gmail.com"
-        # Keep reset_text from _m1_rest_v1 as-is (accurate Instagram reset email).
-        # Only fall back to email_str if the reset endpoint gave nothing useful.
-        if not reset_text or reset_text in ('-', '') or reset_text.startswith('Fail:'):
-            reset_text = email_str
+        # Show the real masked value from Instagram as reset_text so it matches
+        # what Instagram displays. Fall back to email_str only when unavailable.
+        if not _is_real_masked(reset_text):
+            reset_text = masked if masked else email_str
         output = format_hit(
             hit_num    = _m1_hits,
             username   = username,
