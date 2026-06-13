@@ -933,6 +933,16 @@ def _m1_save_hit(username, user, token, chat_id):
         masked, has_phone = _m1_get_masked(username)
         if has_phone:
             return
+
+        # Only count as a hit if the IG account's linked email is @gmail.com
+        # If masked email exists and is NOT Gmail → false positive, skip it
+        if masked and '@gmail.com' not in masked.lower():
+            return
+
+        # If reset email from IG doesn't contain gmail either, skip
+        if (not masked) and reset_text and reset_text not in ('-', '') and '@' in reset_text and 'gmail' not in reset_text.lower():
+            return
+
         _m1_hits  += 1
         _m1_total += 1
         email_str = f"{username}@gmail.com"
