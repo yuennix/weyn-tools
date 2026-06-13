@@ -3,19 +3,22 @@
   let evtSource      = null;
   let knownHits      = new Set();
   let totalHits      = 0;
+  let _stopping      = false;
 
   // ── DOM refs ──
-  const startBtn      = document.getElementById('startBtn');
-  const stopBtn       = document.getElementById('stopBtn');
-  const findChatBtn   = document.getElementById('findChatBtn');
-  const chatResults   = document.getElementById('chatResults');
-  const statusBar     = document.getElementById('statusBar');
-  const methodBadge   = document.getElementById('methodBadge');
-  const hitsFeed      = document.getElementById('hitsFeed');
-  const hitsCount     = document.getElementById('hitsCount');
-  const methodBtn1    = document.getElementById('methodBtn1');
-  const methodBtn2    = document.getElementById('methodBtn2');
-  const yearRangeGroup= document.getElementById('yearRangeGroup');
+  const startBtn       = document.getElementById('startBtn');
+  const stopBtn        = document.getElementById('stopBtn');
+  const findChatBtn    = document.getElementById('findChatBtn');
+  const chatResults    = document.getElementById('chatResults');
+  const statusBar      = document.getElementById('statusBar');
+  const methodBadge    = document.getElementById('methodBadge');
+  const hitsFeed       = document.getElementById('hitsFeed');
+  const hitsCount      = document.getElementById('hitsCount');
+  const methodBtn1     = document.getElementById('methodBtn1');
+  const methodBtn2     = document.getElementById('methodBtn2');
+  const yearRangeGroup = document.getElementById('yearRangeGroup');
+  const minLabel       = document.getElementById('minLabel');
+  const minInput       = document.getElementById('min_followers');
 
   const statIds = ['hits','good','bad_insta','bad_email','taken','limit','scanned','total'];
 
@@ -26,8 +29,12 @@
     methodBtn2.classList.toggle('active', m === '2');
     yearRangeGroup.style.display = m === '2' ? 'none' : '';
     if (m === '2') {
-      const mfEl = document.getElementById('min_followers');
-      if (mfEl && parseInt(mfEl.value) < 1000) mfEl.value = 1000;
+      minLabel.textContent = 'MIN POSTS';
+      minInput.min = '20';
+      if (parseInt(minInput.value) < 20) minInput.value = 20;
+    } else {
+      minLabel.textContent = 'MIN FOLLOWERS';
+      minInput.min = '0';
     }
   }
   methodBtn1.addEventListener('click', () => { if (!startBtn.disabled) selectMethod('1'); });
@@ -48,12 +55,16 @@
 
   function startSSE() {
     if (evtSource) { evtSource.close(); evtSource = null; }
-    if (_sseRetryTimer)  { clearTimeout(_sseRetryTimer); _sseRetryTimer = null; }
+    if (_sseRetryTimer) { clearTimeout(_sseRetryTimer); _sseRetryTimer = null; }
     evtSource = new EventSource('/api/stats');
     evtSource.onmessage = (e) => {
       const d = JSON.parse(e.data);
       updateStats(d);
       updateHits(d.recent_hits || []);
+      // If we are in the process of stopping, don't let a lingering
+      // running=true message re-enable the stop button.
+      if (_stopping && d.running) return;
+      if (!d.running) _stopping = false;
       setRunning(d.running);
     };
     evtSource.addEventListener('expired', () => {
@@ -93,7 +104,7 @@
       }
     });
     if (d.method) {
-      methodBadge.textContent = d.method === '2' ? 'M2 · HIGH FOLLOWERS' : 'M1 · STANDARD';
+      methodBadge.textContent = d.method === '2' ? 'M2 · HIGH POST' : 'M1 · STANDARD';
       methodBadge.className   = d.method === '2' ? 'badge badge-m2' : 'badge';
     }
   }
@@ -148,18 +159,17 @@
 
   // ── Start button ──
   startBtn.addEventListener('click', async () => {
-    const token        = document.getElementById('token').value.trim();
-    const chat_id      = document.getElementById('chat_id').value.trim();
-    const min_followers= document.getElementById('min_followers').value;
+    const token     = document.getElementById('token').value.trim();
+    const chat_id   = document.getElementById('chat_id').value.trim();
+    const min_value = minInput.value;
 
     if (!token || !chat_id) {
       alert('Bot Token and Chat ID are required.');
       return;
     }
 
-    startBtn.disabled = true;
-    statusBar.textContent = '● SCANNING...';
-    statusBar.classList.add('running');
+    _stopping = false;
+    setRunning(true);
 
     knownHits.clear();
     totalHits = 0;
@@ -174,7 +184,7 @@
       const res = await fetch('/api/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ method: selectedMethod, token, chat_id, min_followers })
+        body: JSON.stringify({ method: selectedMethod, token, chat_id, min_followers: min_value })
       });
       const data = await res.json();
       if (!res.ok) {
@@ -182,7 +192,6 @@
         alert(data.error || 'Failed to start.');
         return;
       }
-      setRunning(true);
     } catch (err) {
       setRunning(false);
       alert('Connection error: ' + err.message);
@@ -226,15 +235,12 @@
 
   // ── Stop button ──
   stopBtn.addEventListener('click', async () => {
-    stopBtn.disabled = true;
-    statusBar.textContent = 'IDLE';
-    statusBar.classList.remove('running');
+    _stopping = true;
+    setRunning(false);
     try {
       await fetch('/api/stop', { method: 'POST' });
-      setRunning(false);
     } catch (err) {
       console.error(err);
-      setRunning(false);
     }
   });
 
