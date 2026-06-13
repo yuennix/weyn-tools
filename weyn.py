@@ -1604,7 +1604,7 @@ def _m2_format_hit(hit_num, username, email, user_data, gmail_masked):
 
 # ── Save hit ───────────────────────────────────────────────────────────────────
 
-def _m2_save_hit(username, user_data, token, chat_id, min_posts=20):
+def _m2_save_hit(username, user_data, token, chat_id, min_posts=10):
     """Format M2 hit, write to file, notify Telegram."""
     global _m2_hits, _m2_total
     try:
@@ -1662,7 +1662,7 @@ def _m2_get_usernames(token, chat_id, min_posts, stop_event):
     """Single worker: scrape random IG user IDs, run lookup → Gmail check → hit."""
     global _m2_scanned
     loc_session = _register_session(requests.Session())
-    _min_posts = max(1, int(min_posts) if min_posts else 1)
+    _min_posts = max(10, int(min_posts) if min_posts else 10)
     while not (stop_event and stop_event.is_set()):
         try:
             csrf, lsd = _m2_load_tokens()
