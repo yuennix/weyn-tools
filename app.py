@@ -185,6 +185,7 @@ def start():
         method = (data.get('method') or '1').strip()
         _stop_event = threading.Event()
         if method == '2':
+            weyn._web_state['method'] = '2'
             _job_thread = threading.Thread(
                 target=weyn.run_method2_web,
                 args=(token, chat_id, min_followers, _stop_event),
@@ -192,6 +193,7 @@ def start():
             )
         else:
             method = '1'
+            weyn._web_state['method'] = '1'
             _job_thread = threading.Thread(
                 target=weyn.run_method1_web,
                 args=(token, chat_id, None, min_followers, _stop_event),

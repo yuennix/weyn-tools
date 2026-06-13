@@ -107,7 +107,7 @@
         setTimeout(() => card.classList.remove('bump'), 300);
       }
     });
-    if (d.method) {
+    if (d.method && !_starting) {
       methodBadge.textContent = d.method === '2' ? 'M2 · HIGH POST' : 'M1 · STANDARD';
       methodBadge.className   = d.method === '2' ? 'badge badge-m2' : 'badge';
     }
@@ -189,6 +189,8 @@
     _starting = true;
     _stopping = false;
     setRunning(true);
+    methodBadge.textContent = selectedMethod === '2' ? 'M2 · HIGH POST' : 'M1 · STANDARD';
+    methodBadge.className   = selectedMethod === '2' ? 'badge badge-m2' : 'badge';
 
     knownHits.clear();
     totalHits = 0;
