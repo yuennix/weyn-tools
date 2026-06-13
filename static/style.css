@@ -217,6 +217,40 @@ body {
   text-shadow: 0 0 8px var(--yellow);
 }
 
+/* ─── Method Selector ─── */
+.method-selector {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.method-btn {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  padding: 9px 6px;
+  cursor: pointer;
+  font-family: var(--font);
+  font-size: 11px;
+  letter-spacing: 1px;
+  transition: all 0.15s;
+  text-align: center;
+}
+.method-btn:hover {
+  border-color: var(--magenta);
+  color: var(--magenta);
+}
+.method-btn.active {
+  background: rgba(224, 64, 251, 0.1);
+  border-color: var(--magenta);
+  color: var(--magenta);
+  text-shadow: 0 0 8px var(--magenta);
+}
+.badge-m2 {
+  color: var(--magenta) !important;
+  border-color: var(--magenta) !important;
+  text-shadow: 0 0 6px var(--magenta);
+}
+
 /* ─── Form ─── */
 .form-group {
   margin-bottom: 14px;

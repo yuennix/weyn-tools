@@ -1,20 +1,37 @@
 (() => {
-  const selectedMethod = '1';
-  let evtSource        = null;
+  let selectedMethod = '1';
+  let evtSource      = null;
   let knownHits      = new Set();
   let totalHits      = 0;
 
   // ── DOM refs ──
-  const startBtn    = document.getElementById('startBtn');
-  const stopBtn     = document.getElementById('stopBtn');
-  const findChatBtn = document.getElementById('findChatBtn');
-  const chatResults = document.getElementById('chatResults');
-  const statusBar   = document.getElementById('statusBar');
-  const methodBadge = document.getElementById('methodBadge');
-  const hitsFeed    = document.getElementById('hitsFeed');
-  const hitsCount   = document.getElementById('hitsCount');
+  const startBtn      = document.getElementById('startBtn');
+  const stopBtn       = document.getElementById('stopBtn');
+  const findChatBtn   = document.getElementById('findChatBtn');
+  const chatResults   = document.getElementById('chatResults');
+  const statusBar     = document.getElementById('statusBar');
+  const methodBadge   = document.getElementById('methodBadge');
+  const hitsFeed      = document.getElementById('hitsFeed');
+  const hitsCount     = document.getElementById('hitsCount');
+  const methodBtn1    = document.getElementById('methodBtn1');
+  const methodBtn2    = document.getElementById('methodBtn2');
+  const yearRangeGroup= document.getElementById('yearRangeGroup');
 
   const statIds = ['hits','good','bad_insta','bad_email','taken','limit','scanned','total'];
+
+  // ── Method selector ──
+  function selectMethod(m) {
+    selectedMethod = m;
+    methodBtn1.classList.toggle('active', m === '1');
+    methodBtn2.classList.toggle('active', m === '2');
+    yearRangeGroup.style.display = m === '2' ? 'none' : '';
+    if (m === '2') {
+      const mfEl = document.getElementById('min_followers');
+      if (mfEl && parseInt(mfEl.value) < 1000) mfEl.value = 1000;
+    }
+  }
+  methodBtn1.addEventListener('click', () => { if (!startBtn.disabled) selectMethod('1'); });
+  methodBtn2.addEventListener('click', () => { if (!startBtn.disabled) selectMethod('2'); });
 
   // ── Persist token & chat_id across refreshes ──
   const tokenEl  = document.getElementById('token');
@@ -76,7 +93,8 @@
       }
     });
     if (d.method) {
-      methodBadge.textContent = 'M1';
+      methodBadge.textContent = d.method === '2' ? 'M2 · HIGH FOLLOWERS' : 'M1 · STANDARD';
+      methodBadge.className   = d.method === '2' ? 'badge badge-m2' : 'badge';
     }
   }
 

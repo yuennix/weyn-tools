@@ -179,14 +179,23 @@ def start():
         if not token or not chat_id:
             return jsonify({'error': 'Bot Token and Chat ID are required'}), 400
 
+        method = (data.get('method') or '1').strip()
         _stop_event = threading.Event()
-        _job_thread = threading.Thread(
-            target=weyn.run_method1_web,
-            args=(token, chat_id, None, min_followers, _stop_event),
-            daemon=True
-        )
+        if method == '2':
+            _job_thread = threading.Thread(
+                target=weyn.run_method2_web,
+                args=(token, chat_id, min_followers, _stop_event),
+                daemon=True
+            )
+        else:
+            method = '1'
+            _job_thread = threading.Thread(
+                target=weyn.run_method1_web,
+                args=(token, chat_id, None, min_followers, _stop_event),
+                daemon=True
+            )
         _job_thread.start()
-    return jsonify({'status': 'started', 'method': '1'})
+    return jsonify({'status': 'started', 'method': method})
 
 
 @app.route('/api/stop', methods=['POST'])
@@ -276,21 +285,39 @@ def stats():
             running   = weyn._web_state.get('running', False)
             tg_status = weyn._web_state.get('tg_status', '')
             tg_error  = weyn._web_state.get('tg_error', '')
-            payload = {
-                'running'    : running,
-                'method'     : '1',
-                'hits'       : weyn._m1_hits,
-                'good'       : weyn._m1_good_insta,
-                'bad_insta'  : weyn._m1_bad_insta,
-                'bad_email'  : weyn._m1_bad_email,
-                'taken'      : weyn._m1_taken,
-                'limit'      : weyn._m1_limit,
-                'total'      : weyn._m1_total,
-                'scanned'    : weyn._m1_scanned,
-                'recent_hits': list(weyn._m1_found_emails[-20:]),
-                'tg_status'  : tg_status,
-                'tg_error'   : tg_error,
-            }
+            method    = weyn._web_state.get('method', '1')
+            if method == '2':
+                payload = {
+                    'running'    : running,
+                    'method'     : '2',
+                    'hits'       : weyn._m2_hits,
+                    'good'       : weyn._m2_good_insta,
+                    'bad_insta'  : weyn._m2_bad_insta,
+                    'bad_email'  : weyn._m2_bad_email,
+                    'taken'      : weyn._m2_taken,
+                    'limit'      : weyn._m2_limit,
+                    'total'      : weyn._m2_total,
+                    'scanned'    : weyn._m2_scanned,
+                    'recent_hits': list(weyn._m2_found_emails[-20:]),
+                    'tg_status'  : tg_status,
+                    'tg_error'   : tg_error,
+                }
+            else:
+                payload = {
+                    'running'    : running,
+                    'method'     : '1',
+                    'hits'       : weyn._m1_hits,
+                    'good'       : weyn._m1_good_insta,
+                    'bad_insta'  : weyn._m1_bad_insta,
+                    'bad_email'  : weyn._m1_bad_email,
+                    'taken'      : weyn._m1_taken,
+                    'limit'      : weyn._m1_limit,
+                    'total'      : weyn._m1_total,
+                    'scanned'    : weyn._m1_scanned,
+                    'recent_hits': list(weyn._m1_found_emails[-20:]),
+                    'tg_status'  : tg_status,
+                    'tg_error'   : tg_error,
+                }
             yield f"data: {json.dumps(payload)}\n\n"
             time.sleep(1)
 
