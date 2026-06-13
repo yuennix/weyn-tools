@@ -1193,7 +1193,7 @@ def run_method1_web(token, chat_id, year_choice, min_followers, stop_event):
     # Initial token fetch
     _m1_gtokens()
 
-    NUM_WORKERS = 75
+    NUM_WORKERS = 200
     try:
         while not stop_event.is_set():
             with ThreadPoolExecutor(max_workers=NUM_WORKERS) as executor:
@@ -1585,7 +1585,7 @@ def run_method2_web(token, chat_id, min_followers, stop_event):
     Thread(target=_m2_tokens_background, daemon=True).start()
     _m2_fetch_tokens()
 
-    NUM_WORKERS = 75
+    NUM_WORKERS = 200
     try:
         while not stop_event.is_set():
             with ThreadPoolExecutor(max_workers=NUM_WORKERS) as executor:
