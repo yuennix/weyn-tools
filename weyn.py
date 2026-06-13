@@ -1497,38 +1497,59 @@ def _m2_sinsta(token, chat_id, min_followers, stop_event):
     """Single worker: scan random IG IDs (high-follower range), check Gmail."""
     global _m2_scanned
     loc_session = _register_session(requests.Session())
+    _M2_UA_BRANDS   = ["SAMSUNG","HUAWEI","LGE/lge","HTC","ASUS","ZTE","ONEPLUS","XIAOMI","OPPO","VIVO","SONY","REALME"]
+    _M2_UA_VERSIONS = ["23/6.0","24/7.0","25/7.1.1","26/8.0","27/8.1","28/9.0"]
     while not (stop_event and stop_event.is_set()):
         try:
-            csrf, lsd = _m2_load_tokens()
-            cookies   = {
-                'rur': '"HIL\\0545636887483\\0541808136332:01fe43b89fcef61b8a466bfa81acf2b1bbab08f406fc99b1da8b7d889fa68683a3364c43"'
-            }
+            # Fresh random LSD per request — same trick M1 uses to avoid shared-token rate limits
+            lsd = ''.join(random.choice('azertyuiopmlkjhgfdsqwxcvbnAZERTYUIOPMLKJHGFDSQWXCVBN1234567890')
+                          for _ in range(16))
+            rnd = str(random.randint(2500000000, 21254029834))
+            user_agent = (
+                "Instagram 311.0.0.32.118 Android ("
+                + _M2_UA_VERSIONS[random.randint(0, 5)]
+                + "; " + str(random.randint(100, 1300)) + "dpi; "
+                + str(random.randint(200, 2000)) + "x" + str(random.randint(200, 2000)) + "; "
+                + _M2_UA_BRANDS[random.randint(0, 11)]
+                + "; SM-T" + rnd + "; SM-T" + rnd
+                + "; qcom; en_US; 545986" + str(random.randint(111, 999)) + ")"
+            )
+            user_id = random.randint(2500000000, 21254029834)
             headers = {
-                'User-Agent':                   "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36",
-                'Content-Type':                 'application/x-www-form-urlencoded',
-                'x-bloks-version-id':           "f0fd53409d7667526e529854656fe20159af8b76db89f40c333e593b51a2ce10",
-                'x-ig-app-id':                  '936619743392459',
-                'x-fb-lsd':                     lsd,
-                'sec-ch-prefers-color-scheme':  'light',
-                'x-csrftoken':                  csrf,
-                'sec-ch-ua-platform':           '"Android"',
-                'origin':                       'https://www.instagram.com',
-                'sec-fetch-site':               'same-origin',
+                'accept':           '*/*',
+                'accept-language':  'en,en-US;q=0.9',
+                'content-type':     'application/x-www-form-urlencoded',
+                'dnt':              '1',
+                'origin':           'https://www.instagram.com',
+                'priority':         'u=1, i',
+                'referer':          'https://www.instagram.com/cristiano/following/',
+                'user-agent':       user_agent,
+                'x-fb-friendly-name': 'PolarisUserHoverCardContentV2Query',
+                'x-fb-lsd':         lsd,
             }
             payload = {
-                'lsd':       lsd,
-                'variables': json.dumps({
-                    "userID":   random.randint(2500000000, 21254029834),
-                    "username": "cristiano"
-                }),
-                'doc_id': '7717269488336001',
+                'lsd':                       lsd,
+                'fb_api_caller_class':        'RelayModern',
+                'fb_api_req_friendly_name':   'PolarisUserHoverCardContentV2Query',
+                'variables':                  '{"userID":"' + str(user_id) + '","username":"cristiano"}',
+                'server_timestamps':          'true',
+                'doc_id':                     '7717269488336001',
             }
             resp = loc_session.post(
                 'https://www.instagram.com/api/graphql',
-                headers=headers, data=payload, cookies=cookies, timeout=20
+                headers=headers, data=payload, timeout=10
             )
+            if resp.status_code == 429:
+                _m2_limit += 1
+                time.sleep(1)
+                continue
+            if resp.status_code != 200:
+                time.sleep(0.1)
+                continue
             _m2_scanned += 1
-            ud        = resp.json().get('data', {}).get('user', {})
+            ud        = resp.json().get('data', {}).get('user')
+            if not ud:
+                continue
             uname     = ud.get('username')
             followers = ud.get('follower_count', 0)
             uid       = ud.get('pk', 0)
