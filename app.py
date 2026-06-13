@@ -284,12 +284,14 @@ def stats():
                 return
             _auth_check_counter += 1
             _heartbeat_counter  += 1
-            if _auth_check_counter >= 30:
+            # Thresholds doubled (sleep is 0.5s) so wall-clock intervals stay same:
+            # auth check every 60 ticks = 30 s, heartbeat every 30 ticks = 15 s
+            if _auth_check_counter >= 60:
                 _auth_check_counter = 0
                 if not auth.check_key_valid(auth_key):
                     yield f"event: expired\ndata: {json.dumps({'expired': True})}\n\n"
                     return
-            if _heartbeat_counter >= 15:
+            if _heartbeat_counter >= 30:
                 _heartbeat_counter = 0
                 yield ": keepalive\n\n"
             running   = weyn._web_state.get('running', False)
@@ -329,7 +331,7 @@ def stats():
                     'tg_error'   : tg_error,
                 }
             yield f"data: {json.dumps(payload)}\n\n"
-            time.sleep(1)
+            time.sleep(0.5)
 
     return Response(generate(), mimetype='text/event-stream',
                     headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
