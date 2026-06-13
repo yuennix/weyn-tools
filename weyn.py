@@ -952,21 +952,14 @@ def _m1_save_hit(username, user, token, chat_id):
     global _m1_hits, _m1_total, _m1_found_emails
 
     # ── All network calls run OUTSIDE the lock so threads don't queue up ──────
-    def _is_real_masked(v):
-        return bool(v and v not in ('-', '') and not v.startswith('Fail:') and '@' in v)
-
     user_id    = user.get('pk', 'Unknown')
     followers  = user.get('follower_count', 0)
     following  = user.get('following_count', 0)
     bio        = user.get('biography', 'None') or 'None'
     year_label = str(gdate(user_id))
 
-    # PRIMARY CHECK: Instagram password-reset endpoint gives the masked email.
-    # If it returns a real masked email that doesn't match → not our target.
+    # Fetch reset-endpoint masked email (display only — not used to filter)
     reset_text = _m1_rest_v1(username)
-    if _is_real_masked(reset_text):
-        if not _m1_masked_matches_username(username, reset_text):
-            return
 
     about      = _m1_get_about_account(user_id, username)
     join_date  = about.get("join_date") or year_label
@@ -978,19 +971,14 @@ def _m1_save_hit(username, user, token, chat_id):
     country    = f"{country_nm} {country_fl}".strip() if country_fl else country_nm
     former_raw = about.get("former_usernames", [])
     former     = ", ".join(former_raw) if former_raw else "-"
-    masked, has_phone = _m1_get_masked(username)
 
-    # Skip accounts with a phone number linked — not our target
-    if has_phone:
-        return
+    # Fetch GraphQL masked email (display only — not used to filter)
+    masked, _ = _m1_get_masked(username)
 
-    # SECONDARY CHECK: GraphQL masked email must match if present.
-    if masked:
-        if not _m1_masked_matches_username(username, masked):
-            return
-
-    # Best masked email for the Reset field (reset endpoint > GraphQL > plain)
-    email_str  = f"{username}@gmail.com"
+    # Best value for the Reset display field
+    email_str = f"{username}@gmail.com"
+    def _is_real_masked(v):
+        return bool(v and v not in ('-', '') and not v.startswith('Fail:') and '@' in v)
     if not _is_real_masked(reset_text):
         reset_text = masked if masked else email_str
 
