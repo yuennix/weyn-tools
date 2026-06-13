@@ -911,6 +911,41 @@ def _m1_gtokens():
 
 # ── Core scanning functions ──
 
+def _m1_masked_matches_username(username, masked):
+    """
+    Return True only if the masked email from Instagram confirms it is
+    username@gmail.com.
+
+    Instagram masks like: shoping5857 → s*******7@gmail.com
+    We verify:
+      1. Domain is @gmail.com
+      2. First visible char of masked local == first char of username
+      3. Last visible char of masked local  == last  char of username
+    """
+    if not masked or '@' not in masked:
+        return False
+    local, domain = masked.lower().rsplit('@', 1)
+    if 'gmail.com' not in domain:
+        return False
+    uname = username.lower()
+    if not uname:
+        return False
+    # first char
+    if local[0] != uname[0]:
+        return False
+    # last visible char (skip trailing asterisks)
+    last_visible = None
+    for ch in reversed(local):
+        if ch != '*':
+            last_visible = ch
+            break
+    if last_visible is None:
+        return False
+    if last_visible != uname[-1]:
+        return False
+    return True
+
+
 def _m1_save_hit(username, user, token, chat_id):
     global _m1_hits, _m1_total, _m1_found_emails
     with _m1_hit_lock:
@@ -934,14 +969,16 @@ def _m1_save_hit(username, user, token, chat_id):
         if has_phone:
             return
 
-        # Only count as a hit if the IG account's linked email is @gmail.com
-        # If masked email exists and is NOT Gmail → false positive, skip it
-        if masked and '@gmail.com' not in masked.lower():
-            return
-
-        # If reset email from IG doesn't contain gmail either, skip
-        if (not masked) and reset_text and reset_text not in ('-', '') and '@' in reset_text and 'gmail' not in reset_text.lower():
-            return
+        # Strict match: masked email must confirm it is exactly username@gmail.com
+        # (first char, last char, and @gmail.com domain all must match)
+        if masked:
+            if not _m1_masked_matches_username(username, masked):
+                return
+        else:
+            # No masked email available — fall back to reset email check
+            # If reset email shows a non-Gmail domain, it's a false positive
+            if reset_text and reset_text not in ('-', '') and '@' in reset_text and 'gmail' not in reset_text.lower():
+                return
 
         _m1_hits  += 1
         _m1_total += 1
