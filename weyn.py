@@ -987,18 +987,14 @@ def _m1_save_hit(username, user, token, chat_id):
             return
 
         # SECONDARY CHECK: GraphQL masked email.
-        # If present it must match; if it matches it counts as confirmation.
-        graphql_confirmed = False
+        # If present it must match; silent (None) means unknown — not wrong.
         if masked:
             if not _m1_masked_matches_username(username, masked):
                 return
-            graphql_confirmed = True
 
-        # REQUIRE at least one confirmed match so we never save a hit where
-        # neither endpoint could verify that the email is username@gmail.com.
-        if not reset_confirmed and not graphql_confirmed:
-            return
-
+        # Both checks above only reject on a CONFIRMED mismatch.
+        # If both endpoints returned nothing (rate-limited / down) we still
+        # save — silence is ambiguous, not proof the email is wrong.
         _m1_hits  += 1
         _m1_total += 1
         email_str = f"{username}@gmail.com"
@@ -1628,17 +1624,14 @@ def _m2_save_hit(username, user_data, token, chat_id):
             reset_confirmed = True
 
         # SECONDARY CHECK: GraphQL masked email (by username)
-        gmail_masked      = _m2_get_masked(username)
-        graphql_confirmed = False
+        gmail_masked = _m2_get_masked(username)
         if gmail_masked:
             if not _m1_masked_matches_username(username, gmail_masked):
                 return   # masked email from GraphQL does not match → skip
-            graphql_confirmed = True
 
-        # In M2, _m2_lookup already confirmed username@gmail.com is linked to an
-        # IG account (bloks search), so we allow the hit even when neither masked
-        # endpoint returned data. If either one DID return data it must match
-        # (checked above). This keeps M2 hits flowing while still blocking fakes.
+        # Both checks above only reject on a CONFIRMED mismatch.
+        # Silence (None / '-') from either endpoint is ambiguous — not proof the
+        # email is wrong — so we allow the hit through.
 
         # Build the best reset display value we have
         if _is_real_masked(reset_text):
