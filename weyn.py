@@ -957,6 +957,17 @@ def _m1_save_hit(username, user, token, chat_id):
         bio        = user.get('biography', 'None') or 'None'
         year_label = str(gdate(user_id))
         reset_text = _m1_rest_v1(username)
+
+        # PRIMARY CHECK: Instagram password-reset endpoint.
+        # If it returns a real masked email (not '-' / 'Fail:...') and that
+        # masked email does NOT match username@gmail.com → not our target, skip.
+        if (reset_text
+                and reset_text not in ('-', '')
+                and not reset_text.startswith('Fail:')
+                and '@' in reset_text):
+            if not _m1_masked_matches_username(username, reset_text):
+                return
+
         about      = _m1_get_about_account(user_id, username)
         join_date  = about.get("join_date") or year_label
         _yr = re.search(r'\b(20\d{2})\b', join_date)
@@ -969,8 +980,8 @@ def _m1_save_hit(username, user, token, chat_id):
         former     = ", ".join(former_raw) if former_raw else "-"
         masked, _has_phone = _m1_get_masked(username)
 
-        # If Instagram's reset flow reveals the account uses a non-Gmail email,
-        # or the masked email doesn't match username@gmail.com — skip it.
+        # SECONDARY CHECK: GraphQL masked email.
+        # Same logic — if it's present and doesn't match, skip.
         if masked:
             if not _m1_masked_matches_username(username, masked):
                 return
