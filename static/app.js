@@ -41,6 +41,16 @@
   methodBtn1.addEventListener('click', () => { if (!startBtn.disabled) selectMethod('1'); });
   methodBtn2.addEventListener('click', () => { if (!startBtn.disabled) selectMethod('2'); });
 
+  // ── Strip iOS smart-punctuation from token/chat_id strings ──
+  function sanitizeInput(str) {
+    return String(str)
+      .replace(/[\u2013\u2014\u2015]/g, '-')   // en-dash / em-dash → hyphen
+      .replace(/[\u2018\u2019]/g, "'")          // curly single quotes → straight
+      .replace(/[\u201C\u201D]/g, '"')          // curly double quotes → straight
+      .replace(/\u00A0/g, ' ')                  // non-breaking space → space
+      .trim();
+  }
+
   // ── Persist token & chat_id across refreshes ──
   const tokenEl  = document.getElementById('token');
   const chatIdEl = document.getElementById('chat_id');
@@ -177,8 +187,8 @@
 
   // ── Start button ──
   startBtn.addEventListener('click', async () => {
-    const token     = document.getElementById('token').value.trim();
-    const chat_id   = document.getElementById('chat_id').value.trim();
+    const token     = sanitizeInput(document.getElementById('token').value);
+    const chat_id   = sanitizeInput(document.getElementById('chat_id').value);
     const min_value = minInput.value;
 
     if (!token || !chat_id) {
