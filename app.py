@@ -15,9 +15,10 @@ app.config['SESSION_COOKIE_HTTPONLY'] = True
 
 auth.init_db()
 
-_job_thread = None
-_stop_event = None
-_job_lock   = threading.Lock()
+_job_thread        = None
+_stop_event        = None
+_job_lock          = threading.Lock()
+_force_logout_keys: set = set()
 
 ADMIN_PASSWORD = 'yuennix'
 
@@ -139,6 +140,7 @@ def admin_api_revoke():
     if not key:
         return jsonify({'ok': False, 'error': 'Key required'})
     auth.revoke_key(key)
+    _force_logout_keys.add(key)
     return jsonify({'ok': True})
 
 
@@ -151,6 +153,7 @@ def admin_api_delete():
     if not key:
         return jsonify({'ok': False, 'error': 'Key required'})
     auth.delete_key(key)
+    _force_logout_keys.add(key)
     return jsonify({'ok': True})
 
 
@@ -272,6 +275,11 @@ def stats():
         _auth_check_counter = 0
         _heartbeat_counter  = 0
         while True:
+            # Immediate force-logout when admin revokes or deletes this key
+            if auth_key in _force_logout_keys:
+                _force_logout_keys.discard(auth_key)
+                yield f"event: expired\ndata: {json.dumps({'expired': True})}\n\n"
+                return
             _auth_check_counter += 1
             _heartbeat_counter  += 1
             if _auth_check_counter >= 30:

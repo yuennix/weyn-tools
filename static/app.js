@@ -4,6 +4,7 @@
   let knownHits      = new Set();
   let totalHits      = 0;
   let _stopping      = false;
+  let _starting      = false;
 
   // ── DOM refs ──
   const startBtn       = document.getElementById('startBtn');
@@ -61,9 +62,12 @@
       const d = JSON.parse(e.data);
       updateStats(d);
       updateHits(d.recent_hits || []);
-      // If we are in the process of stopping, don't let a lingering
-      // running=true message re-enable the stop button.
-      if (_stopping && d.running) return;
+      // Suppress button flips during transitions:
+      // • _stopping: stop clicked but backend thread still shutting down
+      // • _starting: start clicked but backend thread not yet confirmed running
+      if (_stopping && d.running)  return;
+      if (_starting && !d.running) return;
+      if (d.running)  _starting = false;
       if (!d.running) _stopping = false;
       setRunning(d.running);
     };
@@ -182,6 +186,7 @@
       return;
     }
 
+    _starting = true;
     _stopping = false;
     setRunning(true);
 
@@ -202,11 +207,13 @@
       });
       const data = await res.json();
       if (!res.ok) {
+        _starting = false;
         setRunning(false);
         alert(data.error || 'Failed to start.');
         return;
       }
     } catch (err) {
+      _starting = false;
       setRunning(false);
       alert('Connection error: ' + err.message);
     }
