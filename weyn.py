@@ -978,7 +978,11 @@ def _m1_save_hit(username, user, token, chat_id):
         country    = f"{country_nm} {country_fl}".strip() if country_fl else country_nm
         former_raw = about.get("former_usernames", [])
         former     = ", ".join(former_raw) if former_raw else "-"
-        masked, _has_phone = _m1_get_masked(username)
+        masked, has_phone = _m1_get_masked(username)
+
+        # Skip accounts with a phone number linked — not our target
+        if has_phone:
+            return
 
         # SECONDARY CHECK: GraphQL masked email.
         # Same logic — if it's present and doesn't match, skip.
@@ -989,9 +993,9 @@ def _m1_save_hit(username, user, token, chat_id):
         _m1_hits  += 1
         _m1_total += 1
         email_str = f"{username}@gmail.com"
-        if masked:
-            reset_text = masked
-        if not reset_text or reset_text == '-':
+        # Keep reset_text from _m1_rest_v1 as-is (accurate Instagram reset email).
+        # Only fall back to email_str if the reset endpoint gave nothing useful.
+        if not reset_text or reset_text in ('-', '') or reset_text.startswith('Fail:'):
             reset_text = email_str
         output = format_hit(
             hit_num    = _m1_hits,
