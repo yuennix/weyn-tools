@@ -965,20 +965,7 @@ def _m1_save_hit(username, user, token, chat_id):
         country    = f"{country_nm} {country_fl}".strip() if country_fl else country_nm
         former_raw = about.get("former_usernames", [])
         former     = ", ".join(former_raw) if former_raw else "-"
-        masked, has_phone = _m1_get_masked(username)
-        if has_phone:
-            return
-
-        # Strict match: masked email must confirm it is exactly username@gmail.com
-        # (first char, last char, and @gmail.com domain all must match)
-        if masked:
-            if not _m1_masked_matches_username(username, masked):
-                return
-        else:
-            # No masked email available — fall back to reset email check
-            # If reset email shows a non-Gmail domain, it's a false positive
-            if reset_text and reset_text not in ('-', '') and '@' in reset_text and 'gmail' not in reset_text.lower():
-                return
+        masked, _has_phone = _m1_get_masked(username)
 
         _m1_hits  += 1
         _m1_total += 1
