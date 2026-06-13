@@ -547,6 +547,19 @@ body {
   font-size: 13px;
   font-weight: bold;
   letter-spacing: 1px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.hit-posts-badge {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: var(--green);
+  background: rgba(0,255,136,0.08);
+  border: 1px solid rgba(0,255,136,0.25);
+  padding: 1px 7px;
+  border-radius: 20px;
 }
 .hit-card .hit-email {
   color: var(--green);

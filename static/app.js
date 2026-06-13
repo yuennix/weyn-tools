@@ -111,7 +111,17 @@
 
   function updateHits(hits) {
     if (!hits || hits.length === 0) return;
-    hits.forEach(email => {
+    hits.forEach(raw => {
+      // M2 stores JSON {"e": email, "p": posts}; M1 stores plain email strings
+      let email, posts = null;
+      try {
+        const obj = JSON.parse(raw);
+        email = obj.e;
+        posts = obj.p;
+      } catch (_) {
+        email = raw;
+      }
+
       if (knownHits.has(email)) return;
       knownHits.add(email);
       totalHits++;
@@ -121,10 +131,14 @@
       const empty = hitsFeed.querySelector('.hits-empty');
       if (empty) empty.remove();
 
+      const postsBadge = posts !== null
+        ? `<span class="hit-posts-badge">${escHtml(String(posts))} posts</span>`
+        : '';
+
       const card = document.createElement('div');
       card.className = 'hit-card';
       card.innerHTML = `
-        <div class="hit-username">@${escHtml(username)}</div>
+        <div class="hit-username">@${escHtml(username)}${postsBadge}</div>
         <div class="hit-email">${escHtml(email)}</div>
         <div class="hit-meta">
           <a href="https://www.instagram.com/${escHtml(username)}" target="_blank"

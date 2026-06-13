@@ -1569,7 +1569,7 @@ def _m2_format_hit(hit_num, username, email, user_data, gmail_masked):
     meta      = 'True' if posts > 2 else 'False'
 
     return (
-        f"\n💎 LIGHT SPEED #{hit_num} 💎\n\n"
+        f"\n💎 WEYN HIGH POST #{hit_num} 💎\n\n"
         f"ʙᴜsɪɴᴇss  ⋆ {business}\n"
         f"ᴍᴇᴛᴀ     ⋆ {meta}\n"
         f"ɴᴀᴍᴇ     ⋆ {name}\n"
@@ -1581,7 +1581,7 @@ def _m2_format_hit(hit_num, username, email, user_data, gmail_masked):
         f"ᴇᴍᴀɪʟ    ⋆ {email}\n"
         f"ᴍᴀsᴋᴇᴅ   ⋆ {mail}\n"
         f"ᴜʀʟ      ⋆ instagram.com/{username}\n\n"
-        "─── @UFEG0 @LIGHTMAINS ───"
+        "─── @jinbelowg @weyn_vouches ───"
     )
 
 
@@ -1606,8 +1606,10 @@ def _m2_save_hit(username, user_data, token, chat_id):
 
         _save_hit_to_file(msg)
 
+        import json as _json
+        hit_entry = _json.dumps({"e": email, "p": posts})
         with _m2_found_lock:
-            _m2_found_emails.append(email)
+            _m2_found_emails.append(hit_entry)
             if len(_m2_found_emails) > 200:
                 _m2_found_emails.pop(0)
 
