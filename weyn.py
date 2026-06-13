@@ -144,14 +144,16 @@ def format_hit(hit_num, username, email, followers, following, bio,
 │  𝐁𝐢𝐨        ➤  {bio}
 │  𝐑𝐞𝐬𝐞𝐭      ➤  {reset_text}
 │
-├──〔 𝐀𝐁𝐎𝐔𝐓 𝐓𝐇𝐈𝐒 𝐀𝐂𝐂𝐎𝐔𝐍𝐓 〕───────────┤
-│
-{about_lines}{masked_line}│
 ├──〔 𝐏𝐑𝐎𝐅𝐈𝐋𝐄 𝐋𝐈𝐍𝐊 〕──────────────────┤
 │
 │  https://www.instagram.com/{username}
 │
+├──〔 𝐀𝐁𝐎𝐔𝐓 𝐓𝐇𝐈𝐒 𝐀𝐂𝐂𝐎𝐔𝐍𝐓 〕───────────┤
+│
+{about_lines}{masked_line}│
 ╰──────────────────────────────────────╯
+
+        @jinbelowg @weyn_vouches
 """
 
 
@@ -966,6 +968,12 @@ def _m1_save_hit(username, user, token, chat_id):
         former_raw = about.get("former_usernames", [])
         former     = ", ".join(former_raw) if former_raw else "-"
         masked, _has_phone = _m1_get_masked(username)
+
+        # If Instagram's reset flow reveals the account uses a non-Gmail email,
+        # or the masked email doesn't match username@gmail.com — skip it.
+        if masked:
+            if not _m1_masked_matches_username(username, masked):
+                return
 
         _m1_hits  += 1
         _m1_total += 1
