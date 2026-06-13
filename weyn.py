@@ -962,13 +962,12 @@ def _m1_save_hit(username, user, token, chat_id):
         def _is_real_masked(v):
             return bool(v and v not in ('-', '') and not v.startswith('Fail:') and '@' in v)
 
-        # PRIMARY CHECK: Instagram password-reset endpoint.
-        # If it returns a real masked email it must match username@gmail.com.
-        reset_confirmed = False
+        # PRIMARY CHECK: search username on Instagram's reset endpoint.
+        # If it gives back a real masked email, it must match username@gmail.com.
+        # That masked email is also what we display in the Reset field of the hit.
         if _is_real_masked(reset_text):
             if not _m1_masked_matches_username(username, reset_text):
                 return
-            reset_confirmed = True
 
         about      = _m1_get_about_account(user_id, username)
         join_date  = about.get("join_date") or year_label
@@ -1615,13 +1614,13 @@ def _m2_save_hit(username, user_data, token, chat_id):
         def _is_real_masked(v):
             return bool(v and v not in ('-', '') and not v.startswith('Fail:') and '@' in v)
 
-        # PRIMARY CHECK: Instagram password-reset endpoint (by username)
-        reset_text      = _m1_rest_v1(username)
-        reset_confirmed = False
+        # PRIMARY CHECK: search username on Instagram's reset endpoint.
+        # If it gives back a real masked email, it must match username@gmail.com.
+        # That masked email is also what we display in the Masked field of the hit.
+        reset_text = _m1_rest_v1(username)
         if _is_real_masked(reset_text):
             if not _m1_masked_matches_username(username, reset_text):
                 return   # masked email from reset page does not match → skip
-            reset_confirmed = True
 
         # SECONDARY CHECK: GraphQL masked email (by username)
         gmail_masked = _m2_get_masked(username)
