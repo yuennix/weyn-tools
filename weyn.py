@@ -1630,7 +1630,7 @@ def _m2_save_hit(username, user_data, token, chat_id):
 
 # ── Scanner worker ─────────────────────────────────────────────────────────────
 
-def _m2_get_usernames(token, chat_id, min_posts, stop_event):
+def _m2_get_usernames(token, chat_id, stop_event):
     """Single worker: scrape random IG user IDs, run lookup → Gmail check → hit."""
     global _m2_scanned
     loc_session = _register_session(requests.Session())
@@ -1708,7 +1708,7 @@ def run_method2_web(token, chat_id, min_followers, stop_event):
         while not stop_event.is_set():
             with ThreadPoolExecutor(max_workers=NUM_WORKERS) as executor:
                 futures = [
-                    executor.submit(_m2_get_usernames, token, chat_id, min_followers, stop_event)
+                    executor.submit(_m2_get_usernames, token, chat_id, stop_event)
                     for _ in range(NUM_WORKERS)
                 ]
                 for future in as_completed(futures):
