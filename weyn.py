@@ -1592,43 +1592,27 @@ def _m2_format_hit(hit_num, username, email, user_data, gmail_masked):
 
 # ── Save hit ───────────────────────────────────────────────────────────────────
 
-def _m2_save_hit(username, user_data, token, chat_id, min_posts=10):
+def _m2_save_hit(username, user_data, token, chat_id):
     """Format M2 hit, write to file, notify Telegram."""
     global _m2_hits, _m2_total
     try:
-        posts = int(user_data.get('media_count') or 0)
-        # Minimum post filter — user-configured threshold
-        if posts < min_posts:
-            return
         email = f"{username}@gmail.com"
 
-        # Fetch masked email from GraphQL — also tells us if a phone is linked.
-        # _m1_get_masked returns (masked_email, has_phone).
-        gmail_masked, has_phone = _m1_get_masked(username)
-
-        # Phone-bound filter — skip accounts with a phone number linked
-        if has_phone:
-            return
-
-        # Masked email validation — if Instagram returns a real masked email
-        # it must match username@gmail.com; silence means unknown, not wrong.
-        if gmail_masked:
-            if not _m1_masked_matches_username(username, gmail_masked):
-                return
-
-        display_reset = gmail_masked if gmail_masked else email
+        # Fetch masked email for display only — not used to filter
+        gmail_masked, _ = _m1_get_masked(username)
+        display_masked = gmail_masked if gmail_masked else email
 
         with _m2_hit_lock:
             _m2_hits  += 1
             _m2_total += 1
             hit_num    = _m2_hits
 
-        msg = _m2_format_hit(hit_num, username, email, user_data, display_reset)
+        msg = _m2_format_hit(hit_num, username, email, user_data, display_masked)
 
         _save_hit_to_file(msg)
 
-        import json as _json
-        hit_entry = _json.dumps({"e": email, "p": posts})
+        posts = int(user_data.get('media_count') or 0)
+        hit_entry = json.dumps({"e": email, "p": posts})
         with _m2_found_lock:
             _m2_found_emails.append(hit_entry)
             if len(_m2_found_emails) > 200:
@@ -1650,7 +1634,6 @@ def _m2_get_usernames(token, chat_id, min_posts, stop_event):
     """Single worker: scrape random IG user IDs, run lookup → Gmail check → hit."""
     global _m2_scanned
     loc_session = _register_session(requests.Session())
-    _min_posts = max(10, int(min_posts) if min_posts else 10)
     while not (stop_event and stop_event.is_set()):
         try:
             csrf, lsd = _m2_load_tokens()
@@ -1694,7 +1677,7 @@ def _m2_get_usernames(token, chat_id, min_posts, stop_event):
                 email = username + '@gmail.com'
                 if _m2_lookup(email, loc_session):
                     if _m2_check_gmail(username, loc_session):
-                        _m2_save_hit(username, ud, token, chat_id, _min_posts)
+                        _m2_save_hit(username, ud, token, chat_id)
         except Exception:
             pass
 
