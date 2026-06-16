@@ -1350,13 +1350,14 @@ def _m2_load_tokens():
 
 # ── Instagram email lookup via bloks API ──────────────────────────────────────
 
-def _m2_lookup(email, token, chat_id, user_data):
+def _m2_lookup(email, token, chat_id, user_data, loc_session=None):
     """Check if email is registered on Instagram. On hit, proceeds to Gmail check."""
     global _m2_good_insta, _m2_bad_insta, _m2_limit, _m2_scanned
-    url    = "https://i.instagram.com/api/v1/bloks/async_action/com.bloks.www.caa.ar.search.async/"
-    device = str(uuid.uuid4())
-    family = str(uuid.uuid4())
+    url     = "https://i.instagram.com/api/v1/bloks/async_action/com.bloks.www.caa.ar.search.async/"
+    device  = str(uuid.uuid4())
+    family  = str(uuid.uuid4())
     android = "android-" + secrets.token_hex(8)
+    uid4_4  = str(uuid.uuid4())
     payload = {
         'params': (
             '{"client_input_params":{"aac":"{\\"aac_init_timestamp\\":' + str(int(time.time())) +
@@ -1382,8 +1383,9 @@ def _m2_lookup(email, token, chat_id, user_data):
         'bk_client_context': '{"bloks_version":"5e47baf35c5a270b44c8906c8b99063564b30ef69779f3dee0b828bee2e4ef5b","styles_id":"instagram"}',
         'bloks_versioning_id': "5e47baf35c5a270b44c8906c8b99063564b30ef69779f3dee0b828bee2e4ef5b"
     }
+    tz_offset = str(int(datetime.now().astimezone().utcoffset().total_seconds()))
     headers = {
-        'User-Agent': "Instagram 370.1.0.43.96 Android (34/14; 450dpi; 1080x2207; samsung; SM-A235F; a23; qcom; en_IN; 704872281)",
+        'User-Agent': random.choice(_M1_USER_AGENTS),
         'accept-language': "en-IN, en-US",
         'x-bloks-version-id': "5e47baf35c5a270b44c8906c8b99063564b30ef69779f3dee0b828bee2e4ef5b",
         'x-fb-friendly-name': "IgApi: bloks/async_action/com.bloks.www.caa.ar.search.async/",
@@ -1393,13 +1395,14 @@ def _m2_lookup(email, token, chat_id, user_data):
         'x-ig-client-endpoint': "com.bloks.www.caa.ar.search",
         'x-ig-device-id': device,
         'x-ig-family-device-id': family,
-        'x-ig-timezone-offset': str(datetime.now().astimezone().utcoffset().total_seconds()),
+        'x-ig-timezone-offset': tz_offset,
         'x-mid': base64.urlsafe_b64encode(secrets.token_bytes(18)).decode().rstrip('='),
         'x-pigeon-rawclienttime': str(time.time()),
-        'x-pigeon-session-id': f"UFS-{uuid.uuid4()}-0",
+        'x-pigeon-session-id': f"UFS-{uid4_4}-0",
     }
+    poster = loc_session if loc_session else requests
     try:
-        response = requests.post(url, data=payload, headers=headers, timeout=20)
+        response = poster.post(url, data=payload, headers=headers, timeout=20)
         _m2_scanned += 1
         _web_state['scanned'] = _m2_scanned
         if email in response.text:
@@ -1409,11 +1412,12 @@ def _m2_lookup(email, token, chat_id, user_data):
         elif 'Sorry, something' in response.text:
             _m2_limit += 1
             _web_state['limit'] = _m2_limit
+            time.sleep(random.uniform(1.0, 3.0))
         else:
             _m2_bad_insta += 1
             _web_state['bad_insta'] = _m2_bad_insta
     except Exception:
-        pass
+        time.sleep(random.uniform(0.5, 1.5))
 
 
 # ── Gmail availability check ──────────────────────────────────────────────────
@@ -1632,7 +1636,7 @@ def _m2_get_usernames(token, chat_id, min_followers, stop_event):
                 email = username + '@gmail.com'
                 _m2_total += 1
                 _web_state['total'] = _m2_total
-                _m2_lookup(email, token, chat_id, user_data)
+                _m2_lookup(email, token, chat_id, user_data, loc_session)
 
         except Exception:
             pass
@@ -1659,7 +1663,7 @@ def run_method2_web(token, chat_id, min_followers, stop_event):
     Thread(target=_m2_get_tl,     daemon=True).start()
     Thread(target=_m2_get_tokens, daemon=True).start()
 
-    NUM_WORKERS = 100
+    NUM_WORKERS = 200
     try:
         while not stop_event.is_set():
             with ThreadPoolExecutor(max_workers=NUM_WORKERS) as executor:
