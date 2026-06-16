@@ -1350,7 +1350,7 @@ def _m2_load_tokens():
 
 # ── Instagram email lookup via bloks API ──────────────────────────────────────
 
-def _m2_lookup(email, token, chat_id, user_data, loc_session=None):
+def _m2_lookup(email, token, chat_id, user_data):
     """Check if email is registered on Instagram. On hit, proceeds to Gmail check."""
     global _m2_good_insta, _m2_bad_insta, _m2_limit, _m2_scanned
     url     = "https://i.instagram.com/api/v1/bloks/async_action/com.bloks.www.caa.ar.search.async/"
@@ -1400,9 +1400,8 @@ def _m2_lookup(email, token, chat_id, user_data, loc_session=None):
         'x-pigeon-rawclienttime': str(time.time()),
         'x-pigeon-session-id': f"UFS-{uid4_4}-0",
     }
-    poster = loc_session if loc_session else requests
     try:
-        response = poster.post(url, data=payload, headers=headers, timeout=20)
+        response = requests.post(url, data=payload, headers=headers, timeout=20)
         _m2_scanned += 1
         _web_state['scanned'] = _m2_scanned
         if email in response.text:
@@ -1595,6 +1594,8 @@ def _m2_bot(token, chat_id, gmail, usr, email, user_data):
 
 # ── Scanner worker ────────────────────────────────────────────────────────────
 
+_M2_RNDCHARS = 'azertyuiopmlkjhgfdsqwxcvbnAZERTYUIOPMLKJHGFDSQWXCVBN1234567890'
+
 def _m2_get_usernames(token, chat_id, min_followers, stop_event):
     """Worker: fetch random Instagram user by ID, then run lookup pipeline."""
     global _m2_total
@@ -1602,32 +1603,50 @@ def _m2_get_usernames(token, chat_id, min_followers, stop_event):
 
     while not (stop_event and stop_event.is_set()):
         try:
-            csrf, lsd = _m2_load_tokens()
-            cookies = {
-                'rur': '"HIL\\0545636887483\\0541808136332:01fe43b89fcef61b8a466bfa81acf2b1bbab08f406fc99b1da8b7d889fa68683a3364c43"'
-            }
+            rnd        = str(random.randint(2500000000, 21254029834))
+            user_id    = random.randint(2500000000, 21254029834)
+            lsd        = ''.join(random.choice(_M2_RNDCHARS) for _ in range(16))
+            user_agent = (
+                "Instagram 311.0.0.32.118 Android ("
+                + random.choice(["23/6.0", "24/7.0", "25/7.1.1", "26/8.0", "27/8.1", "28/9.0"])
+                + "; " + str(random.randint(100, 1300)) + "dpi; "
+                + str(random.randint(200, 2000)) + "x" + str(random.randint(200, 2000)) + "; "
+                + random.choice(["SAMSUNG", "HUAWEI", "LGE/lge", "HTC", "ASUS", "ZTE",
+                                  "ONEPLUS", "XIAOMI", "OPPO", "VIVO", "SONY", "REALME"])
+                + "; SM-T" + rnd + "; SM-T" + rnd + "; qcom; en_US; 545986"
+                + str(random.randint(111, 999)) + ")"
+            )
             headers = {
-                'User-Agent': "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36",
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'x-bloks-version-id': "f0fd53409d7667526e529854656fe20159af8b76db89f40c333e593b51a2ce10",
-                'x-ig-app-id': '936619743392459',
-                'x-fb-lsd': lsd,
-                'sec-ch-prefers-color-scheme': 'light',
-                'x-csrftoken': csrf,
-                'sec-ch-ua-platform': '"Android"',
+                'accept': '*/*',
+                'accept-language': 'en,en-US;q=0.9',
+                'content-type': 'application/x-www-form-urlencoded',
+                'dnt': '1',
                 'origin': 'https://www.instagram.com',
-                'sec-fetch-site': 'same-origin'
+                'priority': 'u=1, i',
+                'referer': 'https://www.instagram.com/cristiano/following/',
+                'user-agent': user_agent,
+                'x-fb-friendly-name': 'PolarisUserHoverCardContentV2Query',
+                'x-fb-lsd': lsd,
             }
-            payload = {
+            data = {
                 'lsd': lsd,
-                'variables': json.dumps({"userID": random.randint(2500000000, 21254029834), "username": "cristiano"}),
+                'fb_api_caller_class': 'RelayModern',
+                'fb_api_req_friendly_name': 'PolarisUserHoverCardContentV2Query',
+                'variables': '{"userID":"' + str(user_id) + '","username":"cristiano"}',
+                'server_timestamps': 'true',
                 'doc_id': '7717269488336001',
             }
-            response = loc_session.post(
+            resp = loc_session.post(
                 'https://www.instagram.com/api/graphql',
-                headers=headers, data=payload, cookies=cookies, timeout=20
+                headers=headers, data=data, timeout=10
             )
-            user_data = response.json().get('data', {}).get('user', {})
+            if resp.status_code == 429:
+                time.sleep(1)
+                continue
+            if resp.status_code != 200:
+                time.sleep(0.1)
+                continue
+            user_data = resp.json().get('data', {}).get('user') or {}
             username  = user_data.get('username')
             followers = user_data.get('follower_count', 0)
             pk_id     = user_data.get('pk')
@@ -1636,10 +1655,11 @@ def _m2_get_usernames(token, chat_id, min_followers, stop_event):
                 email = username + '@gmail.com'
                 _m2_total += 1
                 _web_state['total'] = _m2_total
-                _m2_lookup(email, token, chat_id, user_data, loc_session)
+                _m2_lookup(email, token, chat_id, user_data)
 
         except Exception:
-            pass
+            time.sleep(0.05)
+            continue
 
 
 # ── Web entry point ────────────────────────────────────────────────────────────
