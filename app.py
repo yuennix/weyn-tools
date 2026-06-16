@@ -211,8 +211,7 @@ def stop():
     with _job_lock:
         if _stop_event:
             _stop_event.set()
-        weyn._web_state['running'] = False
-    weyn.close_all_sessions()
+    weyn.force_stop()
     return jsonify({'status': 'stopped'})
 
 

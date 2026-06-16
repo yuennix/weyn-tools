@@ -92,6 +92,18 @@ def close_all_sessions():
                 pass
         _active_sessions.clear()
 
+def force_stop():
+    """Immediately shut down M2 thread pools and mark state as stopped."""
+    _web_state['running'] = False
+    for pool_name in ('_m2_disc_pool', '_m2_lookup_pool'):
+        pool = globals().get(pool_name)
+        if pool is not None:
+            try:
+                pool.shutdown(wait=False, cancel_futures=True)
+            except Exception:
+                pass
+    close_all_sessions()
+
 def _send_telegram(token, chat_id, text):
     try:
         resp = requests.post(
@@ -1233,6 +1245,7 @@ _m2_found_emails: list = []
 _m2_found_lock   = Lock()
 _m2_hit_lock     = Lock()
 _m2_lookup_pool: ThreadPoolExecutor = None
+_m2_disc_pool:   ThreadPoolExecutor = None
 
 _m2_session  = requests.Session()
 _m2__session = requests.Session()
@@ -1688,19 +1701,21 @@ def run_method2_web(token, chat_id, min_followers, stop_event):
     NUM_WORKERS   = 200
     NUM_LOOKUP    = 30
     try:
-        with ThreadPoolExecutor(max_workers=NUM_LOOKUP) as lookup_pool:
-            _m2_lookup_pool = lookup_pool
-            with ThreadPoolExecutor(max_workers=NUM_WORKERS) as disc_pool:
-                futures = [
-                    disc_pool.submit(_m2_get_usernames, token, chat_id, min_followers, stop_event)
-                    for _ in range(NUM_WORKERS)
-                ]
-                for future in as_completed(futures):
-                    try:
-                        future.result()
-                    except Exception:
-                        pass
+        disc_pool   = ThreadPoolExecutor(max_workers=NUM_WORKERS)
+        lookup_pool = ThreadPoolExecutor(max_workers=NUM_LOOKUP)
+        _m2_disc_pool   = disc_pool
+        _m2_lookup_pool = lookup_pool
+        futures = [
+            disc_pool.submit(_m2_get_usernames, token, chat_id, min_followers, stop_event)
+            for _ in range(NUM_WORKERS)
+        ]
+        for future in as_completed(futures):
+            try:
+                future.result()
+            except Exception:
+                pass
     finally:
+        _m2_disc_pool   = None
         _m2_lookup_pool = None
         _web_state['running'] = False
 
