@@ -8,7 +8,7 @@ from random import randrange, choice
 import uuid
 import time
 from datetime import datetime
-from threading import Thread, Lock, Event
+from threading import Thread, Lock, Event, Semaphore
 import requests
 import urllib.parse
 import base64
@@ -1232,6 +1232,7 @@ _m2_scanned      = 0
 _m2_found_emails: list = []
 _m2_found_lock   = Lock()
 _m2_hit_lock     = Lock()
+_m2_bloks_sem    = Semaphore(30)
 
 _m2_session  = requests.Session()
 _m2__session = requests.Session()
@@ -1400,23 +1401,23 @@ def _m2_lookup(email, token, chat_id, user_data):
         'x-pigeon-rawclienttime': str(time.time()),
         'x-pigeon-session-id': f"UFS-{uid4_4}-0",
     }
-    try:
-        response = requests.post(url, data=payload, headers=headers, timeout=20)
-        _m2_scanned += 1
-        _web_state['scanned'] = _m2_scanned
-        if email in response.text:
-            _m2_good_insta += 1
-            _web_state['good'] = _m2_good_insta
-            _m2_check_gmail_and_hit(email, token, chat_id, user_data)
-        elif 'Sorry, something' in response.text:
-            _m2_limit += 1
-            _web_state['limit'] = _m2_limit
-            time.sleep(random.uniform(1.0, 3.0))
-        else:
-            _m2_bad_insta += 1
-            _web_state['bad_insta'] = _m2_bad_insta
-    except Exception:
-        time.sleep(random.uniform(0.5, 1.5))
+    with _m2_bloks_sem:
+        try:
+            response = requests.post(url, data=payload, headers=headers, timeout=20)
+            _m2_scanned += 1
+            _web_state['scanned'] = _m2_scanned
+            if email in response.text:
+                _m2_good_insta += 1
+                _web_state['good'] = _m2_good_insta
+                _m2_check_gmail_and_hit(email, token, chat_id, user_data)
+            elif 'Sorry, something' in response.text:
+                _m2_limit += 1
+                _web_state['limit'] = _m2_limit
+            else:
+                _m2_bad_insta += 1
+                _web_state['bad_insta'] = _m2_bad_insta
+        except Exception:
+            pass
 
 
 # ── Gmail availability check ──────────────────────────────────────────────────
