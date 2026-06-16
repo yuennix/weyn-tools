@@ -1232,7 +1232,7 @@ _m2_scanned      = 0
 _m2_found_emails: list = []
 _m2_found_lock   = Lock()
 _m2_hit_lock     = Lock()
-_m2_bloks_sem    = Semaphore(30)
+_m2_lookup_pool: ThreadPoolExecutor = None
 
 _m2_session  = requests.Session()
 _m2__session = requests.Session()
@@ -1401,23 +1401,22 @@ def _m2_lookup(email, token, chat_id, user_data):
         'x-pigeon-rawclienttime': str(time.time()),
         'x-pigeon-session-id': f"UFS-{uid4_4}-0",
     }
-    with _m2_bloks_sem:
-        try:
-            response = requests.post(url, data=payload, headers=headers, timeout=20)
-            _m2_scanned += 1
-            _web_state['scanned'] = _m2_scanned
-            if email in response.text:
-                _m2_good_insta += 1
-                _web_state['good'] = _m2_good_insta
-                _m2_check_gmail_and_hit(email, token, chat_id, user_data)
-            elif 'Sorry, something' in response.text:
-                _m2_limit += 1
-                _web_state['limit'] = _m2_limit
-            else:
-                _m2_bad_insta += 1
-                _web_state['bad_insta'] = _m2_bad_insta
-        except Exception:
-            pass
+    try:
+        response = requests.post(url, data=payload, headers=headers, timeout=20)
+        _m2_scanned += 1
+        _web_state['scanned'] = _m2_scanned
+        if email in response.text:
+            _m2_good_insta += 1
+            _web_state['good'] = _m2_good_insta
+            _m2_check_gmail_and_hit(email, token, chat_id, user_data)
+        elif 'Sorry, something' in response.text:
+            _m2_limit += 1
+            _web_state['limit'] = _m2_limit
+        else:
+            _m2_bad_insta += 1
+            _web_state['bad_insta'] = _m2_bad_insta
+    except Exception:
+        pass
 
 
 # ── Gmail availability check ──────────────────────────────────────────────────
@@ -1656,7 +1655,8 @@ def _m2_get_usernames(token, chat_id, min_followers, stop_event):
                 email = username + '@gmail.com'
                 _m2_total += 1
                 _web_state['total'] = _m2_total
-                _m2_lookup(email, token, chat_id, user_data)
+                if _m2_lookup_pool is not None:
+                    _m2_lookup_pool.submit(_m2_lookup, email, token, chat_id, user_data)
 
         except Exception:
             time.sleep(0.05)
@@ -1668,6 +1668,7 @@ def _m2_get_usernames(token, chat_id, min_followers, stop_event):
 def run_method2_web(token, chat_id, min_followers, stop_event):
     global _m2_hits, _m2_good_insta, _m2_bad_insta, _m2_bad_email
     global _m2_taken, _m2_limit, _m2_total, _m2_scanned, _m2_found_emails
+    global _m2_lookup_pool
 
     _m2_hits = _m2_good_insta = _m2_bad_insta = _m2_bad_email = 0
     _m2_taken = _m2_limit = _m2_total = _m2_scanned = 0
@@ -1684,12 +1685,14 @@ def run_method2_web(token, chat_id, min_followers, stop_event):
     Thread(target=_m2_get_tl,     daemon=True).start()
     Thread(target=_m2_get_tokens, daemon=True).start()
 
-    NUM_WORKERS = 200
+    NUM_WORKERS   = 200
+    NUM_LOOKUP    = 30
     try:
-        while not stop_event.is_set():
-            with ThreadPoolExecutor(max_workers=NUM_WORKERS) as executor:
+        with ThreadPoolExecutor(max_workers=NUM_LOOKUP) as lookup_pool:
+            _m2_lookup_pool = lookup_pool
+            with ThreadPoolExecutor(max_workers=NUM_WORKERS) as disc_pool:
                 futures = [
-                    executor.submit(_m2_get_usernames, token, chat_id, min_followers, stop_event)
+                    disc_pool.submit(_m2_get_usernames, token, chat_id, min_followers, stop_event)
                     for _ in range(NUM_WORKERS)
                 ]
                 for future in as_completed(futures):
@@ -1697,9 +1700,8 @@ def run_method2_web(token, chat_id, min_followers, stop_event):
                         future.result()
                     except Exception:
                         pass
-            if not stop_event.is_set():
-                time.sleep(0.5)
     finally:
+        _m2_lookup_pool = None
         _web_state['running'] = False
 
 
