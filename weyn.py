@@ -1770,8 +1770,8 @@ def _m3_generate_android_ua():
     )
 
 
-def _m3_check_v1(email, client):
-    """V1: Direct Instagram check_email endpoint — fastest."""
+def _m3_check_v1(email, session):
+    """V1: Direct Instagram check_email endpoint — no httpx, pure requests."""
     url = "https://i.instagram.com/api/v1/users/check_email/"
     headers = {
         'User-Agent': _m3_generate_android_ua(),
@@ -1780,18 +1780,28 @@ def _m3_check_v1(email, client):
         'accept-language': "en-IN, en-US",
     }
     try:
-        resp = client.post(url, data=f"email={email}", headers=headers, timeout=10)
-        if 'email_is_taken' in resp.text:
+        resp = session.post(url, data={"email": email}, headers=headers, timeout=10)
+        try:
+            data = resp.json()
+            if data.get('email_is_taken') is True:
+                return "registered"
+            elif data.get('email_is_taken') is False:
+                return "not_registered"
+        except Exception:
+            pass
+        # Fallback: text-based check for older API responses
+        text = resp.text
+        if '"email_is_taken":true' in text or '"email_is_taken": true' in text:
             return "registered"
-        elif 'available' in resp.text.lower() or 'Email' in resp.text:
+        if '"email_is_taken":false' in text or '"email_is_taken": false' in text:
             return "not_registered"
         return "check_v2"
     except Exception:
         return "check_v2"
 
 
-def _m3_check_v2(email, client):
-    """V2: Bloks/CAA search endpoint — fallback."""
+def _m3_check_v2(email, session):
+    """V2: Bloks/CAA search endpoint — pure requests fallback."""
     android = "android-" + secrets.token_hex(8)
     device  = str(uuid.uuid4())
     family  = str(uuid.uuid4())
@@ -1875,7 +1885,7 @@ def _m3_check_v2(email, client):
         'x-pigeon-session-id': f"UFS-{uuid.uuid4()}-0",
     }
     try:
-        resp = client.post(url, data=payload, headers=headers, timeout=10)
+        resp = session.post(url, data=payload, headers=headers, timeout=10)
         if email in resp.text:
             return "registered"
         return "not_registered"
@@ -1941,29 +1951,29 @@ def _m3_worker(token, chat_id, stop_event):
             _web_state['scanned'] = _m3_scanned
 
             try:
-                with httpx.Client(http2=True, timeout=15) as client:
-                    result_v1 = _m3_check_v1(email, client)
+                session = requests.Session()
+                result_v1 = _m3_check_v1(email, session)
 
-                    if result_v1 == "registered":
+                if result_v1 == "registered":
+                    _m3_good_insta += 1
+                    _web_state['good'] = _m3_good_insta
+                    _m3_save_hit(token, chat_id, email, "V1")
+
+                elif result_v1 == "check_v2":
+                    result_v2 = _m3_check_v2(email, session)
+                    if result_v2 == "registered":
                         _m3_good_insta += 1
                         _web_state['good'] = _m3_good_insta
-                        _m3_save_hit(token, chat_id, email, "V1")
-
-                    elif result_v1 == "check_v2":
-                        result_v2 = _m3_check_v2(email, client)
-                        if result_v2 == "registered":
-                            _m3_good_insta += 1
-                            _web_state['good'] = _m3_good_insta
-                            _m3_save_hit(token, chat_id, email, "V2")
-                        elif result_v2 == "unknown":
-                            _m3_bad_email += 1
-                            _web_state['bad_email'] = _m3_bad_email
-                        else:
-                            _m3_bad_insta += 1
-                            _web_state['bad_insta'] = _m3_bad_insta
+                        _m3_save_hit(token, chat_id, email, "V2")
+                    elif result_v2 == "unknown":
+                        _m3_bad_email += 1
+                        _web_state['bad_email'] = _m3_bad_email
                     else:
                         _m3_bad_insta += 1
                         _web_state['bad_insta'] = _m3_bad_insta
+                else:
+                    _m3_bad_insta += 1
+                    _web_state['bad_insta'] = _m3_bad_insta
 
             except Exception:
                 _m3_bad_insta += 1
