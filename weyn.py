@@ -132,16 +132,7 @@ def get_year_range(year_choice):
     return 1, 6000000000
 
 # ── WEYN hit message format (retained) ──
-def format_hit(hit_num, username, email, followers, following, bio,
-               year_label, reset_text, join_date, country,
-               masked=None, former=None):
-    about_lines = (
-        f"│  𝐉𝐨𝐢𝐧𝐞𝐝     ➤  {join_date}\n"
-        f"│  𝐘𝐞𝐚𝐫       ➤  {year_label}\n"
-        f"│  𝐂𝐨𝐮𝐧𝐭𝐫𝐲    ➤  {country}\n"
-        f"│  𝐅𝐨𝐫𝐦𝐞𝐫     ➤  {former or '-'}\n"
-    )
-    masked_line = f"│  𝐌𝐚𝐬𝐤𝐞𝐝     ➤  {masked}\n" if masked else ""
+def format_hit(hit_num, username, email, followers, following, bio, reset_text):
     return f"""
 ╔═━━━────────────━━━═╗
         WEYN IG HIT #{hit_num}
@@ -160,9 +151,6 @@ def format_hit(hit_num, username, email, followers, following, bio,
 │
 │  https://www.instagram.com/{username}
 │
-├──〔 𝐀𝐁𝐎𝐔𝐓 𝐓𝐇𝐈𝐒 𝐀𝐂𝐂𝐎𝐔𝐍𝐓 〕───────────┤
-│
-{about_lines}{masked_line}│
 ╰──────────────────────────────────────╯
 
         @jinbelowg @weyn_vouches
@@ -968,31 +956,12 @@ def _m1_save_hit(username, user, token, chat_id):
     followers  = user.get('follower_count', 0)
     following  = user.get('following_count', 0)
     bio        = user.get('biography', 'None') or 'None'
-    year_label = str(gdate(user_id))
+    email_str  = f"{username}@gmail.com"
 
-    # Fetch reset-endpoint masked email (display only — not used to filter)
+    # Fetch reset-endpoint masked email
     reset_text = _m1_rest_v1(username)
-
-    about      = _m1_get_about_account(user_id, username)
-    join_date  = about.get("join_date") or year_label
-    _yr = re.search(r'\b(20\d{2})\b', join_date)
-    if _yr:
-        year_label = _yr.group(1)
-    country_nm = about.get("country") or "-"
-    country_fl = _m1_get_country_flag(country_nm)
-    country    = f"{country_nm} {country_fl}".strip() if country_fl else country_nm
-    former_raw = about.get("former_usernames", [])
-    former     = ", ".join(former_raw) if former_raw else "-"
-
-    # Fetch GraphQL masked email (display only — not used to filter)
-    masked, _ = _m1_get_masked(username)
-
-    # Best value for the Reset display field
-    email_str = f"{username}@gmail.com"
-    def _is_real_masked(v):
-        return bool(v and v not in ('-', '') and not v.startswith('Fail:') and '@' in v)
-    if not _is_real_masked(reset_text):
-        reset_text = masked if masked else email_str
+    if not (reset_text and reset_text not in ('-', '') and not reset_text.startswith('Fail:') and '@' in reset_text):
+        reset_text = email_str
 
     output = format_hit(
         hit_num    = 0,          # placeholder; replaced inside the lock below
@@ -1001,12 +970,7 @@ def _m1_save_hit(username, user, token, chat_id):
         followers  = followers,
         following  = following,
         bio        = bio,
-        year_label = year_label,
         reset_text = reset_text,
-        join_date  = join_date,
-        country    = country,
-        masked     = masked,
-        former     = former,
     )
 
     # ── Lock only for counter update + hit number assignment ─────────────────
@@ -1892,13 +1856,17 @@ def _m3_check_v2(email, session):
     try:
         resp = session.post(url, data=payload, headers=headers, timeout=4)
         if email in resp.text:
-            return "registered"
-        return "not_registered"
+            username = None
+            m = re.search(r'"username"\s*:\s*"([A-Za-z0-9_.]{1,30})"', resp.text)
+            if m:
+                username = m.group(1)
+            return ("registered", username)
+        return ("not_registered", None)
     except Exception:
-        return "unknown"
+        return ("unknown", None)
 
 
-def _m3_save_hit(token, chat_id, email, method_label="V1"):
+def _m3_save_hit(token, chat_id, email, method_label="V1", username=None):
     global _m3_hits, _m3_total
     domain  = email.split('@')[1]
     prefix  = email.split('@')[0]
@@ -1909,12 +1877,14 @@ def _m3_save_hit(token, chat_id, email, method_label="V1"):
         _m3_total += 1
         hit_num    = _m3_hits
 
+    profile_line = f"LINK   : https://www.instagram.com/{username}\n" if username else ""
     msg = (
         f"\n\nWEYN M3 — EMAIL SCANNER\n"
         f"HIT #{hit_num}\n"
         f"EMAIL  : {email}\n"
         f"MASKED : {masked}\n"
         f"STATUS : REGISTERED ({method_label})\n"
+        f"{profile_line}"
         f"RESET  : https://www.instagram.com/accounts/password/reset/\n"
         f"_______________________________________\n"
         f"BY ~ @jinbelowg @weyn_vouches"
@@ -1964,15 +1934,17 @@ def _m3_worker(token, chat_id, stop_event):
                 if result_v1 == "registered":
                     _m3_good_insta += 1
                     _web_state['good'] = _m3_good_insta
-                    _m3_save_hit(token, chat_id, email, "V1")
+                    # Run V2 just to extract the username for the profile link
+                    _, username = _m3_check_v2(email, session)
+                    _m3_save_hit(token, chat_id, email, "V1", username)
 
                 elif result_v1 == "check_v2":
-                    result_v2 = _m3_check_v2(email, session)
-                    if result_v2 == "registered":
+                    v2_status, username = _m3_check_v2(email, session)
+                    if v2_status == "registered":
                         _m3_good_insta += 1
                         _web_state['good'] = _m3_good_insta
-                        _m3_save_hit(token, chat_id, email, "V2")
-                    elif result_v2 == "unknown":
+                        _m3_save_hit(token, chat_id, email, "V2", username)
+                    elif v2_status == "unknown":
                         _m3_bad_email += 1
                         _web_state['bad_email'] = _m3_bad_email
                     else:
