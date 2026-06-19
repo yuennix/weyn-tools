@@ -93,9 +93,9 @@ def close_all_sessions():
         _active_sessions.clear()
 
 def force_stop():
-    """Immediately shut down M2/M3 thread pools and mark state as stopped."""
+    """Immediately shut down all thread pools and mark state as stopped."""
     _web_state['running'] = False
-    for pool_name in ('_m2_disc_pool', '_m2_lookup_pool', '_m3_pool'):
+    for pool_name in ('_m1_pool', '_m2_disc_pool', '_m2_lookup_pool', '_m3_pool'):
         pool = globals().get(pool_name)
         if pool is not None:
             try:
@@ -1146,7 +1146,9 @@ def _m1_sinsta(min_id, max_id, token, chat_id, min_followers=0, stop_event=None)
             }
             global _m1_scanned
             _m1_scanned += 1
-            resp = loc_session.post(_M1_CONFIG["insta_graphql"], headers=headers, data=data, timeout=10)
+            if stop_event and stop_event.is_set():
+                break
+            resp = loc_session.post(_M1_CONFIG["insta_graphql"], headers=headers, data=data, timeout=4)
             if resp.status_code == 429:
                 time.sleep(1)
                 continue
@@ -1211,21 +1213,21 @@ def run_method1_web(token, chat_id, year_choice, min_followers, stop_event):
     _m1_gtokens()
 
     NUM_WORKERS = 200
+    global _m1_pool
     try:
-        while not stop_event.is_set():
-            with ThreadPoolExecutor(max_workers=NUM_WORKERS) as executor:
-                futures = [
-                    executor.submit(_m1_sinsta, min_id, max_id, token, chat_id, min_followers, stop_event)
-                    for _ in range(NUM_WORKERS)
-                ]
-                for future in as_completed(futures):
-                    try:
-                        future.result()
-                    except Exception:
-                        pass
-            if not stop_event.is_set():
-                time.sleep(0.5)
+        pool = ThreadPoolExecutor(max_workers=NUM_WORKERS)
+        _m1_pool = pool
+        futures = [
+            pool.submit(_m1_sinsta, min_id, max_id, token, chat_id, min_followers, stop_event)
+            for _ in range(NUM_WORKERS)
+        ]
+        for future in as_completed(futures):
+            try:
+                future.result()
+            except Exception:
+                pass
     finally:
+        _m1_pool = None
         _web_state['running'] = False
 
 
@@ -1246,6 +1248,7 @@ _m2_found_lock   = Lock()
 _m2_hit_lock     = Lock()
 _m2_lookup_pool: ThreadPoolExecutor = None
 _m2_disc_pool:   ThreadPoolExecutor = None
+_m1_pool:        ThreadPoolExecutor = None
 
 _m2_session  = requests.Session()
 _m2__session = requests.Session()
@@ -1649,9 +1652,11 @@ def _m2_get_usernames(token, chat_id, min_followers, stop_event):
                 'server_timestamps': 'true',
                 'doc_id': '7717269488336001',
             }
+            if stop_event and stop_event.is_set():
+                break
             resp = loc_session.post(
                 'https://www.instagram.com/api/graphql',
-                headers=headers, data=data, timeout=10
+                headers=headers, data=data, timeout=4
             )
             if resp.status_code == 429:
                 time.sleep(1)
@@ -1780,7 +1785,7 @@ def _m3_check_v1(email, session):
         'accept-language': "en-IN, en-US",
     }
     try:
-        resp = session.post(url, data={"email": email}, headers=headers, timeout=10)
+        resp = session.post(url, data={"email": email}, headers=headers, timeout=4)
         try:
             data = resp.json()
             if data.get('email_is_taken') is True:
@@ -1885,7 +1890,7 @@ def _m3_check_v2(email, session):
         'x-pigeon-session-id': f"UFS-{uuid.uuid4()}-0",
     }
     try:
-        resp = session.post(url, data=payload, headers=headers, timeout=10)
+        resp = session.post(url, data=payload, headers=headers, timeout=4)
         if email in resp.text:
             return "registered"
         return "not_registered"
@@ -1951,7 +1956,9 @@ def _m3_worker(token, chat_id, stop_event):
             _web_state['scanned'] = _m3_scanned
 
             try:
-                session = requests.Session()
+                if stop_event and stop_event.is_set():
+                    break
+                session = _register_session(requests.Session())
                 result_v1 = _m3_check_v1(email, session)
 
                 if result_v1 == "registered":
