@@ -15,8 +15,10 @@ A Flask-based web tool for automated Instagram account scanning. Features a cybe
 ## Running the App
 
 ```
-python -m gunicorn --bind 0.0.0.0:5000 --reuse-port --reload main:app
+python3 -m gunicorn --bind 0.0.0.0:5000 --reuse-port --reload --worker-class gthread --threads 4 --timeout 0 main:app
 ```
+
+> **Important:** `--worker-class gthread --threads 4 --timeout 0` is required. The default sync worker kills itself after 30 s when serving the SSE `/api/stats` stream, spawning a fresh process with all-zero counters — that's why live stats show 0. The gthread worker handles SSE + concurrent requests (start/stop) in separate threads without timeouts.
 
 ## Environment Variables
 

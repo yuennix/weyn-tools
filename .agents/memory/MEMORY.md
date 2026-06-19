@@ -1,0 +1,1 @@
+- [Gunicorn SSE configuration](gunicorn-sse-config.md) — gthread + threads 4 + timeout 0 required or live stats always show 0 due to worker timeout killing the SSE process.
