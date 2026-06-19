@@ -1932,11 +1932,21 @@ def _m3_worker(token, chat_id, stop_event):
                 result_v1 = _m3_check_v1(email, session)
 
                 if result_v1 == "registered":
-                    _m3_good_insta += 1
-                    _web_state['good'] = _m3_good_insta
-                    # Run V2 just to extract the username for the profile link
-                    _, username = _m3_check_v2(email, session)
-                    _m3_save_hit(token, chat_id, email, "V1", username)
+                    # Confirm with V2 before saving — avoids false positives
+                    v2_status, username = _m3_check_v2(email, session)
+                    if v2_status == "registered":
+                        _m3_good_insta += 1
+                        _web_state['good'] = _m3_good_insta
+                        _m3_save_hit(token, chat_id, email, "V1", username)
+                    elif v2_status == "not_registered":
+                        # V1 false positive — email is not actually taken
+                        _m3_bad_insta += 1
+                        _web_state['bad_insta'] = _m3_bad_insta
+                    else:
+                        # V2 inconclusive — still trust V1
+                        _m3_good_insta += 1
+                        _web_state['good'] = _m3_good_insta
+                        _m3_save_hit(token, chat_id, email, "V1", username)
 
                 elif result_v1 == "check_v2":
                     v2_status, username = _m3_check_v2(email, session)
