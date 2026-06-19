@@ -250,6 +250,11 @@ body {
   border-color: var(--magenta) !important;
   text-shadow: 0 0 6px var(--magenta);
 }
+.badge-m3 {
+  color: #f59e0b !important;
+  border-color: #f59e0b !important;
+  text-shadow: 0 0 6px #f59e0b;
+}
 
 /* ─── Form ─── */
 .form-group {

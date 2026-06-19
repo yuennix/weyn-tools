@@ -17,6 +17,7 @@
   const hitsCount      = document.getElementById('hitsCount');
   const methodBtn1     = document.getElementById('methodBtn1');
   const methodBtn2     = document.getElementById('methodBtn2');
+  const methodBtn3     = document.getElementById('methodBtn3');
   const yearRangeGroup = document.getElementById('yearRangeGroup');
   const minLabel       = document.getElementById('minLabel');
   const minInput       = document.getElementById('min_followers');
@@ -28,18 +29,26 @@
     selectedMethod = m;
     methodBtn1.classList.toggle('active', m === '1');
     methodBtn2.classList.toggle('active', m === '2');
-    yearRangeGroup.style.display = m === '2' ? 'none' : '';
+    methodBtn3.classList.toggle('active', m === '3');
+    yearRangeGroup.style.display = (m === '2' || m === '3') ? 'none' : '';
     if (m === '2') {
       minLabel.textContent = 'MIN POSTS';
       minInput.min = '20';
       if (parseInt(minInput.value) < 20) minInput.value = 20;
+    } else if (m === '3') {
+      minLabel.textContent = 'THREADS (fixed 200)';
+      minInput.min = '0';
+      minInput.value = 200;
+      minInput.disabled = true;
     } else {
       minLabel.textContent = 'MIN FOLLOWERS';
       minInput.min = '0';
+      minInput.disabled = false;
     }
   }
   methodBtn1.addEventListener('click', () => { if (!startBtn.disabled) selectMethod('1'); });
   methodBtn2.addEventListener('click', () => { if (!startBtn.disabled) selectMethod('2'); });
+  methodBtn3.addEventListener('click', () => { if (!startBtn.disabled) selectMethod('3'); });
 
   // ── Strip iOS smart-punctuation from token/chat_id strings ──
   function sanitizeInput(str) {
@@ -118,20 +127,23 @@
       }
     });
     if (d.method && !_starting) {
-      methodBadge.textContent = d.method === '2' ? 'M2 · HIGH POST' : 'M1 · STANDARD';
-      methodBadge.className   = d.method === '2' ? 'badge badge-m2' : 'badge';
+      const labels = { '1': 'M1 · STANDARD', '2': 'M2 · HIGH POST', '3': 'M3 · EMAIL SCAN' };
+      const classes = { '1': 'badge', '2': 'badge badge-m2', '3': 'badge badge-m3' };
+      methodBadge.textContent = labels[d.method] || ('M' + d.method);
+      methodBadge.className   = classes[d.method] || 'badge';
     }
   }
 
   function updateHits(hits) {
     if (!hits || hits.length === 0) return;
     hits.forEach(raw => {
-      // M2 stores JSON {"e": email, "p": posts}; M1 stores plain email strings
-      let email, posts = null;
+      // M2 stores JSON {"e": email, "p": posts}; M3 stores {"e": email, "m": method}; M1 stores plain email strings
+      let email, posts = null, methodLabel = null;
       try {
         const obj = JSON.parse(raw);
-        email = obj.e;
-        posts = obj.p;
+        email       = obj.e;
+        posts       = obj.p !== undefined ? obj.p : null;
+        methodLabel = obj.m !== undefined ? obj.m : null;
       } catch (_) {
         email = raw;
       }
@@ -147,7 +159,9 @@
 
       const postsBadge = posts !== null
         ? `<span class="hit-posts-badge">${escHtml(String(posts))} posts</span>`
-        : '';
+        : methodLabel !== null
+          ? `<span class="hit-posts-badge" style="color:#f59e0b;border-color:#f59e0b">${escHtml(methodLabel)}</span>`
+          : '';
 
       const card = document.createElement('div');
       card.className = 'hit-card';
@@ -199,8 +213,10 @@
     _starting = true;
     _stopping = false;
     setRunning(true);
-    methodBadge.textContent = selectedMethod === '2' ? 'M2 · HIGH POST' : 'M1 · STANDARD';
-    methodBadge.className   = selectedMethod === '2' ? 'badge badge-m2' : 'badge';
+    const _badgeLabels  = { '1': 'M1 · STANDARD', '2': 'M2 · HIGH POST', '3': 'M3 · EMAIL SCAN' };
+    const _badgeClasses = { '1': 'badge', '2': 'badge badge-m2', '3': 'badge badge-m3' };
+    methodBadge.textContent = _badgeLabels[selectedMethod]  || ('M' + selectedMethod);
+    methodBadge.className   = _badgeClasses[selectedMethod] || 'badge';
 
     knownHits.clear();
     totalHits = 0;

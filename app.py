@@ -191,6 +191,13 @@ def start():
                 args=(token, chat_id, min_followers, _stop_event),
                 daemon=True
             )
+        elif method == '3':
+            weyn._web_state['method'] = '3'
+            _job_thread = threading.Thread(
+                target=weyn.run_method3_web,
+                args=(token, chat_id, _stop_event),
+                daemon=True
+            )
         else:
             method = '1'
             weyn._web_state['method'] = '1'
@@ -310,6 +317,22 @@ def stats():
                     'total'      : weyn._m2_total,
                     'scanned'    : weyn._m2_scanned,
                     'recent_hits': list(weyn._m2_found_emails[-20:]),
+                    'tg_status'  : tg_status,
+                    'tg_error'   : tg_error,
+                }
+            elif method == '3':
+                payload = {
+                    'running'    : running,
+                    'method'     : '3',
+                    'hits'       : weyn._m3_hits,
+                    'good'       : weyn._m3_good_insta,
+                    'bad_insta'  : weyn._m3_bad_insta,
+                    'bad_email'  : weyn._m3_bad_email,
+                    'taken'      : weyn._m3_taken,
+                    'limit'      : weyn._m3_limit,
+                    'total'      : weyn._m3_total,
+                    'scanned'    : weyn._m3_scanned,
+                    'recent_hits': list(weyn._m3_found_emails[-20:]),
                     'tg_status'  : tg_status,
                     'tg_error'   : tg_error,
                 }

