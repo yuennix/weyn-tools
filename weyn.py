@@ -1955,7 +1955,10 @@ def _m3_worker(token, chat_id, stop_event):
     try:
         while not (stop_event and stop_event.is_set()):
             try:
-                chosen        = _m3_gen_username()
+                user1  = ''.join(random.choice('abcdefghijklmnopqrstuvwxyz') for _ in range(6))
+                user2  = ''.join(random.choice('abcdefghijklmnopqrstuvwxyz') for _ in range(6))
+                chosen = random.choice([user1, user2])
+
                 domain_suffix = random.choice(_M3_DOMAINS)
                 email         = chosen + domain_suffix
 
@@ -1968,18 +1971,27 @@ def _m3_worker(token, chat_id, stop_event):
                 result_v1 = _m3_check_v1(email, client)
 
                 if result_v1 == "registered":
-                    # Trust V1 directly — no V2 double-check needed, saves one full API call
-                    _m3_good_insta += 1
-                    _web_state['good'] = _m3_good_insta
-                    _m3_save_hit(token, chat_id, email, "V1", chosen, True)
-
-                elif result_v1 == "check_v2":
-                    # V1 inconclusive — fall back to V2 which also extracts real username
-                    v2_status, username, _ = _m3_check_v2(email, client)
+                    # Confirm with V2 — also extracts username + pk
+                    v2_status, username, user_pk = _m3_check_v2(email, client)
                     if v2_status == "registered":
                         _m3_good_insta += 1
                         _web_state['good'] = _m3_good_insta
-                        _m3_save_hit(token, chat_id, email, "V2", username or chosen, True)
+                        _m3_save_hit(token, chat_id, email, "V1", username, True)
+                    elif v2_status == "not_registered":
+                        _m3_bad_insta += 1
+                        _web_state['bad_insta'] = _m3_bad_insta
+                    else:
+                        # V2 inconclusive — trust V1
+                        _m3_good_insta += 1
+                        _web_state['good'] = _m3_good_insta
+                        _m3_save_hit(token, chat_id, email, "V1", username, True)
+
+                elif result_v1 == "check_v2":
+                    v2_status, username, user_pk = _m3_check_v2(email, client)
+                    if v2_status == "registered":
+                        _m3_good_insta += 1
+                        _web_state['good'] = _m3_good_insta
+                        _m3_save_hit(token, chat_id, email, "V2", username, True)
                     elif v2_status == "unknown":
                         _m3_bad_email += 1
                         _web_state['bad_email'] = _m3_bad_email
