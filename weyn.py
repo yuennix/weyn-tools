@@ -1951,7 +1951,7 @@ def _m3_save_hit(token, chat_id, email, method_label="V1", username=None):
     _send_telegram(token, chat_id, msg)
 
 
-def _m3_worker(token, chat_id, stop_event, year_choice=None):
+def _m3_worker(token, chat_id, stop_event):
     global _m3_good_insta, _m3_bad_insta, _m3_bad_email, _m3_scanned
     global _m3_taken
 
@@ -1961,18 +1961,8 @@ def _m3_worker(token, chat_id, stop_event, year_choice=None):
     except Exception:
         client = httpx.Client(timeout=10)
 
-    def _year_ok(user_pk):
-        """Return True if this account's creation year matches the filter."""
-        if year_choice is None:
-            return True
-        if user_pk is None:
-            return False  # can't verify year → fail closed, skip unverifiable hits
-        return gdate(user_pk) == year_choice
-
     def _try_save(email, label, username, user_pk):
-        """Check year + email availability then save or count as taken."""
-        if not _year_ok(user_pk):
-            return  # year mismatch — silently skip (counted as bad_insta below)
+        """Check email availability then save or count as taken."""
         if _m3_email_available(email):
             _m3_save_hit(token, chat_id, email, label, username)
         else:
@@ -2050,7 +2040,7 @@ def _m3_worker(token, chat_id, stop_event, year_choice=None):
             pass
 
 
-def run_method3_web(token, chat_id, stop_event, year_choice=None):
+def run_method3_web(token, chat_id, stop_event):
     global _m3_hits, _m3_good_insta, _m3_bad_insta, _m3_bad_email
     global _m3_taken, _m3_limit, _m3_total, _m3_scanned
     global _m3_found_emails, _m3_pool, _m3_used_emails
