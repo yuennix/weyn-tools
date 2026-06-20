@@ -203,7 +203,7 @@ def start():
             weyn._web_state['method'] = '3'
             _job_thread = threading.Thread(
                 target=weyn.run_method3_web,
-                args=(token, chat_id, _stop_event, year_choice),
+                args=(token, chat_id, _stop_event),
                 daemon=True
             )
         else:
