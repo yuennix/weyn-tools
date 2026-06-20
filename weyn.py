@@ -1723,14 +1723,7 @@ _m3_pool: ThreadPoolExecutor = None
 _m3_used_emails  = set()
 _m3_used_lock    = Lock()
 
-_M3_DOMAINS = [
-    "@gmail.com", "@gmail.com", "@gmail.com",   # weighted 3x — highest hit rate
-    "@yahoo.com", "@yahoo.com",
-    "@hotmail.com", "@hotmail.com",
-    "@outlook.com",
-    "@icloud.com",
-    "@hi2.in", "@mail.com",
-]
+_M3_DOMAINS = ["@hi2.in", "@telegmail.com"]
 
 # Common first names + popular suffixes → human-like usernames with high IG density
 _M3_NAMES = [
