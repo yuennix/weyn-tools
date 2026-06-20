@@ -30,7 +30,7 @@
     methodBtn1.classList.toggle('active', m === '1');
     methodBtn2.classList.toggle('active', m === '2');
     methodBtn3.classList.toggle('active', m === '3');
-    yearRangeGroup.style.display = (m === '2' || m === '3') ? 'none' : '';
+    yearRangeGroup.style.display = m === '2' ? 'none' : '';
     if (m === '2') {
       minLabel.textContent = 'MIN POSTS';
       minInput.min = '20';
@@ -137,13 +137,14 @@
   function updateHits(hits) {
     if (!hits || hits.length === 0) return;
     hits.forEach(raw => {
-      // M2 stores JSON {"e": email, "p": posts}; M3 stores {"e": email, "m": method}; M1 stores plain email strings
-      let email, posts = null, methodLabel = null;
+      // M2: {"e":email,"p":posts}  M3: {"e":email,"m":method,"u":igUsername}  M1: plain string
+      let email, posts = null, methodLabel = null, igUsername = null;
       try {
         const obj = JSON.parse(raw);
         email       = obj.e;
         posts       = obj.p !== undefined ? obj.p : null;
         methodLabel = obj.m !== undefined ? obj.m : null;
+        igUsername  = (obj.u && obj.u.length) ? obj.u : null;
       } catch (_) {
         email = raw;
       }
@@ -153,7 +154,8 @@
       totalHits++;
       hitsCount.textContent = totalHits;
 
-      const username = email.includes('@') ? email.split('@')[0] : email;
+      const emailUser = email.includes('@') ? email.split('@')[0] : email;
+      const profileHandle = igUsername || emailUser;
       const empty = hitsFeed.querySelector('.hits-empty');
       if (empty) empty.remove();
 
@@ -163,18 +165,20 @@
           ? `<span class="hit-posts-badge" style="color:#f59e0b;border-color:#f59e0b">${escHtml(methodLabel)}</span>`
           : '';
 
+      const profileLink = `https://www.instagram.com/${escHtml(profileHandle)}`;
+
       const card = document.createElement('div');
       card.className = 'hit-card';
       card.innerHTML = `
-        <div class="hit-username">@${escHtml(username)}${postsBadge}</div>
+        <div class="hit-username">@${escHtml(profileHandle)}${postsBadge}</div>
         <div class="hit-email">${escHtml(email)}</div>
-        <div class="hit-meta">
-          <a href="https://www.instagram.com/${escHtml(username)}" target="_blank"
-             style="color:var(--cyan);text-decoration:none;">
-            instagram.com/${escHtml(username)}
+        <div class="hit-profile">
+          <a href="${profileLink}" target="_blank" rel="noopener"
+             style="color:var(--cyan);text-decoration:none;font-size:11px;letter-spacing:.5px;">
+            ↗ ${profileLink}
           </a>
-          &nbsp;·&nbsp;${new Date().toLocaleTimeString()}
-        </div>`;
+        </div>
+        <div class="hit-meta">${new Date().toLocaleTimeString()}</div>`;
       hitsFeed.insertBefore(card, hitsFeed.firstChild);
     });
   }
@@ -228,10 +232,12 @@
     });
 
     try {
+      const yearEl       = document.getElementById('year_choice');
+      const year_choice  = yearEl && yearEl.value ? yearEl.value : null;
       const res = await fetch('/api/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ method: selectedMethod, token, chat_id, min_followers: min_value })
+        body: JSON.stringify({ method: selectedMethod, token, chat_id, min_followers: min_value, year_choice })
       });
       const data = await res.json();
       if (!res.ok) {
