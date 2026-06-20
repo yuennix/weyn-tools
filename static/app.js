@@ -165,19 +165,11 @@
           ? `<span class="hit-posts-badge" style="color:#f59e0b;border-color:#f59e0b">${escHtml(methodLabel)}</span>`
           : '';
 
-      const profileLink = `https://www.instagram.com/${escHtml(profileHandle)}`;
-
       const card = document.createElement('div');
       card.className = 'hit-card';
       card.innerHTML = `
         <div class="hit-username">@${escHtml(profileHandle)}${postsBadge}</div>
         <div class="hit-email">${escHtml(email)}</div>
-        <div class="hit-profile">
-          <a href="${profileLink}" target="_blank" rel="noopener"
-             style="color:var(--cyan);text-decoration:none;font-size:11px;letter-spacing:.5px;">
-            ↗ ${profileLink}
-          </a>
-        </div>
         <div class="hit-meta">${new Date().toLocaleTimeString()}</div>`;
       hitsFeed.insertBefore(card, hitsFeed.firstChild);
     });
