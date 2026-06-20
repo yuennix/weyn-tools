@@ -30,7 +30,7 @@
     methodBtn1.classList.toggle('active', m === '1');
     methodBtn2.classList.toggle('active', m === '2');
     methodBtn3.classList.toggle('active', m === '3');
-    yearRangeGroup.style.display = m === '2' ? 'none' : '';
+    yearRangeGroup.style.display = m === '1' ? '' : 'none';
     if (m === '2') {
       minLabel.textContent = 'MIN POSTS';
       minInput.min = '20';
