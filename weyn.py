@@ -1749,7 +1749,7 @@ def _m3_check_v1(email, session):
         'accept-language': "en-IN, en-US",
     }
     try:
-        resp = session.post(url, data={"email": email}, headers=headers, timeout=4)
+        resp = session.post(url, data={"email": email}, headers=headers, timeout=2)
         try:
             data = resp.json()
             if data.get('email_is_taken') is True:
@@ -1854,7 +1854,7 @@ def _m3_check_v2(email, session):
         'x-pigeon-session-id': f"UFS-{uuid.uuid4()}-0",
     }
     try:
-        resp = session.post(url, data=payload, headers=headers, timeout=4)
+        resp = session.post(url, data=payload, headers=headers, timeout=2)
         if email in resp.text:
             username = None
             m = re.search(r'"username"\s*:\s*"([A-Za-z0-9_.]{1,30})"', resp.text)
@@ -1928,12 +1928,18 @@ def _m3_worker(token, chat_id, stop_event):
             try:
                 if stop_event and stop_event.is_set():
                     break
-                session = _register_session(requests.Session())
-                result_v1 = _m3_check_v1(email, session)
 
+                # Fire V1 and V2 in parallel — both checks run simultaneously
+                session1 = _register_session(requests.Session())
+                session2 = _register_session(requests.Session())
+                with ThreadPoolExecutor(max_workers=2) as mini_pool:
+                    f_v1 = mini_pool.submit(_m3_check_v1, email, session1)
+                    f_v2 = mini_pool.submit(_m3_check_v2, email, session2)
+                    result_v1          = f_v1.result()
+                    v2_status, username = f_v2.result()
+
+                # V1 says registered — verify with V2 result (already available)
                 if result_v1 == "registered":
-                    # Confirm with V2 before saving — avoids false positives
-                    v2_status, username = _m3_check_v2(email, session)
                     if v2_status == "registered":
                         _m3_good_insta += 1
                         _web_state['good'] = _m3_good_insta
@@ -1943,13 +1949,13 @@ def _m3_worker(token, chat_id, stop_event):
                         _m3_bad_insta += 1
                         _web_state['bad_insta'] = _m3_bad_insta
                     else:
-                        # V2 inconclusive — still trust V1
+                        # V2 inconclusive — trust V1
                         _m3_good_insta += 1
                         _web_state['good'] = _m3_good_insta
                         _m3_save_hit(token, chat_id, email, "V1", username)
 
+                # V1 inconclusive — use V2 result (already available, no extra wait)
                 elif result_v1 == "check_v2":
-                    v2_status, username = _m3_check_v2(email, session)
                     if v2_status == "registered":
                         _m3_good_insta += 1
                         _web_state['good'] = _m3_good_insta
@@ -1969,7 +1975,7 @@ def _m3_worker(token, chat_id, stop_event):
                 _web_state['bad_insta'] = _m3_bad_insta
 
         except Exception:
-            time.sleep(0.05)
+            time.sleep(0.01)
             continue
 
 
@@ -1991,7 +1997,7 @@ def run_method3_web(token, chat_id, stop_event):
         'recent_hits': [], 'tg_status': '', 'tg_error': '',
     })
 
-    NUM_WORKERS = 200
+    NUM_WORKERS = 500
     try:
         pool = ThreadPoolExecutor(max_workers=NUM_WORKERS)
         _m3_pool = pool
