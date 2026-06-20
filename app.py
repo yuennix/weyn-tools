@@ -183,6 +183,14 @@ def start():
             return jsonify({'error': 'Bot Token and Chat ID are required'}), 400
 
         method = (data.get('method') or '1').strip()
+        year_raw    = data.get('year_choice')
+        year_choice = None
+        if year_raw is not None:
+            try:
+                year_choice = int(year_raw)
+            except (ValueError, TypeError):
+                year_choice = None
+
         _stop_event = threading.Event()
         if method == '2':
             weyn._web_state['method'] = '2'
@@ -195,7 +203,7 @@ def start():
             weyn._web_state['method'] = '3'
             _job_thread = threading.Thread(
                 target=weyn.run_method3_web,
-                args=(token, chat_id, _stop_event),
+                args=(token, chat_id, _stop_event, year_choice),
                 daemon=True
             )
         else:
@@ -203,7 +211,7 @@ def start():
             weyn._web_state['method'] = '1'
             _job_thread = threading.Thread(
                 target=weyn.run_method1_web,
-                args=(token, chat_id, None, min_followers, _stop_event),
+                args=(token, chat_id, year_choice, min_followers, _stop_event),
                 daemon=True
             )
         _job_thread.start()
