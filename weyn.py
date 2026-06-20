@@ -1831,18 +1831,16 @@ def _m3_save_hit(token, chat_id, email, method_label="V1", username=None):
         _m3_total += 1
         hit_num    = _m3_hits
 
-    profile_line = f"✦ 𝐋𝐈𝐍𝐊      ➤ https://www.instagram.com/{username}\n" if username else ""
+    profile_line = f"LINK   : https://www.instagram.com/{username}\n" if username else ""
     msg = (
-        f"⌈━─━─━─≪ 𝑨 𝑳 𝑬 𝑿 ≫─━─━─━⌉\n\n"
-        f"〔 {domain} 〕\n\n"
-        f"✦ 𝐇𝐈𝐓 #    ➤ {hit_num}\n"
-        f"✦ 𝐄𝐦𝐚𝐢𝐥   ➤ {email}\n"
-        f"✦ 𝐒𝐓𝐀𝐓𝐔𝐒  ➤ REGISTERED ({method_label})\n"
-        f"✦ 𝐌𝐚𝐬𝐤𝐞𝐝  ➤ {masked}\n"
+        f"WEYN M3 — {domain}\n"
+        f"HIT #{hit_num}\n"
+        f"EMAIL  : {email}\n"
+        f"MASKED : {masked}\n"
+        f"STATUS : REGISTERED ({method_label})\n"
         f"{profile_line}"
-        f"✦ 𝐒𝐞𝐬𝐬𝐢𝐨𝐧 ➤ {session_id}\n"
-        f"✦ 𝐑𝐄𝐒𝐄𝐓   ➤ https://www.instagram.com/accounts/password/reset/\n\n"
-        f"⌊━─━─━─≪ 𝑨 𝑳 𝑬 𝑿 ≫─━─━─━⌋\n"
+        f"RESET  : https://www.instagram.com/accounts/password/reset/\n"
+        f"_______________________________________\n"
         f"BY ~ @jinbelowg @weyn_vouches"
     )
 
