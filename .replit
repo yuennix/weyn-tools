@@ -36,5 +36,5 @@ localPort = 5000
 externalPort = 80
 
 [deployment]
-deploymentTarget = "autoscale"
-run = ["gunicorn", "--bind", "0.0.0.0:5000", "main:app"]
+deploymentTarget = "vm"
+run = [".pythonlibs/bin/gunicorn", "--bind=0.0.0.0:5000", "--reuse-port", "--worker-class=gthread", "--workers=2", "--threads=8", "main:app"]
