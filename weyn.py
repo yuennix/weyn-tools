@@ -95,7 +95,7 @@ def close_all_sessions():
 def force_stop():
     """Immediately shut down all thread pools and mark state as stopped."""
     _web_state['running'] = False
-    for pool_name in ('_m1_pool', '_m2_disc_pool', '_m2_lookup_pool', '_m3_pool'):
+    for pool_name in ('_m1_pool', '_m1_lookup_pool', '_m2_disc_pool', '_m2_lookup_pool', '_m3_pool'):
         pool = globals().get(pool_name)
         if pool is not None:
             try:
@@ -1075,21 +1075,26 @@ def _m1_cinstagram(email, token, chat_id, user, loc_session):
     else:
         _m1_bad_insta += 1
 
+_m1_lookup_pool: ThreadPoolExecutor = None
+
 def _m1_sinsta(min_id, max_id, token, chat_id, min_followers=0, stop_event=None):
     loc_session = _register_session(requests.Session())
+    _BRANDS = ["SAMSUNG","HUAWEI","LGE/lge","HTC","ASUS","ZTE","ONEPLUS","XIAOMI","OPPO","VIVO","SONY","REALME"]
+    _VERS   = ["23/6.0","24/7.0","25/7.1.1","26/8.0","27/8.1","28/9.0"]
+    _CHARS  = 'azertyuiopmlkjhgfdsqwxcvbnAZERTYUIOPMLKJHGFDSQWXCVBN1234567890'
     while not (stop_event and stop_event.is_set()):
         try:
             user_id    = random.randrange(min_id, max_id)
             rnd        = str(random.randint(2500000000, 21254029834))
             user_agent = (
                 "Instagram 311.0.0.32.118 Android ("
-                + ["23/6.0","24/7.0","25/7.1.1","26/8.0","27/8.1","28/9.0"][random.randint(0,5)]
-                + "; " + str(random.randint(100,1300)) + "dpi; "
-                + str(random.randint(200,2000)) + "x" + str(random.randint(200,2000)) + "; "
-                + ["SAMSUNG","HUAWEI","LGE/lge","HTC","ASUS","ZTE","ONEPLUS","XIAOMI","OPPO","VIVO","SONY","REALME"][random.randint(0,11)]
-                + "; SM-T" + rnd + "; SM-T" + rnd + "; qcom; en_US; 545986" + str(random.randint(111,999)) + ")"
+                + random.choice(_VERS)
+                + "; " + str(random.randint(100, 1300)) + "dpi; "
+                + str(random.randint(200, 2000)) + "x" + str(random.randint(200, 2000)) + "; "
+                + random.choice(_BRANDS)
+                + "; SM-T" + rnd + "; SM-T" + rnd + "; qcom; en_US; 545986" + str(random.randint(111, 999)) + ")"
             )
-            lsd = ''.join(random.choice('azertyuiopmlkjhgfdsqwxcvbnAZERTYUIOPMLKJHGFDSQWXCVBN1234567890') for _ in range(16))
+            lsd = ''.join(random.choices(_CHARS, k=16))
             headers = {
                 'accept': '*/*', 'accept-language': 'en,en-US;q=0.9',
                 'content-type': 'application/x-www-form-urlencoded',
@@ -1110,14 +1115,14 @@ def _m1_sinsta(min_id, max_id, token, chat_id, min_followers=0, stop_event=None)
             }
             global _m1_scanned
             _m1_scanned += 1
+            _web_state['scanned'] = _m1_scanned
             if stop_event and stop_event.is_set():
                 break
-            resp = loc_session.post(_M1_CONFIG["insta_graphql"], headers=headers, data=data, timeout=4)
+            resp = loc_session.post(_M1_CONFIG["insta_graphql"], headers=headers, data=data, timeout=2)
             if resp.status_code == 429:
-                time.sleep(1)
+                time.sleep(0.1)
                 continue
             if resp.status_code != 200:
-                time.sleep(0.1)
                 continue
             user = resp.json().get('data', {}).get('user')
             if user and user.get('username'):
@@ -1130,9 +1135,15 @@ def _m1_sinsta(min_id, max_id, token, chat_id, min_followers=0, stop_event=None)
                     continue
                 if min_followers > 0 and followers < min_followers:
                     continue
-                _m1_cinstagram(user['username'] + _M1_CONFIG["domain"], token, chat_id, user, loc_session)
+                # Offload the slow email pipeline to a dedicated pool so this
+                # scanner thread is free to pick the next ID immediately.
+                email = user['username'] + _M1_CONFIG["domain"]
+                lp = _m1_lookup_pool
+                if lp is not None:
+                    lp.submit(_m1_cinstagram, email, token, chat_id, user, requests.Session())
+                else:
+                    _m1_cinstagram(email, token, chat_id, user, loc_session)
         except Exception:
-            time.sleep(0.05)
             continue
 
 
@@ -1176,14 +1187,17 @@ def run_method1_web(token, chat_id, year_choice, min_followers, stop_event):
     # Initial token fetch
     _m1_gtokens()
 
-    NUM_WORKERS = 200
-    global _m1_pool
+    NUM_SCANNERS = 500
+    NUM_LOOKUP   = 100
+    global _m1_pool, _m1_lookup_pool
     try:
-        pool = ThreadPoolExecutor(max_workers=NUM_WORKERS)
-        _m1_pool = pool
+        lookup_pool  = ThreadPoolExecutor(max_workers=NUM_LOOKUP)
+        scanner_pool = ThreadPoolExecutor(max_workers=NUM_SCANNERS)
+        _m1_lookup_pool = lookup_pool
+        _m1_pool        = scanner_pool
         futures = [
-            pool.submit(_m1_sinsta, min_id, max_id, token, chat_id, min_followers, stop_event)
-            for _ in range(NUM_WORKERS)
+            scanner_pool.submit(_m1_sinsta, min_id, max_id, token, chat_id, min_followers, stop_event)
+            for _ in range(NUM_SCANNERS)
         ]
         for future in as_completed(futures):
             try:
@@ -1191,7 +1205,8 @@ def run_method1_web(token, chat_id, year_choice, min_followers, stop_event):
             except Exception:
                 pass
     finally:
-        _m1_pool = None
+        _m1_pool        = None
+        _m1_lookup_pool = None
         _web_state['running'] = False
 
 
