@@ -127,7 +127,7 @@
       }
     });
     if (d.method && !_starting) {
-      const labels = { '1': 'M1 · STANDARD', '2': 'M2 · HIGH POST', '3': 'M3 · EMAIL SCAN' };
+      const labels = { '1': 'M1 · STANDARD', '2': 'M2 · HIGH POST', '3': 'M3 · HI2.IN/TELEGMAIL' };
       const classes = { '1': 'badge', '2': 'badge badge-m2', '3': 'badge badge-m3' };
       methodBadge.textContent = labels[d.method] || ('M' + d.method);
       methodBadge.className   = classes[d.method] || 'badge';
@@ -213,7 +213,7 @@
     _starting = true;
     _stopping = false;
     setRunning(true);
-    const _badgeLabels  = { '1': 'M1 · STANDARD', '2': 'M2 · HIGH POST', '3': 'M3 · EMAIL SCAN' };
+    const _badgeLabels  = { '1': 'M1 · STANDARD', '2': 'M2 · HIGH POST', '3': 'M3 · HI2.IN/TELEGMAIL' };
     const _badgeClasses = { '1': 'badge', '2': 'badge badge-m2', '3': 'badge badge-m3' };
     methodBadge.textContent = _badgeLabels[selectedMethod]  || ('M' + selectedMethod);
     methodBadge.className   = _badgeClasses[selectedMethod] || 'badge';
