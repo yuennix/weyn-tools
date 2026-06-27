@@ -621,12 +621,26 @@ def _m2_worker(token, chat_id, stop_event):
                 result_v1 = _m2_check_v1(email, client)
 
                 if result_v1 == "registered":
-                    domain  = email.split('@')[1]
-                    prefix  = email.split('@')[0]
-                    reg_status = _m2_check_registration_fast(domain, prefix)
-                    _m2_good_insta += 1
-                    _web_state['good'] = _m2_good_insta
-                    _m2_save_hit(token, chat_id, email, "V1", None, reg_status)
+                    # V2 double-check to confirm — also extracts username
+                    v2_status, username, _ = _m2_check_v2(email, client)
+                    if v2_status == "registered":
+                        domain = email.split('@')[1]
+                        prefix = email.split('@')[0]
+                        reg_status = _m2_check_registration_fast(domain, prefix)
+                        _m2_good_insta += 1
+                        _web_state['good'] = _m2_good_insta
+                        _m2_save_hit(token, chat_id, email, "V1", username, reg_status)
+                    elif v2_status == "not_registered":
+                        _m2_bad_insta += 1
+                        _web_state['bad_insta'] = _m2_bad_insta
+                    else:
+                        # V2 inconclusive — trust V1
+                        domain = email.split('@')[1]
+                        prefix = email.split('@')[0]
+                        reg_status = _m2_check_registration_fast(domain, prefix)
+                        _m2_good_insta += 1
+                        _web_state['good'] = _m2_good_insta
+                        _m2_save_hit(token, chat_id, email, "V1", username, reg_status)
 
                 elif result_v1 == "check_v2":
                     v2_status, username, _ = _m2_check_v2(email, client)
