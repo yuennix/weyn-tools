@@ -1,5 +1,6 @@
 (() => {
   let selectedMethod = '1';
+  let selectedDomain = '1';
   let evtSource      = null;
   let knownHits      = new Set();
   let totalHits      = 0;
@@ -17,46 +18,38 @@
   const hitsCount      = document.getElementById('hitsCount');
   const methodBtn1     = document.getElementById('methodBtn1');
   const methodBtn2     = document.getElementById('methodBtn2');
-  const methodBtn3     = document.getElementById('methodBtn3');
-  const yearRangeGroup = document.getElementById('yearRangeGroup');
-  const minLabel       = document.getElementById('minLabel');
-  const minInput       = document.getElementById('min_followers');
+  const domainGroup    = document.getElementById('domainGroup');
+  const domainBtn1     = document.getElementById('domainBtn1');
+  const domainBtn2     = document.getElementById('domainBtn2');
 
   const statIds = ['hits','good','bad_insta','bad_email','taken','limit','scanned','total'];
+
+  // ── Domain selector ──
+  function selectDomain(d) {
+    selectedDomain = d;
+    domainBtn1.classList.toggle('active', d === '1');
+    domainBtn2.classList.toggle('active', d === '2');
+  }
+  domainBtn1.addEventListener('click', () => { if (!startBtn.disabled) selectDomain('1'); });
+  domainBtn2.addEventListener('click', () => { if (!startBtn.disabled) selectDomain('2'); });
 
   // ── Method selector ──
   function selectMethod(m) {
     selectedMethod = m;
     methodBtn1.classList.toggle('active', m === '1');
     methodBtn2.classList.toggle('active', m === '2');
-    methodBtn3.classList.toggle('active', m === '3');
-    yearRangeGroup.style.display = m === '1' ? '' : 'none';
-    if (m === '2') {
-      minLabel.textContent = 'MIN POSTS';
-      minInput.min = '20';
-      if (parseInt(minInput.value) < 20) minInput.value = 20;
-    } else if (m === '3') {
-      minLabel.textContent = 'THREADS (fixed 200)';
-      minInput.min = '0';
-      minInput.value = 200;
-      minInput.disabled = true;
-    } else {
-      minLabel.textContent = 'MIN FOLLOWERS';
-      minInput.min = '0';
-      minInput.disabled = false;
-    }
+    domainGroup.style.display = m === '1' ? '' : 'none';
   }
   methodBtn1.addEventListener('click', () => { if (!startBtn.disabled) selectMethod('1'); });
   methodBtn2.addEventListener('click', () => { if (!startBtn.disabled) selectMethod('2'); });
-  methodBtn3.addEventListener('click', () => { if (!startBtn.disabled) selectMethod('3'); });
 
   // ── Strip iOS smart-punctuation from token/chat_id strings ──
   function sanitizeInput(str) {
     return String(str)
-      .replace(/[\u2013\u2014\u2015]/g, '-')   // en-dash / em-dash → hyphen
-      .replace(/[\u2018\u2019]/g, "'")          // curly single quotes → straight
-      .replace(/[\u201C\u201D]/g, '"')          // curly double quotes → straight
-      .replace(/\u00A0/g, ' ')                  // non-breaking space → space
+      .replace(/[\u2013\u2014\u2015]/g, '-')
+      .replace(/[\u2018\u2019]/g, "'")
+      .replace(/[\u201C\u201D]/g, '"')
+      .replace(/\u00A0/g, ' ')
       .trim();
   }
 
@@ -81,9 +74,6 @@
       const d = JSON.parse(e.data);
       updateStats(d);
       updateHits(d.recent_hits || []);
-      // Suppress button flips during transitions:
-      // • _stopping: stop clicked but backend thread still shutting down
-      // • _starting: start clicked but backend thread not yet confirmed running
       if (_stopping && d.running)  return;
       if (_starting && !d.running) return;
       if (d.running)  _starting = false;
@@ -127,8 +117,8 @@
       }
     });
     if (d.method && !_starting) {
-      const labels = { '1': 'M1 · STANDARD', '2': 'M2 · HIGH POST', '3': 'M3 · HI2.IN/TELEGMAIL' };
-      const classes = { '1': 'badge', '2': 'badge badge-m2', '3': 'badge badge-m3' };
+      const labels  = { '1': 'M1 · HI2/TELEGMAIL', '2': 'M2 · ULTRA FAST V2' };
+      const classes = { '1': 'badge', '2': 'badge badge-m2' };
       methodBadge.textContent = labels[d.method] || ('M' + d.method);
       methodBadge.className   = classes[d.method] || 'badge';
     }
@@ -137,7 +127,6 @@
   function updateHits(hits) {
     if (!hits || hits.length === 0) return;
     hits.forEach(raw => {
-      // M2: {"e":email,"p":posts}  M3: {"e":email,"m":method,"u":igUsername}  M1: plain string
       let email, posts = null, methodLabel = null, igUsername = null;
       try {
         const obj = JSON.parse(raw);
@@ -197,9 +186,8 @@
 
   // ── Start button ──
   startBtn.addEventListener('click', async () => {
-    const token     = sanitizeInput(document.getElementById('token').value);
-    const chat_id   = sanitizeInput(document.getElementById('chat_id').value);
-    const min_value = minInput.value;
+    const token   = sanitizeInput(document.getElementById('token').value);
+    const chat_id = sanitizeInput(document.getElementById('chat_id').value);
 
     if (!token || !chat_id) {
       alert('Bot Token and Chat ID are required.');
@@ -209,8 +197,8 @@
     _starting = true;
     _stopping = false;
     setRunning(true);
-    const _badgeLabels  = { '1': 'M1 · STANDARD', '2': 'M2 · HIGH POST', '3': 'M3 · HI2.IN/TELEGMAIL' };
-    const _badgeClasses = { '1': 'badge', '2': 'badge badge-m2', '3': 'badge badge-m3' };
+    const _badgeLabels  = { '1': 'M1 · HI2/TELEGMAIL', '2': 'M2 · ULTRA FAST V2' };
+    const _badgeClasses = { '1': 'badge', '2': 'badge badge-m2' };
     methodBadge.textContent = _badgeLabels[selectedMethod]  || ('M' + selectedMethod);
     methodBadge.className   = _badgeClasses[selectedMethod] || 'badge';
 
@@ -224,12 +212,10 @@
     });
 
     try {
-      const yearEl       = document.getElementById('year_choice');
-      const year_choice  = yearEl && yearEl.value ? yearEl.value : null;
       const res = await fetch('/api/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ method: selectedMethod, token, chat_id, min_followers: min_value, year_choice })
+        body: JSON.stringify({ method: selectedMethod, domain_choice: selectedDomain, token, chat_id })
       });
       const data = await res.json();
       if (!res.ok) {
@@ -292,5 +278,6 @@
   });
 
   // ── Init ──
+  selectMethod('1');
   startSSE();
 })();
