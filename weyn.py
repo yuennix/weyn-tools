@@ -388,50 +388,7 @@ _m2_pool: ThreadPoolExecutor = None
 _m2_used_emails  = set()
 _m2_used_lock    = Lock()
 
-_M3_DOMAINS = ["@hi2.in", "@telegmail.com"]
-
-# Common first names + popular suffixes → human-like usernames with high IG density
-_M3_NAMES = [
-    "alex","adam","ahmed","ali","anna","bella","ben","carlos","chloe","chris",
-    "daniel","david","elena","emma","ethan","fatima","felix","grace","hana","ivan",
-    "jack","james","jessica","john","julia","kevin","lara","laura","leo","liam",
-    "lily","lucas","luna","marcus","maria","mark","matt","maya","mike","mia",
-    "mohamed","nadia","nate","nick","nina","noah","olivia","omar","paris","paul",
-    "peter","rachel","ryan","sara","sarah","sofia","steve","tom","tyler","zara",
-    "max","sam","kim","jen","dan","kate","amy","jake","jay","joe",
-    "nico","rafa","xavi","luca","marco","carlo","mario","luigi","sergio","pablo",
-    "yusuf","hamza","hassan","ibrahim","ismail","karim","khalid","layla","nour","rania",
-]
-
-_M3_SUFFIXES = [
-    "","1","2","7","9","01","07","09","10","11","12","13","21","23","99","00",
-    "123","007","111","777","999","2000","2001","2002","2003","2004","2005",
-    "2006","2007","2008","2009","2010","official","real","_","__","x","xx",
-]
-
-
-def _m2_gen_username():
-    """Generate a human-like username: name+suffix or name+name or random."""
-    mode = random.randint(0, 3)
-    if mode == 0:
-        # name + numeric suffix
-        return random.choice(_M3_NAMES) + random.choice(_M3_SUFFIXES)
-    elif mode == 1:
-        # name + name
-        n1, n2 = random.sample(_M3_NAMES, 2)
-        return n1 + n2
-    elif mode == 2:
-        # name + 2-4 digit number
-        return random.choice(_M3_NAMES) + str(random.randint(1, 9999))
-    else:
-        # short random (5-8 chars) with vowels so it looks human
-        vowels = 'aeiou'
-        cons   = 'bcdfghjklmnpqrstvwxyz'
-        length = random.randint(5, 8)
-        return ''.join(
-            random.choice(vowels) if i % 2 else random.choice(cons)
-            for i in range(length)
-        )
+_M3_DOMAINS = ["@hi2.in", "@telegmail.com", "@mail.com", "@yopmail.com"]
 
 
 def _m2_generate_android_ua():
@@ -549,8 +506,31 @@ def _m2_check_v2(email, client):
         return ("unknown", None, None)
 
 
-def _m2_check_domain_mx(domain):
-    """Quick DNS MX check via Google DNS-over-HTTPS — no recaptcha, no IMAP."""
+def _m2_check_registration_fast(domain, prefix):
+    """Mailcheck.ai domain validation — replaces hi2.in check, no recaptcha."""
+    results = []
+    email = f"{prefix}@{domain}"
+    try:
+        r = requests.get(
+            f"https://api.mailcheck.ai/email/{email}",
+            headers={'User-Agent': 'Mozilla/5.0'},
+            timeout=5
+        )
+        if r.status_code == 200:
+            data = r.json()
+            if data.get('disposable', False) is False:
+                results.append("valid_domain")
+    except Exception:
+        pass
+    if re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', email):
+        results.append("valid_format")
+    return results
+
+
+def _m2_get_domain_stats(email):
+    """DNS MX lookup via Google DoH to confirm the domain is live."""
+    domain = email.split('@')[1]
+    has_mx = False
     try:
         r = requests.get(
             f"https://dns.google/resolve?name={domain}&type=MX",
@@ -558,13 +538,13 @@ def _m2_check_domain_mx(domain):
             timeout=5
         )
         if r.status_code == 200:
-            return bool(r.json().get('Answer'))
+            has_mx = bool(r.json().get('Answer'))
     except Exception:
         pass
-    return False
+    return has_mx
 
 
-def _m2_save_hit(token, chat_id, email, method_label="V1", username=None, has_mx=None):
+def _m2_save_hit(token, chat_id, email, method_label="V1", username=None, reg_status=None):
     global _m2_hits, _m2_total
     domain  = email.split('@')[1]
     prefix  = email.split('@')[0]
@@ -576,23 +556,28 @@ def _m2_save_hit(token, chat_id, email, method_label="V1", username=None, has_mx
         _m2_total += 1
         hit_num    = _m2_hits
 
-    ig_handle   = username if username else prefix
-    profile_url = f"https://www.instagram.com/{ig_handle}"
-    mx_flag     = "✓" if has_mx else "?"
+    domain_valid = "✓" if reg_status and any("valid" in s for s in reg_status) else "?"
 
-    msg = (
-        f"WEYN M2 — {domain}\n"
-        f"HIT #{hit_num}\n"
-        f"EMAIL  : {email}\n"
-        f"MASKED : {masked}\n"
-        f"STATUS : REGISTERED ({method_label})\n"
-        f"DOMAIN : {mx_flag} MX valid\n"
-        f"PROFILE: {profile_url}\n"
-        f"RESET  : https://www.instagram.com/accounts/password/reset/\n"
-        f"SESSION: {session_id}\n"
-        f"_______________________________________\n"
-        f"BY ~ @jinbelowg @weyn_vouches"
-    )
+    if method_label == "V1":
+        msg = (
+            f"⌈━─━─━─≪ 𝑨 𝑳 𝑬 𝑿 ≫─━─━─━⌉\n\n"
+            f"〔 {domain} 〕\n\n"
+            f"✦ 𝐄𝐦𝐚𝐢𝐥 ➤ {email}\n"
+            f"✦ 𝐒𝐓𝐀𝐓𝐔𝐒 ➤ REGISTERED\n"
+            f"✦ 𝐃𝐨𝐦𝐚𝐢𝐧 𝐕𝐚𝐥𝐢𝐝 ➤ {domain_valid}\n"
+            f"✦ 𝐌𝐚𝐬𝐤𝐞𝐝 ➤ {masked}\n"
+            f"✦ 𝐀𝐏𝐈 𝐒𝐞𝐬𝐬𝐢𝐨𝐧 ➤ {session_id}\n\n"
+            f"⌊━─━─━─≪ 𝑨 𝑳 𝑬 𝑿 ≫─━─━─━⌋"
+        )
+    else:
+        msg = (
+            f"⌈━─━─━─≪ 𝑨 𝑳 𝑬 𝑿 ≫─━─━─━⌉\n\n"
+            f"〔 {domain} 〕\n\n"
+            f"✦ 𝐄𝐦𝐚𝐢𝐥 ➤ {email}\n"
+            f"✦ 𝐒𝐓𝐀𝐓𝐔𝐒 ➤ REGISTERED (Bloks)\n"
+            f"✦ 𝐀𝐏𝐈 𝐒𝐞𝐬𝐬𝐢𝐨𝐧 ➤ {session_id}\n\n"
+            f"⌊━─━─━─≪ 𝑨 𝑳 𝑬 𝑿 ≫─━─━─━⌋"
+        )
 
     _save_hit_to_file(msg)
 
@@ -613,9 +598,9 @@ def _m2_worker(token, chat_id, stop_event):
     global _m2_good_insta, _m2_bad_insta, _m2_bad_email, _m2_scanned, _m2_taken
 
     try:
-        client = httpx.Client(http2=True, timeout=5)
+        client = httpx.Client(http2=True, timeout=15)
     except Exception:
-        client = httpx.Client(timeout=5)
+        client = httpx.Client(timeout=15)
 
     try:
         while not (stop_event and stop_event.is_set()):
@@ -636,27 +621,19 @@ def _m2_worker(token, chat_id, stop_event):
                 result_v1 = _m2_check_v1(email, client)
 
                 if result_v1 == "registered":
-                    # Confirm with V2 — also extracts username + pk
-                    v2_status, username, user_pk = _m2_check_v2(email, client)
-                    if v2_status == "registered":
-                        _m2_good_insta += 1
-                        _web_state['good'] = _m2_good_insta
-                        _m2_save_hit(token, chat_id, email, "V1", username, True)
-                    elif v2_status == "not_registered":
-                        _m2_bad_insta += 1
-                        _web_state['bad_insta'] = _m2_bad_insta
-                    else:
-                        # V2 inconclusive — trust V1
-                        _m2_good_insta += 1
-                        _web_state['good'] = _m2_good_insta
-                        _m2_save_hit(token, chat_id, email, "V1", username, True)
+                    domain  = email.split('@')[1]
+                    prefix  = email.split('@')[0]
+                    reg_status = _m2_check_registration_fast(domain, prefix)
+                    _m2_good_insta += 1
+                    _web_state['good'] = _m2_good_insta
+                    _m2_save_hit(token, chat_id, email, "V1", None, reg_status)
 
                 elif result_v1 == "check_v2":
-                    v2_status, username, user_pk = _m2_check_v2(email, client)
+                    v2_status, username, _ = _m2_check_v2(email, client)
                     if v2_status == "registered":
                         _m2_good_insta += 1
                         _web_state['good'] = _m2_good_insta
-                        _m2_save_hit(token, chat_id, email, "V2", username, True)
+                        _m2_save_hit(token, chat_id, email, "V2", username, None)
                     elif v2_status == "unknown":
                         _m2_bad_email += 1
                         _web_state['bad_email'] = _m2_bad_email
@@ -694,7 +671,7 @@ def run_method2_web(token, chat_id, stop_event):
         'recent_hits': [], 'tg_status': '', 'tg_error': '',
     })
 
-    NUM_WORKERS = 500
+    NUM_WORKERS = 200
     try:
         pool = ThreadPoolExecutor(max_workers=NUM_WORKERS)
         _m2_pool = pool
