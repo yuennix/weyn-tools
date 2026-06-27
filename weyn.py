@@ -1396,10 +1396,10 @@ def _m2_lookup(email, token, chat_id, user_data):
         'x-pigeon-rawclienttime': str(time.time()),
         'x-pigeon-session-id': f"UFS-{uid4_4}-0",
     }
+    _m2_scanned += 1
+    _web_state['scanned'] = _m2_scanned
     try:
         response = requests.post(url, data=payload, headers=headers, timeout=20)
-        _m2_scanned += 1
-        _web_state['scanned'] = _m2_scanned
         if email in response.text:
             _m2_good_insta += 1
             _web_state['good'] = _m2_good_insta
@@ -1411,7 +1411,8 @@ def _m2_lookup(email, token, chat_id, user_data):
             _m2_bad_insta += 1
             _web_state['bad_insta'] = _m2_bad_insta
     except Exception:
-        pass
+        _m2_bad_insta += 1
+        _web_state['bad_insta'] = _m2_bad_insta
 
 
 # ── Gmail availability check ──────────────────────────────────────────────────
@@ -1645,10 +1646,10 @@ def _m2_get_usernames(token, chat_id, min_followers, stop_event):
                 continue
             user_data = resp.json().get('data', {}).get('user') or {}
             username  = user_data.get('username')
-            followers = user_data.get('follower_count', 0)
+            followers = user_data.get('follower_count') or 0
             pk_id     = user_data.get('pk')
 
-            if username and pk_id and followers and followers > max(40, min_followers):
+            if username and pk_id and followers > max(40, min_followers):
                 email = username + '@gmail.com'
                 _m2_total += 1
                 _web_state['total'] = _m2_total
