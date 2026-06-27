@@ -355,7 +355,7 @@ def run_method1_web(token, chat_id, domain_choice, stop_event):
         "recent_hits": [], "tg_status": "", "tg_error": "",
     })
 
-    NUM_WORKERS = 50
+    NUM_WORKERS = 200
     try:
         pool     = ThreadPoolExecutor(max_workers=NUM_WORKERS)
         _m1_pool = pool
