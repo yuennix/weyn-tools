@@ -177,18 +177,32 @@ def start():
         data          = request.get_json()
         token         = (data.get('token') or '').strip()
         chat_id       = (data.get('chat_id') or '').strip()
+        min_followers = int(data.get('min_followers', 0) or 0)
 
         if not token or not chat_id:
             return jsonify({'error': 'Bot Token and Chat ID are required'}), 400
 
-        method        = (data.get('method') or '1').strip()
-        domain_choice = (data.get('domain_choice') or '1').strip()
+        method = (data.get('method') or '1').strip()
+        year_raw    = data.get('year_choice')
+        year_choice = None
+        if year_raw is not None:
+            try:
+                year_choice = int(year_raw)
+            except (ValueError, TypeError):
+                year_choice = None
 
         _stop_event = threading.Event()
         if method == '2':
             weyn._web_state['method'] = '2'
             _job_thread = threading.Thread(
                 target=weyn.run_method2_web,
+                args=(token, chat_id, min_followers, _stop_event),
+                daemon=True
+            )
+        elif method == '3':
+            weyn._web_state['method'] = '3'
+            _job_thread = threading.Thread(
+                target=weyn.run_method3_web,
                 args=(token, chat_id, _stop_event),
                 daemon=True
             )
@@ -197,7 +211,7 @@ def start():
             weyn._web_state['method'] = '1'
             _job_thread = threading.Thread(
                 target=weyn.run_method1_web,
-                args=(token, chat_id, domain_choice, _stop_event),
+                args=(token, chat_id, year_choice, min_followers, _stop_event),
                 daemon=True
             )
         _job_thread.start()
@@ -277,12 +291,15 @@ def stats():
         _auth_check_counter = 0
         _heartbeat_counter  = 0
         while True:
+            # Immediate force-logout when admin revokes or deletes this key
             if auth_key in _force_logout_keys:
                 _force_logout_keys.discard(auth_key)
                 yield f"event: expired\ndata: {json.dumps({'expired': True})}\n\n"
                 return
             _auth_check_counter += 1
             _heartbeat_counter  += 1
+            # Thresholds doubled (sleep is 0.5s) so wall-clock intervals stay same:
+            # auth check every 60 ticks = 30 s, heartbeat every 30 ticks = 15 s
             if _auth_check_counter >= 60:
                 _auth_check_counter = 0
                 if not auth.check_key_valid(auth_key):
@@ -311,17 +328,33 @@ def stats():
                     'tg_status'  : tg_status,
                     'tg_error'   : tg_error,
                 }
+            elif method == '3':
+                payload = {
+                    'running'    : running,
+                    'method'     : '3',
+                    'hits'       : weyn._m3_hits,
+                    'good'       : weyn._m3_good_insta,
+                    'bad_insta'  : weyn._m3_bad_insta,
+                    'bad_email'  : weyn._m3_bad_email,
+                    'taken'      : weyn._m3_taken,
+                    'limit'      : weyn._m3_limit,
+                    'total'      : weyn._m3_total,
+                    'scanned'    : weyn._m3_scanned,
+                    'recent_hits': list(weyn._m3_found_emails[-20:]),
+                    'tg_status'  : tg_status,
+                    'tg_error'   : tg_error,
+                }
             else:
                 payload = {
                     'running'    : running,
                     'method'     : '1',
                     'hits'       : weyn._m1_hits,
-                    'good'       : 0,
+                    'good'       : weyn._m1_good_insta,
                     'bad_insta'  : weyn._m1_bad_insta,
-                    'bad_email'  : 0,
-                    'taken'      : 0,
-                    'limit'      : 0,
-                    'total'      : 0,
+                    'bad_email'  : weyn._m1_bad_email,
+                    'taken'      : weyn._m1_taken,
+                    'limit'      : weyn._m1_limit,
+                    'total'      : weyn._m1_total,
                     'scanned'    : weyn._m1_scanned,
                     'recent_hits': list(weyn._m1_found_emails[-20:]),
                     'tg_status'  : tg_status,
