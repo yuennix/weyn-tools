@@ -1228,119 +1228,110 @@ _m2_hit_lock     = Lock()
 _m2_pool:        ThreadPoolExecutor = None
 _m1_pool:        ThreadPoolExecutor = None
 
-# ── Instagram email check (bloks API) ─────────────────────────────────────────
+# ── Instagram email check — V1 (check_email) then V2 (bloks) fallback ─────────
 
-def _m2_check_instagram_email(email):
-    url     = "https://i.instagram.com/api/v1/bloks/async_action/com.bloks.www.caa.ar.search.async/"
+def _m2_generate_ua():
+    devices = [
+        ("samsung", "SM-G973F", "beyond1", "exynos9820"),
+        ("samsung", "SM-A536B", "a53x",    "exynos1280"),
+        ("Google",  "Pixel 7",  "panther", "gs201"),
+        ("Xiaomi",  "M2102J20SG","ares",   "mt6893"),
+        ("OnePlus", "ONEPLUS A6003","OnePlus6","sdm845"),
+    ]
+    brand, model, device, board = random.choice(devices)
+    android_ver = random.choice(["11", "12", "13", "14"])
+    api_level   = {"11": "30", "12": "31", "13": "33", "14": "34"}[android_ver]
+    dpi         = random.choice(["420", "440", "450", "480"])
+    res         = random.choice(["1080x2280", "1080x2400", "1440x3088"])
+    ig_ver      = f"{random.randint(280, 340)}.0.0.{random.randint(10, 40)}.{random.randint(80, 150)}"
+    rnd         = random.randint(300000000, 400000000)
+    return (f"Instagram {ig_ver} Android ({api_level}/{android_ver}; {dpi}dpi; {res}; "
+            f"{brand}; {model}; {device}; {board}; en_US; {rnd})")
+
+
+def _m2_check_v1(email):
+    """Fast path: check_email endpoint — returns 'registered', 'not_registered', or 'unknown'."""
+    try:
+        with httpx.Client(http2=True, timeout=8) as client:
+            resp = client.post(
+                "https://i.instagram.com/api/v1/users/check_email/",
+                data=f"email={email}",
+                headers={
+                    'User-Agent': _m2_generate_ua(),
+                    'content-type': "application/x-www-form-urlencoded; charset=UTF-8",
+                    'x-ig-app-id': "567067343352427",
+                    'accept-language': "en-IN, en-US",
+                }
+            )
+            if 'email_is_taken' in resp.text:
+                return 'registered'
+            if 'available' in resp.text.lower() or '"valid"' in resp.text:
+                return 'not_registered'
+            return 'unknown'
+    except Exception:
+        return 'unknown'
+
+
+def _m2_check_v2(email):
+    """Fallback: bloks CAA search — email appears in response only when found."""
+    android = "android-" + secrets.token_hex(8)
     device  = str(uuid.uuid4())
     family  = str(uuid.uuid4())
-    android = "android-" + secrets.token_hex(8)
-
-    brands        = ["samsung", "Google", "Xiaomi", "OnePlus", "Nothing", "Realme", "Redmi"]
-    models        = ["SM-G973F", "Pixel 7", "M2102J20SG", "ONEPLUS A6003", "A063"]
-    dpi_values    = ["420", "450", "440"]
-    res_values    = ["1080x2280", "1080x2400", "1440x3088"]
-    android_vers  = ["11", "12", "13", "14"]
-    insta_vers    = [280, 290, 300, 310, 320, 330, 340]
-
-    brand      = random.choice(brands)
-    model      = random.choice(models)
-    dpi_val    = random.choice(dpi_values)
-    res_val    = random.choice(res_values)
-    android_v  = random.choice(android_vers)
-    insta_v    = random.choice(insta_vers)
-    tz_offset  = str(random.choice([60, 330, 480, 570]))
-
-    ua = (f"Instagram {insta_v}.0.0.{random.randint(10,99)} Android "
-          f"({android_v}; {dpi_val}dpi; {res_val}; {brand}; {model}; en_US)")
-
+    url     = "https://i.instagram.com/api/v1/bloks/async_action/com.bloks.www.caa.ar.search.async/"
     payload = {
-        'params': json.dumps({
-            "client_input_params": {
-                "aac": json.dumps({
-                    "aac_init_timestamp": int(time.time()),
-                    "aacjid": str(uuid.uuid4()),
-                    "aaccs": secrets.token_urlsafe(32)
-                }),
-                "flash_call_permissions_status": {
-                    "READ_PHONE_STATE": "PERMANENTLY_DENIED",
-                    "READ_CALL_LOG": "DENIED",
-                    "ANSWER_PHONE_CALLS": "DENIED"
-                },
-                "was_headers_prefill_available": 0,
-                "network_bssid": None,
-                "sfdid": "",
-                "fetched_email_token_list": {},
-                "search_query": email,
-                "auth_secure_device_id": "",
-                "ig_oauth_token": [],
-                "cloud_trust_token": None,
-                "was_headers_prefill_used": 0,
-                "sso_accounts_auth_data": [],
-                "encrypted_msisdn": "",
-                "device_network_info": None,
-                "text_input_id": f"akyuf0:{random.randint(50, 70)}",
-                "zero_balance_state": None,
-                "android_build_type": "release",
-                "accounts_list": [],
-                "is_oauth_without_permission": 0,
-                "ig_android_qe_device_id": device,
-                "gms_incoming_call_retriever_eligibility": "client_not_supported",
-                "search_screen_type": "email_or_username",
-                "is_whatsapp_installed": 1,
-                "lois_settings": {"lois_token": ""},
-                "ig_vetted_device_nonce": None,
-                "headers_infra_flow_id": "",
-                "fetched_email_list": []
-            },
-            "server_params": {
-                "event_request_id": str(uuid.uuid4()),
-                "is_from_logged_out": 0,
-                "layered_homepage_experiment_group": None,
-                "device_id": android,
-                "login_surface": "login_home",
-                "waterfall_id": str(uuid.uuid4()),
-                "INTERNAL__latency_qpl_instance_id": random.uniform(6.3e13, 6.5e13),
-                "is_platform_login": 0,
-                "context_data": "",
-                "login_entry_point": "logged_out",
-                "INTERNAL__latency_qpl_marker_id": 36707139,
-                "family_device_id": family,
-                "offline_experiment_group": "caa_iteration_v3_perf_ig_4",
-                "access_flow_version": "pre_mt_behavior",
-                "is_from_logged_in_switcher": 0,
-                "qe_device_id": device
-            }
-        }),
-        'bk_client_context': json.dumps({
-            "bloks_version": "5e47baf35c5a270b44c8906c8b99063564b30ef69779f3dee0b828bee2e4ef5b",
-            "styles_id": "instagram"
-        }),
-        'bloks_versioning_id': "5e47baf35c5a270b44c8906c8b99063564b30ef69779f3dee0b828bee2e4ef5b"
+        'params': (
+            '{"client_input_params":{"search_query":"' + email +
+            '","was_headers_prefill_available":0,"was_headers_prefill_used":0,'
+            '"text_input_id":"akyuf0:61","accounts_list":[],"fetched_email_list":[],'
+            '"fetched_email_token_list":{},"sso_accounts_auth_data":[],"ig_oauth_token":[],'
+            '"auth_secure_device_id":"","encrypted_msisdn":"","is_oauth_without_permission":0,'
+            '"is_whatsapp_installed":1,"lois_settings":{"lois_token":""},'
+            '"flash_call_permissions_status":{"READ_PHONE_STATE":"PERMANENTLY_DENIED",'
+            '"READ_CALL_LOG":"DENIED","ANSWER_PHONE_CALLS":"DENIED"}},'
+            '"server_params":{"event_request_id":"' + str(uuid.uuid4()) +
+            '","is_from_logged_out":0,"device_id":"' + android +
+            '","login_surface":"login_home","waterfall_id":"' + str(uuid.uuid4()) +
+            '","is_platform_login":0,"login_entry_point":"logged_out",'
+            '"family_device_id":"' + family + '","qe_device_id":"' + device + '"}}'
+        ),
+        'bk_client_context': '{"bloks_version":"5e47baf35c5a270b44c8906c8b99063564b30ef69779f3dee0b828bee2e4ef5b","styles_id":"instagram"}',
+        'bloks_versioning_id': "5e47baf35c5a270b44c8906c8b99063564b30ef69779f3dee0b828bee2e4ef5b",
     }
-
     headers = {
-        'User-Agent': ua,
-        'accept-language': 'en-IN, en-US',
+        'User-Agent': _m2_generate_ua(),
+        'accept-language': "en-IN, en-US",
         'x-bloks-version-id': "5e47baf35c5a270b44c8906c8b99063564b30ef69779f3dee0b828bee2e4ef5b",
-        'x-fb-friendly-name': 'IgApi: bloks/async_action/com.bloks.www.caa.ar.search.async/',
+        'x-fb-friendly-name': "IgApi: bloks/async_action/com.bloks.www.caa.ar.search.async/",
         'x-ig-android-id': android,
-        'x-ig-app-id': '567067343352427',
-        'x-ig-app-locale': 'en_IN',
+        'x-ig-app-id': "567067343352427",
+        'x-ig-app-locale': "en_IN",
+        'x-ig-client-endpoint': "com.bloks.www.caa.ar.search",
         'x-ig-device-id': device,
         'x-ig-family-device-id': family,
-        'x-ig-timezone-offset': tz_offset,
+        'x-ig-timezone-offset': str(int(datetime.now().astimezone().utcoffset().total_seconds())),
         'x-mid': base64.urlsafe_b64encode(secrets.token_bytes(18)).decode().rstrip('='),
-        'x-pigeon-rawclienttime': str(time.time()),
-        'x-pigeon-session-id': f'UFS-{uuid.uuid4()}-0',
-        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
+        'x-pigeon-session-id': f"UFS-{uuid.uuid4()}-0",
     }
-
     try:
-        response = requests.post(url, data=payload, headers=headers, timeout=20)
-        return email.lower() in response.text.lower()
+        with httpx.Client(http2=True, timeout=10) as client:
+            resp = client.post(url, data=payload, headers=headers)
+            if email in resp.text:
+                return 'registered'
+            return 'not_registered'
     except Exception:
+        return 'unknown'
+
+
+def _m2_check_instagram_email(email):
+    """Check if email is registered on Instagram. Returns True on confirmed hit."""
+    result = _m2_check_v1(email)
+    if result == 'registered':
+        return True
+    if result == 'not_registered':
         return False
+    # unknown (timeout / unexpected response) → try bloks fallback
+    result2 = _m2_check_v2(email)
+    return result2 == 'registered'
 
 
 # ── Worker: generate hi2.in email and check ───────────────────────────────────
