@@ -168,7 +168,7 @@ _web_lock = Lock()
 _M1_INSTA_GRAPHQL = "https://www.instagram.com/api/graphql"
 _M1_GOOGLE_URL    = "https://accounts.google.com"
 _M1_FORM_TYPE     = "application/x-www-form-urlencoded; charset=UTF-8"
-_M1_TOKEN_FILE    = "gmail_token.txt"
+_M1_TOKEN_FILE    = "tokens.txt"
 _M1_DOMAINS       = ["@gmail.com", "@aol.com"]
 
 _M1_BASE_URL      = "https://www.instagram.com"
@@ -586,21 +586,23 @@ def _m1_rest_v1(username):
 
 # ── Google / Gmail token helpers ──
 
+_M1_TL_SESSION = requests.Session()
+
 def _m1_gtokens():
-    max_retries = 2
-    endpoint    = "/signin/v2/usernamerecovery?flowName=GlifWebSignIn&flowEntry=ServiceLogin&hl=en-GB"
-    alphabet    = "abcdefghijklmnopqrstuvwxyz"
-    for attempt in range(max_retries + 1):
+    """Write TL/host to tokens.txt via validatepersonaldetails flow (+ batchexecute fallback)."""
+    alphabet = "abcdefghijklmnopqrstuvwxyz"
+    endpoint = "/signin/v2/usernamerecovery?flowName=GlifWebSignIn&flowEntry=ServiceLogin&hl=en-GB"
+    for _ in range(3):
         try:
-            n1   = "".join(random.choices(alphabet, k=random.randint(6, 9)))
-            n2   = "".join(random.choices(alphabet, k=random.randint(3, 9)))
-            host = "".join(random.choices(alphabet, k=random.randint(15, 30)))
+            n1   = "".join(random.choice(alphabet) for _ in range(random.randint(6, 9)))
+            n2   = "".join(random.choice(alphabet) for _ in range(random.randint(3, 9)))
+            host = "".join(random.choice(alphabet) for _ in range(random.randint(15, 30)))
             headers = {
                 "accept": "*/*",
                 "accept-language": "en-GB,en;q=0.9",
                 "content-type": "application/x-www-form-urlencoded;charset=UTF-8",
                 "google-accounts-xsrf": "1",
-                "user-agent": random.choice(_M1_USER_AGENTS)
+                "user-agent": random.choice(_M1_USER_AGENTS),
             }
             res1 = requests.get(f"{_M1_GOOGLE_URL}{endpoint}", headers=headers, timeout=15)
             if res1.status_code != 200:
@@ -617,11 +619,11 @@ def _m1_gtokens():
                 "authority": "accounts.google.com",
                 "origin": _M1_GOOGLE_URL,
                 "referer": f"{_M1_GOOGLE_URL}/signup/v2/createaccount?service=mail&continue=https%3A%2F%2Fmail.google.com%2Fmail%2Fu%2F0%2F&theme=mn",
-                "user-agent": random.choice(_M1_USER_AGENTS)
+                "user-agent": random.choice(_M1_USER_AGENTS),
             })
             data = {
                 "f.req": f'["{tl}","{n1}","{n2}","{n1}","{n2}",0,0,null,null,"web-glif-signup",0,null,1,[],1]',
-                "deviceinfo": '[null,null,null,null,null,"NL",null,null,null,"GlifWebSignIn",null,[],null,null,null,null,2,null,0,1,"",null,null,2,2]'
+                "deviceinfo": '[null,null,null,null,null,"NL",null,null,null,"GlifWebSignIn",null,[],null,null,null,null,2,null,0,1,"",null,null,2,2]',
             }
             response = requests.post(
                 f"{_M1_GOOGLE_URL}/_/signup/validatepersonaldetails",
@@ -644,7 +646,7 @@ def _m1_gtokens():
             "referer": "https://accounts.google.com/",
             "user-agent": random.choice(_M1_USER_AGENTS),
             "x-goog-ext-278367001-jspb": '["GlifWebSignIn"]',
-            "x-same-domain": "1"
+            "x-same-domain": "1",
         }
         params2 = {"rpcids": "NHJMOd", "source-path": "/lifecycle/steps/signup/username", "hl": "en"}
         fake_em = "".join(random.choices("abcdefghijklmnopqrstuvwxyz1234567890.", k=random.randint(16, 26)))
@@ -664,6 +666,63 @@ def _m1_gtokens():
         pass
     return False
 
+
+def _m1_get_tl_background():
+    """Background: refresh TL every 120 s via validatepersonaldetails→validatebasicinfo, write to google.txt."""
+    while True:
+        try:
+            url1    = "https://accounts.google.com/_/signup/validatepersonaldetails"
+            params1 = {"hl": "en-GB", "_reqid": "46000", "rt": "j"}
+            payload1 = {
+                "continue":        "https://accounts.google.com/ManageAccount?nc=1",
+                "f.req":           '[\"AEThLlw3_SjR2r7ZvRrESUg3K4e9eBWmlOC4rULBmw9UAcZVy1db7ezAlKKPXcOeac71VE9Ducrl\",null,null,null,null,0,0,\"aesowns\",\"aesowns\",null,0,null,1,[],1]',
+                "azt":             "AFoagUUWePV-jOFGpL5c7eI9kfCfGnCl5w:1776669382039",
+                "cookiesDisabled": "false",
+                "deviceinfo":      '[null,null,null,null,null,"IN",null,null,null,"GlifWebSignIn",null,[],null,null,null,null,1,null,0,1,"",null,null,2,2,2]',
+                "gmscoreversion":  "null",
+                "flowName":        "GlifWebSignIn",
+                "checkConnection": "youtube:301",
+                "checkedDomains":  "youtube",
+                "pstMsg":          "1",
+                "":                "",
+            }
+            headers1 = {
+                "User-Agent":           "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Mobile Safari/537.36",
+                "x-same-domain":        "1",
+                "google-accounts-xsrf": "1",
+                "origin":               "https://accounts.google.com",
+                "referer":              "https://accounts.google.com/createaccount?flowName=GlifWebSignIn&flowEntry=ServiceLogin",
+                "accept-language":      "en-IN,en-GB;q=0.9,en-US;q=0.8,en;q=0.7",
+                "Cookie":               "__Host-GAPS=1:6oR-TWX06t3JKSEu3DqYRT_IWnQLlw:Rc9Z7lHTPNW6qMCN",
+            }
+            resp1 = _M1_TL_SESSION.post(url1, params=params1, data=payload1, headers=headers1, timeout=20)
+            tl_1  = json.loads(resp1.text[5:])[0][1][2]
+
+            url2    = "https://accounts.google.com/_/signup/validatebasicinfo"
+            params2 = {"hl": "en-GB", "TL": tl_1, "_reqid": "346000", "rt": "j"}
+            payload2 = {
+                "continue":        "https://accounts.google.com/ManageAccount?nc=1",
+                "f.req":           f'["TL:{tl_1}",2015,4,15,2,null,null,0,null,null,0,0]',
+                "azt":             "AFoagUUWePV-jOFGpL5c7eI9kfCfGnCl5w:1776669382039",
+                "cookiesDisabled": "false",
+                "deviceinfo":      '[null,null,null,null,null,"IN",null,null,null,"GlifWebSignIn",null,[],null,null,null,null,1,null,0,1,"",null,null,2,2,2]',
+                "gmscoreversion":  "null",
+                "flowName":        "GlifWebSignIn",
+                "checkConnection": "youtube:301",
+                "checkedDomains":  "youtube",
+                "pstMsg":          "1",
+                "":                "",
+            }
+            headers1["referer"] = f"https://accounts.google.com/signup/v2/birthdaygender?flowName=GlifWebSignIn&flowEntry=ServiceLogin&TL={tl_1}"
+            resp2 = _M1_TL_SESSION.post(url2, params=params2, data=payload2, headers=headers1, timeout=20)
+            tl    = json.loads(resp2.text[5:])[0][0][4].split("TL:")[1]
+            with open("google.txt", "w") as w:
+                w.write(tl)
+        except Exception:
+            pass
+        time.sleep(120)
+
+
 def _m1_gtokens_background():
     time.sleep(60)
     while True:
@@ -676,193 +735,83 @@ def _m1_gtokens_background():
 
 # ── Gmail availability check ──
 
-def _m1_fresh_tl():
-    """
-    Fetch a fresh Google TL token inline — no file, no caching.
-    Returns (session, tl, host, ua) or (None, None, None, None).
-    Tries two strategies: the data-initial-setup-data pattern first,
-    then a minimal batchexecute call as fallback.
-    """
-    ua = random.choice(_M1_USER_AGENTS)
-    hdrs = {
-        "User-Agent": ua,
-        "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
-        "Accept-Language": "en-GB,en;q=0.9",
-    }
-    # ── Strategy 1: hit the signup createaccount page ──────────────────────
-    for signup_url in [
-        ("https://accounts.google.com/signup/v2/createaccount"
-         "?service=mail&continue=https%3A%2F%2Fmail.google.com%2Fmail%2Fu%2F0%2F"
-         "&theme=mn&flowName=GlifWebSignIn"),
-        ("https://accounts.google.com/signup/v2/createusername"
-         "?service=mail&continue=https%3A%2F%2Fmail.google.com%2Fmail%2Fu%2F0%2F"
-         "&flowName=GlifWebSignIn"),
-    ]:
+def _m1_cgmail(username, user, token, chat_id, loc_session):
+    global _m1_bad_email, _m1_taken
+    try:
+        if "@" in username:
+            username = username.split("@")[0]
+
+        # ── Primary: tokens.txt (gtokens flow) ──────────────────────────────
         try:
-            sess = requests.Session()
-            r = sess.get(signup_url, headers=hdrs, timeout=12)
-            # Pattern A — data-initial-setup-data with quoted TL at end
-            m = re.search(
-                r'data-initial-setup-data="%.@.null,null,null,null,null,null,null,null,null,'
-                r'&quot;(.*?)&quot;,null,null,null,&quot;(.*?)&',
-                r.text
+            with open(_M1_TOKEN_FILE, "r") as f:
+                line = f.read().splitlines()[0]
+            tl, host = line.split("//")
+            cookies = {"__Host-GAPS": host}
+            headers = {
+                "authority": "accounts.google.com",
+                "accept": "*/*",
+                "accept-language": "en-US,en;q=0.9",
+                "content-type": _M1_FORM_TYPE,
+                "google-accounts-xsrf": "1",
+                "origin": _M1_GOOGLE_URL,
+                "referer": f"https://accounts.google.com/signup/v2/createusername?service=mail&continue=https%3A%2F%2Fmail.google.com%2Fmail%2Fu%2F0%2F&TL={tl}",
+                "user-agent": random.choice(_M1_USER_AGENTS),
+            }
+            data = (
+                f"continue=https%3A%2F%2Fmail.google.com%2Fmail%2Fu%2F0%2F&ddm=0&flowEntry=SignUp&service=mail&theme=mn"
+                f"&f.req=%5B%22TL%3A{tl}%22%2C%22{username}%22%2C0%2C0%2C1%2Cnull%2C0%2C5167%5D"
+                "&azt=AFoagUUtRlvV928oS9O7F6eeI4dCO2r1ig%3A1712322460888&cookiesDisabled=false"
+                "&deviceinfo=%5Bnull%2Cnull%2Cnull%2Cnull%2Cnull%2C%22NL%22%2Cnull%2Cnull%2Cnull%2C%22GlifWebSignIn%22"
+                "%2Cnull%2C%5B%5D%2Cnull%2Cnull%2Cnull%2Cnull%2C2%2Cnull%2C0%2C1%2C%22%22%2Cnull%2Cnull%2C2%2C2%5D"
+                "&gmscoreversion=undefined&flowName=GlifWebSignIn&"
             )
-            if m:
-                tl   = m.group(2)
-                host = sess.cookies.get("__Host-GAPS",
-                       "".join(random.choices("abcdefghijklmnopqrstuvwxyz", k=22)))
-                return sess, tl, host, ua
-            # Pattern B — plain "TL" JSON key
-            m2 = re.search(r'"TL"\s*:\s*"([^"]{10,})"', r.text)
-            if m2:
-                tl   = m2.group(1)
-                host = sess.cookies.get("__Host-GAPS",
-                       "".join(random.choices("abcdefghijklmnopqrstuvwxyz", k=22)))
-                return sess, tl, host, ua
-            # Pattern C — TL: inside any quoted string
-            m3 = re.search(r'["\']TL:([A-Za-z0-9_\-]{10,})["\']', r.text)
-            if m3:
-                tl   = m3.group(1)
-                host = sess.cookies.get("__Host-GAPS",
-                       "".join(random.choices("abcdefghijklmnopqrstuvwxyz", k=22)))
-                return sess, tl, host, ua
+            resp = loc_session.post(
+                f"{_M1_GOOGLE_URL}/_/signup/usernameavailability",
+                params={"TL": tl}, cookies=cookies, headers=headers, data=data, timeout=12
+            )
+            if '"gf.uar",1' in resp.text:
+                _m1_save_hit(username, "gmail.com", user, token, chat_id)
+                return
         except Exception:
             pass
-    # ── Strategy 2: batchexecute to pull TL ────────────────────────────────
-    try:
-        fake = "".join(random.choices("abcdefghijklmnopqrstuvwxyz0123456789", k=18))
-        hdrs2 = {
-            "User-Agent": ua,
-            "accept": "*/*",
-            "accept-language": "en",
-            "content-type": "application/x-www-form-urlencoded;charset=UTF-8",
-            "origin": "https://accounts.google.com",
-            "referer": "https://accounts.google.com/",
-            "x-same-domain": "1",
-        }
-        data2 = (
-            f"f.req=%5B%5B%5B%22NHJMOd%22%2C%22%5B%5C%22{fake}%5C%22%2C0%2C0%2C1%2C"
-            f"%5Bnull%2Cnull%2Cnull%2Cnull%2C1%2C17359%5D%2C0%2C40%5D%22%2Cnull%2C%22generic%22%5D%5D%5D"
-        )
-        sess2 = requests.Session()
-        r2 = sess2.post(
-            "https://accounts.google.com/lifecycle/_/AccountLifecyclePlatformSignupUi/data/batchexecute",
-            params={"rpcids": "NHJMOd", "source-path": "/lifecycle/steps/signup/username", "hl": "en"},
-            headers=hdrs2, data=data2, timeout=12
-        )
-        m4 = re.search(r'"TL:([^"]{10,})"', r2.text)
-        if m4:
-            tl   = m4.group(1)
-            host = "".join(random.choices("abcdefghijklmnopqrstuvwxyz", k=22))
-            return sess2, tl, host, ua
-    except Exception:
-        pass
-    return None, None, None, None
 
+        # ── Secondary: google.txt (get_tl_background flow) ──────────────────
+        try:
+            with open("google.txt", "r") as ys:
+                tl = ys.read().strip()
+            url = "https://accounts.google.com/_/signup/usernameavailability"
+            params = {"hl": "en-GB", "TL": tl, "_reqid": "446000", "rt": "j"}
+            payload = {
+                "continue":        "https://accounts.google.com/ManageAccount?nc=1",
+                "f.req":           f'["TL:{tl}","{username}",0,0,1,null,1,2464]',
+                "azt":             "AFoagUUWePV-jOFGpL5c7eI9kfCfGnCl5w:1776669382039",
+                "cookiesDisabled": "false",
+                "deviceinfo":      '[null,null,null,null,null,"IN",null,null,null,"GlifWebSignIn",null,[],null,null,null,null,1,null,0,1,"",null,null,2,2,2]',
+                "gmscoreversion":  "null",
+                "flowName":        "GlifWebSignIn",
+                "checkConnection": "youtube:301",
+                "checkedDomains":  "youtube",
+                "pstMsg":          "1",
+                "":                "",
+            }
+            headers2 = {
+                "User-Agent":           "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Mobile Safari/537.36",
+                "x-same-domain":        "1",
+                "google-accounts-xsrf": "1",
+                "origin":               "https://accounts.google.com",
+                "referer":              f"https://accounts.google.com/signup/v2/createusername?flowName=GlifWebSignIn&flowEntry=ServiceLogin&TL={tl}",
+                "accept-language":      "en-IN,en-GB;q=0.9,en-US;q=0.8,en;q=0.7",
+                "Cookie":               "__Host-GAPS=1:6oR-TWX06t3JKSEu3DqYRT_IWnQLlw:Rc9Z7lHTPNW6qMCN",
+            }
+            response = _M1_TL_SESSION.post(url, params=params, data=payload, headers=headers2, timeout=20)
+            if '"gf.uar",1' in response.text:
+                _m1_save_hit(username, "gmail.com", user, token, chat_id)
+                return
+            else:
+                _m1_taken += 1
+        except Exception:
+            _m1_taken += 1
 
-def _m1_cgmail(username, user, token, chat_id, loc_session):
-    global _m1_bad_email
-    try:
-        sess, tl, host, ua = _m1_fresh_tl()
-        if not tl:
-            _m1_bad_email += 1
-            return
-        cookies = {"__Host-GAPS": host}
-        headers = {
-            "authority": "accounts.google.com",
-            "accept": "*/*",
-            "accept-language": "en-US,en;q=0.9",
-            "content-type": _M1_FORM_TYPE,
-            "google-accounts-xsrf": "1",
-            "origin": _M1_GOOGLE_URL,
-            "referer": (
-                f"https://accounts.google.com/signup/v2/createusername"
-                f"?service=mail&continue=https%3A%2F%2Fmail.google.com%2Fmail%2Fu%2F0%2F&TL={tl}"
-            ),
-            "user-agent": ua,
-        }
-        data = (
-            "continue=https%3A%2F%2Fmail.google.com%2Fmail%2Fu%2F0%2F&ddm=0"
-            "&flowEntry=SignUp&service=mail&theme=mn"
-            f"&f.req=%5B%22TL%3A{tl}%22%2C%22{username}%22%2C0%2C0%2C1%2Cnull%2C0%2C5167%5D"
-            "&azt=AFoagUUtRlvV928oS9O7F6eeI4dCO2r1ig%3A1712322460888&cookiesDisabled=false"
-            "&deviceinfo=%5Bnull%2Cnull%2Cnull%2Cnull%2Cnull%2C%22NL%22%2Cnull%2Cnull%2Cnull"
-            "%2C%22GlifWebSignIn%22%2Cnull%2C%5B%5D%2Cnull%2Cnull%2Cnull%2Cnull%2C2%2Cnull"
-            "%2C0%2C1%2C%22%22%2Cnull%2Cnull%2C2%2C2%5D&gmscoreversion=undefined"
-            "&flowName=GlifWebSignIn&"
-        )
-        client = sess if sess else requests.Session()
-        resp = client.post(
-            f"{_M1_GOOGLE_URL}/_/signup/usernameavailability",
-            params={"TL": tl},
-            cookies=cookies,
-            headers=headers,
-            data=data,
-            timeout=12,
-        )
-        if '"gf.uar",1' in resp.text:
-            _m1_save_hit(username, "gmail.com", user, token, chat_id)
-        else:
-            _m1_bad_email += 1
-    except Exception:
-        _m1_bad_email += 1
-
-
-# ── AOL availability check ──
-
-def _m1_caol(username, user, token, chat_id, loc_session):
-    global _m1_bad_email
-    try:
-        s = requests.Session()
-        create_url = (
-            "https://login.aol.com/account/create?specId=yidregsimplified&done=https%3A%2F%2Fapi.login.aol.com%2Foauth2%2Fauthorize%3F"
-            "activity%3Dheader-signin%26client_id%3Ddj0yJmk9VlN3cDhpNm1Id0szJmQ9WVdrOVdtRm1aMVU1Tm1zbWNHbzlNQS0tJnM9Y29uc3VtZXJzZWNyZXQmeD1mYQ--"
-        )
-        headers = {
-            "authority": "login.aol.com",
-            "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-            "user-agent": random.choice(_M1_WEB_USER_AGENTS),
-            "accept-language": "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7",
-        }
-        r1 = s.get(create_url, headers=headers, timeout=10)
-        specId_match       = re.search(r'name="specId" value="([^"]+)"', r1.text)
-        acrumb_match       = re.search(r'name="acrumb" value="([^"]+)"', r1.text)
-        sessionIndex_match = re.search(r'name="sessionIndex" value="([^"]+)"', r1.text)
-        if not (specId_match and acrumb_match and sessionIndex_match):
-            _m1_bad_email += 1
-            return
-        specId       = specId_match.group(1)
-        acrumb       = acrumb_match.group(1)
-        sessionIndex = sessionIndex_match.group(1)
-        validate_url = "https://login.aol.com/account/module/validate"
-        data = {
-            "specId": specId,
-            "acrumb": acrumb,
-            "sessionIndex": sessionIndex,
-            "userId": username,
-            "validateField": "userId"
-        }
-        headers2 = {
-            "authority": "login.aol.com",
-            "accept": "*/*",
-            "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
-            "origin": "https://login.aol.com",
-            "referer": create_url,
-            "user-agent": random.choice(_M1_WEB_USER_AGENTS),
-            "x-requested-with": "XMLHttpRequest",
-        }
-        r2 = s.post(validate_url, headers=headers2, data=data, timeout=10)
-        if r2.status_code == 200:
-            try:
-                json_resp    = r2.json()
-                userId_field = json_resp.get("fields", {}).get("userId", {})
-                if "error" not in userId_field:
-                    _m1_save_hit(username, "aol.com", user, token, chat_id)
-                    return
-            except Exception:
-                if "IDENTIFIER_AVAILABLE" in r2.text or '"errors":[]' in r2.text:
-                    _m1_save_hit(username, "aol.com", user, token, chat_id)
-                    return
         _m1_bad_email += 1
     except Exception:
         _m1_bad_email += 1
@@ -998,12 +947,7 @@ def _m1_cinstagram(username, user, token, chat_id, loc_session):
     email_gmail = username + "@gmail.com"
     if _m1_lookup_instagram(email_gmail):
         _m1_good_insta += 1
-        t_gmail = Thread(target=_m1_cgmail, args=(username, user, token, chat_id, requests.Session()), daemon=True)
-        t_aol   = Thread(target=_m1_caol,   args=(username, user, token, chat_id, requests.Session()), daemon=True)
-        t_gmail.start()
-        t_aol.start()
-        t_gmail.join()
-        t_aol.join()
+        _m1_cgmail(username, user, token, chat_id, loc_session)
     else:
         _m1_bad_insta += 1
 
@@ -1112,6 +1056,7 @@ def run_method1_web(token, chat_id, year_choice, min_followers, stop_event):
     _m1_about_refresh_tokens(_m1_ABOUT_COOKIE_STR)
     Thread(target=_m1_about_token_refresher, daemon=True).start()
     Thread(target=_m1_gtokens_background,    daemon=True).start()
+    Thread(target=_m1_get_tl_background,     daemon=True).start()
 
     _m1_gtokens()
 
