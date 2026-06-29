@@ -1003,11 +1003,8 @@ def _m1_save_hit(username, domain, user, token, chat_id):
 _m1_lookup_pool: ThreadPoolExecutor = None
 
 _M1_MULTI_DOMAINS = [
-    ("gmail.com",   "gmail"),
-    ("yahoo.com",   "yahoo"),
-    ("aol.com",     "yahoo"),
-    ("hotmail.com", "microsoft"),
-    ("outlook.com", "microsoft"),
+    ("gmail.com", "gmail"),
+    ("aol.com",   "yahoo"),
 ]
 
 def _m1_cinstagram(username, user, token, chat_id, loc_session):
@@ -1017,18 +1014,14 @@ def _m1_cinstagram(username, user, token, chat_id, loc_session):
         email = f"{username}@{domain}"
         if not _m1_lookup_instagram(email):
             return False
-        with _m1_found_lock:
-            _m1_good_insta_ref = True
         if provider == "gmail":
             _m1_cgmail(username, user, token, chat_id, requests.Session())
         elif provider == "yahoo":
             _m1_cyahoo(username, domain, user, token, chat_id)
-        elif provider == "microsoft":
-            _m1_cmicrosoft(username, domain, user, token, chat_id)
         return True
 
     found_any = False
-    with ThreadPoolExecutor(max_workers=len(_M1_MULTI_DOMAINS)) as domain_pool:
+    with ThreadPoolExecutor(max_workers=2) as domain_pool:
         futures_map = {
             domain_pool.submit(_check_domain, domain, provider): domain
             for domain, provider in _M1_MULTI_DOMAINS
