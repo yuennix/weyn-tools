@@ -410,7 +410,9 @@ def _m1_rest_web_check_email(email):
                 }
             )
             data = response.json()
-            return data.get("allow_shared_email_registration") is True
+            # available: False  → email IS registered on Instagram (hit)
+            # available: True   → email is free, not tied to any account (miss)
+            return data.get("available") is False
     except Exception:
         return False
 
