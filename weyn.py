@@ -737,6 +737,64 @@ def _m1_gtokens_background():
 
 # ── Gmail availability check ──
 
+def _m1_cyahoo(username, domain, user, token, chat_id):
+    """Check Yahoo / AOL username availability (both use the same Verizon-Oath backend)."""
+    global _m1_bad_email, _m1_taken
+    try:
+        if "@" in username:
+            username = username.split("@")[0]
+        try:
+            resp = requests.get(
+                "https://api.login.yahoo.com/v4/loginserver/yid/check",
+                params={"yid": username, "specId": "yidregsimplified"},
+                headers={"User-Agent": random.choice(_M1_WEB_USER_AGENTS)},
+                timeout=8,
+            )
+            data = resp.json()
+            errors = data.get("errors", [])
+            taken_codes = {"IDENTIFIER_EXISTS", "YID_UNAVAILABLE", "TAKEN"}
+            if any(e.get("error") in taken_codes for e in errors):
+                _m1_taken += 1
+                return
+            _m1_save_hit(username, domain, user, token, chat_id)
+        except Exception:
+            _m1_bad_email += 1
+    except Exception:
+        _m1_bad_email += 1
+
+
+def _m1_cmicrosoft(username, domain, user, token, chat_id):
+    """Check Hotmail / Outlook username availability via Microsoft's credential-type API."""
+    global _m1_bad_email, _m1_taken
+    try:
+        if "@" in username:
+            username = username.split("@")[0]
+        email = f"{username}@{domain}"
+        try:
+            resp = requests.post(
+                "https://login.microsoftonline.com/common/GetCredentialType",
+                json={"Username": email, "isOtherIdpSupported": True},
+                headers={
+                    "User-Agent": random.choice(_M1_WEB_USER_AGENTS),
+                    "Content-Type": "application/json",
+                },
+                timeout=8,
+            )
+            data = resp.json()
+            exists_code = data.get("IfExistsResult", -1)
+            if exists_code == 0:
+                _m1_save_hit(username, domain, user, token, chat_id)
+                return
+            elif exists_code in (1, 4, 6):
+                _m1_taken += 1
+            else:
+                _m1_bad_email += 1
+        except Exception:
+            _m1_bad_email += 1
+    except Exception:
+        _m1_bad_email += 1
+
+
 def _m1_cgmail(username, user, token, chat_id, loc_session):
     global _m1_bad_email, _m1_taken
     try:
@@ -944,12 +1002,46 @@ def _m1_save_hit(username, domain, user, token, chat_id):
 
 _m1_lookup_pool: ThreadPoolExecutor = None
 
+_M1_MULTI_DOMAINS = [
+    ("gmail.com",   "gmail"),
+    ("yahoo.com",   "yahoo"),
+    ("aol.com",     "yahoo"),
+    ("hotmail.com", "microsoft"),
+    ("outlook.com", "microsoft"),
+]
+
 def _m1_cinstagram(username, user, token, chat_id, loc_session):
     global _m1_good_insta, _m1_bad_insta
-    email_gmail = username + "@gmail.com"
-    if _m1_lookup_instagram(email_gmail):
+
+    def _check_domain(domain, provider):
+        email = f"{username}@{domain}"
+        if not _m1_lookup_instagram(email):
+            return False
+        with _m1_found_lock:
+            _m1_good_insta_ref = True
+        if provider == "gmail":
+            _m1_cgmail(username, user, token, chat_id, requests.Session())
+        elif provider == "yahoo":
+            _m1_cyahoo(username, domain, user, token, chat_id)
+        elif provider == "microsoft":
+            _m1_cmicrosoft(username, domain, user, token, chat_id)
+        return True
+
+    found_any = False
+    with ThreadPoolExecutor(max_workers=len(_M1_MULTI_DOMAINS)) as domain_pool:
+        futures_map = {
+            domain_pool.submit(_check_domain, domain, provider): domain
+            for domain, provider in _M1_MULTI_DOMAINS
+        }
+        for fut in as_completed(futures_map):
+            try:
+                if fut.result():
+                    found_any = True
+            except Exception:
+                pass
+
+    if found_any:
         _m1_good_insta += 1
-        _m1_cgmail(username, user, token, chat_id, loc_session)
     else:
         _m1_bad_insta += 1
 
