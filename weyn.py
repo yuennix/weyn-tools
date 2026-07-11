@@ -9,6 +9,7 @@ import uuid
 import time
 from datetime import datetime
 from threading import Thread, Lock, Event, Semaphore
+import queue
 import requests
 import urllib.parse
 import base64
@@ -121,13 +122,84 @@ def _send_telegram(token, chat_id, text):
         if body.get('ok'):
             _web_state['tg_status'] = 'ok'
             _web_state['tg_error']  = ''
+            return True
         else:
             err = body.get('description', 'Unknown Telegram error')
             _web_state['tg_status'] = 'error'
             _web_state['tg_error']  = err
+            return resp.status_code, body
     except Exception as e:
         _web_state['tg_status'] = 'error'
         _web_state['tg_error']  = str(e)
+        return False
+
+
+# ── Telegram send queue ──
+#
+# Hits are produced by hundreds of concurrent scanner threads, but Telegram
+# only allows ~1 message/sec per chat. Instead of firing sendMessage calls
+# straight from the scanner threads (which blows through that limit and
+# causes messages to silently vanish once Telegram starts rejecting them),
+# every hit is pushed onto a queue and a single background thread drains it
+# at a safe, steady pace. If Telegram responds with 429, the message stays
+# at the front of the queue and the sender sleeps for the `retry_after`
+# value Telegram provides, then retries the same message until it goes
+# through -- no hit notification is ever dropped.
+
+_TG_MIN_INTERVAL = 1.0  # seconds between sends, keeps us under Telegram's per-chat rate limit
+
+_tg_queue = queue.Queue()
+_tg_sender_started = False
+_tg_sender_lock = Lock()
+
+
+def _telegram_sender_loop():
+    while True:
+        token, chat_id, text = _tg_queue.get()
+        while True:
+            try:
+                resp = requests.post(
+                    f"https://api.telegram.org/bot{token}/sendMessage",
+                    json={"chat_id": chat_id, "text": text},
+                    timeout=10
+                )
+                if resp.status_code == 429:
+                    try:
+                        retry_after = resp.json().get('parameters', {}).get('retry_after', 1)
+                    except Exception:
+                        retry_after = 1
+                    time.sleep(max(1, retry_after))
+                    continue  # retry the same message, do not drop it
+
+                body = resp.json()
+                if body.get('ok'):
+                    _web_state['tg_status'] = 'ok'
+                    _web_state['tg_error']  = ''
+                else:
+                    _web_state['tg_status'] = 'error'
+                    _web_state['tg_error']  = body.get('description', 'Unknown Telegram error')
+            except Exception as e:
+                _web_state['tg_status'] = 'error'
+                _web_state['tg_error']  = str(e)
+            break
+
+        _tg_queue.task_done()
+        time.sleep(_TG_MIN_INTERVAL)
+
+
+def _ensure_telegram_sender():
+    global _tg_sender_started
+    with _tg_sender_lock:
+        if not _tg_sender_started:
+            Thread(target=_telegram_sender_loop, daemon=True).start()
+            _tg_sender_started = True
+
+
+def _queue_telegram(token, chat_id, text):
+    """Enqueue a hit notification for the background Telegram sender instead
+    of sending it inline from the scanner thread."""
+    _ensure_telegram_sender()
+    _tg_queue.put((token, chat_id, text))
 
 def get_year_range(year_choice):
     if year_choice is None:
@@ -1053,7 +1125,7 @@ def _m1_save_hit(username, domain, user, token, chat_id):
             _m1_found_emails.append(email_str)
 
     _save_hit_to_file(box)
-    _send_telegram(token, chat_id, box)
+    _queue_telegram(token, chat_id, box)
 
     with _web_lock:
         _web_state["hits"]  = _m1_hits
@@ -1425,7 +1497,7 @@ def _m2_record_hit(token, chat_id, email, username=None):
     _web_state['total']       = _m2_total
     _web_state['recent_hits'] = list(_m2_found_emails[-20:])
 
-    _send_telegram(token, chat_id, msg)
+    _queue_telegram(token, chat_id, msg)
 
 
 # ── Web entry point ────────────────────────────────────────────────────────────
@@ -1702,7 +1774,7 @@ def _m3_save_hit(token, chat_id, email, method_label="V1", username=None, has_mx
     _web_state['total']       = _m3_total
     _web_state['recent_hits'] = list(_m3_found_emails[-20:])
 
-    _send_telegram(token, chat_id, msg)
+    _queue_telegram(token, chat_id, msg)
 
 
 def _m3_worker(token, chat_id, stop_event):
