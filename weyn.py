@@ -1249,8 +1249,8 @@ def run_method1_web(token, chat_id, year_choice, min_followers, stop_event):
 
     _m1_gtokens()
 
-    NUM_SCANNERS = 500
-    NUM_LOOKUP   = 300
+    NUM_SCANNERS = int(os.environ.get('M1_SCANNER_WORKERS', 500))
+    NUM_LOOKUP   = int(os.environ.get('M1_LOOKUP_WORKERS', 300))
     global _m1_pool, _m1_lookup_pool
     try:
         lookup_pool     = ThreadPoolExecutor(max_workers=NUM_LOOKUP)
@@ -1519,7 +1519,7 @@ def run_method2_web(token, chat_id, min_followers, stop_event):
         'recent_hits': [], 'tg_status': '', 'tg_error': '',
     })
 
-    NUM_WORKERS = 500
+    NUM_WORKERS = int(os.environ.get('M2_WORKERS', 500))
     try:
         pool    = ThreadPoolExecutor(max_workers=NUM_WORKERS)
         _m2_pool = pool
@@ -1862,7 +1862,7 @@ def run_method3_web(token, chat_id, stop_event):
         'recent_hits': [], 'tg_status': '', 'tg_error': '',
     })
 
-    NUM_WORKERS = 500
+    NUM_WORKERS = int(os.environ.get('M3_WORKERS', 500))
     try:
         pool = ThreadPoolExecutor(max_workers=NUM_WORKERS)
         _m3_pool = pool
