@@ -9,4 +9,4 @@ COPY . .
 
 EXPOSE 8080
 
-CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--worker-class", "gthread", "--threads", "4", "--timeout", "0", "main:app"]
+CMD gunicorn --bind 0.0.0.0:${PORT:-8080} --worker-class gthread --threads 4 --timeout 0 main:app
