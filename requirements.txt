@@ -33,3 +33,12 @@ typing-extensions==4.15.0
 urllib3==2.7.0
 werkzeug==3.1.8
 yarl==1.24.2
+colorama==0.4.6
+email-validator==2.3.0
+flask==3.1.3
+flask-sqlalchemy==3.1.1
+gunicorn==26.0.0
+httpx==0.28.1
+psycopg2-binary==2.9.12
+pytelegrambotapi==4.34.0
+requests==2.34.2
