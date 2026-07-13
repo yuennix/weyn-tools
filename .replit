@@ -42,3 +42,18 @@ externalPort = 80
 [deployment]
 deploymentTarget = "autoscale"
 run = ["gunicorn", "--bind", "0.0.0.0:5000", "main:app"]
+
+[userenv]
+
+[userenv.shared]
+PROXY_LIST = """
+31.59.20.176:6754:zkflwpqe:8gdovxbperg0
+31.56.127.193:7684:zkflwpqe:8gdovxbperg0
+45.38.107.97:6014:zkflwpqe:8gdovxbperg0
+198.105.121.200:6462:zkflwpqe:8gdovxbperg0
+64.137.96.74:6641:zkflwpqe:8gdovxbperg0
+198.23.243.226:6361:zkflwpqe:8gdovxbperg0
+38.154.185.97:6370:zkflwpqe:8gdovxbperg0
+84.247.60.125:6095:zkflwpqe:8gdovxbperg0
+142.111.67.146:5611:zkflwpqe:8gdovxbperg0
+191.96.254.138:6185:zkflwpqe:8gdovxbperg0"""

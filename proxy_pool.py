@@ -1,41 +1,71 @@
 """
-Lightweight free-proxy rotation, used ONLY for the hi2.in availability gate
-(_hi2_check_available in weyn.py). That endpoint rate-limits/blocks by
-source IP once a scan session gets into the tens of thousands of requests —
-rotating the outgoing IP for just that call lets the container's own IP
-avoid getting flagged.
+Proxy rotation used ONLY for the hi2.in availability gate
+(_hi2_check_available / _hi2_get_recaptcha_token in weyn.py). That endpoint
+rate-limits/blocks by source IP once a scan session sends heavy volume,
+which is why real hits stop showing up after tens of thousands of scanned
+ids. Routing just that call through a rotating proxy avoids tying it to
+the container's own IP.
 
-Source: https://github.com/iplocate/free-proxy-list (updates every ~30 min).
-These are free public proxies — expect a high dead/slow rate. This module
-health-tracks each proxy and always allows falling back to a direct
-(no-proxy) request if the pool is empty or every proxy is currently bad.
+Two sources, in priority order:
+  1. PROXY_LIST env var — authenticated proxies the user supplies, one per
+     line, format "ip:port:user:pass" (or plain "ip:port"). Static list,
+     no background refresh needed.
+  2. Fallback: a free public proxy list (github.com/iplocate/free-proxy-list),
+     refreshed every ~30 min to match its own update cadence. Lower quality
+     — expect a high dead/slow rate, hence the health tracking below.
+
+Selection is least-recently-used among currently-healthy proxies, which
+naturally spreads load across the pool instead of hammering one exit IP
+(a big part of why the caller's own IP got banned in the first place).
+Callers should always be prepared for get_proxy() to return None (empty
+pool / everything benched) and fall back to a direct request.
 """
 
+import os
 import random
 import threading
 import time
 import requests
 
-_SOURCES = [
+_FREE_SOURCES = [
     "https://raw.githubusercontent.com/iplocate/free-proxy-list/main/protocols/http.txt",
     "https://raw.githubusercontent.com/iplocate/free-proxy-list/main/protocols/https.txt",
 ]
 
-_REFRESH_INTERVAL = 30 * 60   # matches upstream's own update cadence
-_FAIL_LIMIT       = 3         # consecutive failures before a proxy is benched
-_BENCH_SECONDS    = 5 * 60    # how long a benched proxy sits out before retry
+_REFRESH_INTERVAL = 30 * 60   # matches the free list's own update cadence
+_FAIL_LIMIT       = 4         # consecutive failures before a proxy is benched
+_BENCH_SECONDS    = 3 * 60    # how long a benched proxy sits out before retry
 
-_lock       = threading.Lock()
-_pool: list = []                     # list of "ip:port" strings
-_fail_count: dict = {}               # "ip:port" -> consecutive failure count
-_benched_until: dict = {}            # "ip:port" -> unix ts when eligible again
-_last_refresh = 0.0
-_started      = False
+_lock                = threading.Lock()
+_pool: list          = []     # list of "ip:port" keys
+_auth: dict          = {}     # "ip:port" -> (user, pass) for authenticated proxies
+_fail_count: dict    = {}
+_benched_until: dict = {}
+_last_used: dict     = {}
+_started             = False
+_using_authenticated = False
 
 
-def _fetch_list() -> list:
+def _parse_authenticated(raw: str):
+    proxies, auth = [], {}
+    for line in raw.replace(',', '\n').split('\n'):
+        line = line.strip()
+        if not line:
+            continue
+        parts = line.split(':')
+        if len(parts) == 4:
+            ip, port, user, pw = parts
+            key = f'{ip}:{port}'
+            proxies.append(key)
+            auth[key] = (user, pw)
+        elif len(parts) == 2:
+            proxies.append(line)
+    return proxies, auth
+
+
+def _fetch_free_list() -> list:
     found = []
-    for url in _SOURCES:
+    for url in _FREE_SOURCES:
         try:
             r = requests.get(url, timeout=10)
             if r.status_code == 200:
@@ -49,29 +79,38 @@ def _fetch_list() -> list:
 
 
 def _refresh_loop():
-    global _pool, _last_refresh
+    global _pool
     while True:
-        fresh = _fetch_list()
+        time.sleep(_REFRESH_INTERVAL)
+        if _using_authenticated:
+            continue  # static list from the user, nothing to refresh
+        fresh = _fetch_free_list()
         if fresh:
             with _lock:
                 _pool = fresh
-                # drop stale bookkeeping for proxies no longer in the list
-                for d in (_fail_count, _benched_until):
+                for d in (_fail_count, _benched_until, _last_used):
                     for key in list(d.keys()):
                         if key not in fresh:
                             d.pop(key, None)
-                _last_refresh = time.time()
-        time.sleep(_REFRESH_INTERVAL)
 
 
 def ensure_started():
-    global _started
+    global _started, _pool, _auth, _using_authenticated
     with _lock:
         if _started:
             return
         _started = True
-    # Populate synchronously once so the very first hi2 check can use a proxy
-    fresh = _fetch_list()
+
+    raw = os.environ.get('PROXY_LIST', '').strip()
+    if raw:
+        proxies, auth = _parse_authenticated(raw)
+        with _lock:
+            _pool = proxies
+            _auth = auth
+            _using_authenticated = True
+        return  # authenticated list is static — no refresh thread needed
+
+    fresh = _fetch_free_list()
     if fresh:
         with _lock:
             _pool = fresh
@@ -79,16 +118,16 @@ def ensure_started():
 
 
 def get_proxy() -> str | None:
-    """Return a random healthy 'ip:port' string, or None if none available."""
+    """Return the least-recently-used healthy proxy key, or None if none available."""
     now = time.time()
     with _lock:
-        candidates = [
-            p for p in _pool
-            if _benched_until.get(p, 0) <= now
-        ]
+        candidates = [p for p in _pool if _benched_until.get(p, 0) <= now]
         if not candidates:
             return None
-        return random.choice(candidates)
+        candidates.sort(key=lambda p: _last_used.get(p, 0))
+        chosen = candidates[0]
+        _last_used[chosen] = now
+        return chosen
 
 
 def report_success(proxy: str):
@@ -109,6 +148,10 @@ def report_failure(proxy: str):
             _benched_until[proxy] = time.time() + _BENCH_SECONDS
 
 
-def as_requests_dict(proxy: str) -> dict:
-    """Build a requests-style proxies= dict for a plain 'ip:port' entry."""
-    return {'http': f'http://{proxy}', 'https': f'http://{proxy}'}
+def as_requests_dict(proxy: str) -> dict | None:
+    """Build a requests-style proxies= dict for a proxy key, with auth if configured."""
+    if not proxy:
+        return None
+    auth = _auth.get(proxy)
+    url  = f'http://{auth[0]}:{auth[1]}@{proxy}' if auth else f'http://{proxy}'
+    return {'http': url, 'https': url}

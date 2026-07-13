@@ -1389,7 +1389,7 @@ _HI2_SITEKEY  = '6LfEUPkgAAAAAKTgbMoewQkWBEQhO2VPL4QviKct'
 _HI2_CO       = base64.urlsafe_b64encode(b'https://hi2.in:443').decode().rstrip('=')
 _HI2_VER_CACHE:   dict = {'v': None, 'ts': 0.0}
 _HI2_VER_LOCK   = Lock()
-_HI2_TOK_CACHE:  dict = {'token': None, 'ts': 0.0}   # reuse tokens < 90 s old
+_HI2_TOK_CACHE:  dict = {}   # proxy key (or 'direct') -> {'token':..., 'ts':...}, reused < 90 s
 _HI2_TOK_LOCK   = Lock()
 _HI2_UA       = ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
                  'AppleWebKit/537.36 (KHTML, like Gecko) '
@@ -1419,17 +1419,30 @@ def _hi2_get_version() -> str:
     return 'rAqPVhe2JMK6mSJKi8r_vw'          # safe fallback
 
 
-def _hi2_get_recaptcha_token() -> str | None:
-    """Return a valid invisible reCAPTCHA v2 token for hi2.in (cached 90 s)."""
+def _hi2_get_recaptcha_token(proxy: str | None = None) -> str | None:
+    """Return a valid invisible reCAPTCHA v2 token for hi2.in (cached 90 s).
+
+    Fetched through the same proxy (if any) that will make the follow-up
+    /api/custom call, so the recaptcha session and the check are always
+    made from the same exit IP — mixing IPs between the two risks hi2.in
+    treating the token as invalid/suspicious and just failing the check.
+    Cached per-proxy so different proxies don't share a token cache.
+    """
+    cache_key = proxy or 'direct'
     with _HI2_TOK_LOCK:
-        if _HI2_TOK_CACHE['token'] and time.time() - _HI2_TOK_CACHE['ts'] < 90:
-            return _HI2_TOK_CACHE['token']
+        entry = _HI2_TOK_CACHE.get(cache_key)
+        if entry and time.time() - entry['ts'] < 90:
+            return entry['token']
 
     version = _hi2_get_version()
     cb      = ''.join(random.choices(string.ascii_lowercase + string.digits, k=10))
 
     s = requests.Session()
     s.headers.update({'User-Agent': _HI2_UA, 'Accept-Language': 'en-US,en;q=0.9'})
+    if proxy:
+        proxies = proxy_pool.as_requests_dict(proxy)
+        if proxies:
+            s.proxies.update(proxies)
 
     # ── Step 1: anchor ────────────────────────────────────────────────────────
     anchor_url = (
@@ -1474,8 +1487,7 @@ def _hi2_get_recaptcha_token() -> str | None:
         if m:
             tok = m.group(1)
             with _HI2_TOK_LOCK:
-                _HI2_TOK_CACHE['token'] = tok
-                _HI2_TOK_CACHE['ts']    = time.time()
+                _HI2_TOK_CACHE[cache_key] = {'token': tok, 'ts': time.time()}
             return tok
     return None
 
@@ -1492,15 +1504,17 @@ def _hi2_check_available(username: str, domain: str = 'hi2.in') -> bool:
     hi2.in rate-limits/blocks by source IP once a scan session sends heavy
     volume, which is why real hits stop showing up after tens of thousands
     of scanned ids. This call (and only this call) goes through a rotating
-    free-proxy pool so it isn't tied to the container's own IP — see
-    proxy_pool.py. Falls back to a direct request if no proxy is available.
+    proxy pool so it isn't tied to the container's own IP — see
+    proxy_pool.py. The recaptcha token is fetched through that same proxy
+    so the whole check comes from one consistent exit IP. Falls back to a
+    direct request if no proxy is available.
     """
-    token = _hi2_get_recaptcha_token()
-    if not token:
-        return True          # can't verify → don't drop the hit
-
     proxy_pool.ensure_started()
     proxy = proxy_pool.get_proxy()
+
+    token = _hi2_get_recaptcha_token(proxy)
+    if not token:
+        return True          # can't verify → don't drop the hit
 
     try:
         r = requests.post(
