@@ -245,6 +245,38 @@ def download_hits():
     )
 
 
+@app.route('/api/download_m2')
+def download_m2():
+    if not is_authenticated():
+        return redirect('/gate')
+    emails = list(weyn._m2_email_list)
+    if not emails:
+        return ('No M2 hits this session.', 404)
+    content = '\n'.join(emails)
+    from flask import Response
+    return Response(
+        content,
+        mimetype='text/plain',
+        headers={'Content-Disposition': 'attachment; filename="m2_hits.txt"'}
+    )
+
+
+@app.route('/api/download_m3')
+def download_m3():
+    if not is_authenticated():
+        return redirect('/gate')
+    emails = list(weyn._m3_email_list)
+    if not emails:
+        return ('No M3 hits this session.', 404)
+    content = '\n'.join(emails)
+    from flask import Response
+    return Response(
+        content,
+        mimetype='text/plain',
+        headers={'Content-Disposition': 'attachment; filename="m3_hits.txt"'}
+    )
+
+
 @app.route('/api/find_chat_id', methods=['POST'])
 def find_chat_id():
     if not is_authenticated():

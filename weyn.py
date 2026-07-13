@@ -1504,6 +1504,7 @@ _m2_total        = 0
 _m2_scanned      = 0
 _m2_found_emails: list = []
 _m2_found_lock   = Lock()
+_m2_email_list:  list = []   # email-only, full session list for download
 _m2_hit_lock     = Lock()
 _m2_pool:        ThreadPoolExecutor = None
 _m1_pool:        ThreadPoolExecutor = None
@@ -1693,11 +1694,12 @@ def _m2_worker(token, chat_id, stop_event):
 
 
 def _m2_record_hit(token, chat_id, email, username=None):
-    global _m2_hits, _m2_total
+    global _m2_hits, _m2_total, _m2_email_list
     with _m2_hit_lock:
         _m2_hits  += 1
         _m2_total += 1
         hit_num    = _m2_hits
+        _m2_email_list.append(email)
 
     profile = username or email.split('@')[0]
     msg = (
@@ -1733,11 +1735,12 @@ def _m2_record_hit(token, chat_id, email, username=None):
 def run_method2_web(token, chat_id, min_followers, stop_event):
     global _m2_hits, _m2_good_insta, _m2_bad_insta, _m2_bad_email
     global _m2_taken, _m2_limit, _m2_total, _m2_scanned, _m2_found_emails
-    global _m2_pool
+    global _m2_pool, _m2_email_list
 
     _m2_hits = _m2_good_insta = _m2_bad_insta = _m2_bad_email = 0
     _m2_taken = _m2_limit = _m2_total = _m2_scanned = 0
     _m2_found_emails = []
+    _m2_email_list   = []
 
     _write_session_separator(2)
     _web_state.update({
@@ -1779,6 +1782,7 @@ _m3_total        = 0
 _m3_scanned      = 0
 _m3_found_emails: list = []
 _m3_found_lock   = Lock()
+_m3_email_list:  list = []   # email-only, full session list for download
 _m3_hit_lock     = Lock()
 _m3_pool: ThreadPoolExecutor = None
 _m3_used_emails  = set()
@@ -1961,7 +1965,7 @@ def _m3_check_domain_mx(domain):
 
 
 def _m3_save_hit(token, chat_id, email, method_label="V1", username=None, has_mx=None):
-    global _m3_hits, _m3_total
+    global _m3_hits, _m3_total, _m3_email_list
     domain  = email.split('@')[1]
     prefix  = email.split('@')[0]
     masked  = f"{prefix[0]}{'*' * max(len(prefix) - 2, 1)}{prefix[-1]}@{domain}"
@@ -1971,6 +1975,7 @@ def _m3_save_hit(token, chat_id, email, method_label="V1", username=None, has_mx
         _m3_hits  += 1
         _m3_total += 1
         hit_num    = _m3_hits
+        _m3_email_list.append(email)
 
     ig_handle   = username if username else prefix
     profile_url = f"https://www.instagram.com/{ig_handle}"
@@ -2099,12 +2104,13 @@ def _m3_worker(token, chat_id, stop_event):
 def run_method3_web(token, chat_id, stop_event):
     global _m3_hits, _m3_good_insta, _m3_bad_insta, _m3_bad_email
     global _m3_taken, _m3_limit, _m3_total, _m3_scanned
-    global _m3_found_emails, _m3_pool, _m3_used_emails
+    global _m3_found_emails, _m3_pool, _m3_used_emails, _m3_email_list
 
     _m3_hits = _m3_good_insta = _m3_bad_insta = _m3_bad_email = 0
     _m3_taken = _m3_limit = _m3_total = _m3_scanned = 0
     _m3_found_emails = []
     _m3_used_emails  = set()
+    _m3_email_list   = []
 
     _write_session_separator(3)
     _web_state.update({
