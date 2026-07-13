@@ -1360,6 +1360,137 @@ def run_method1_web(token, chat_id, year_choice, min_followers, stop_event):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+#  HI2.IN AVAILABILITY CHECK  (shared by M2 and M3)
+# ══════════════════════════════════════════════════════════════════════════════
+#
+#  Flow (from hi2.in HAR / invisible reCAPTCHA v2):
+#    1. GET /recaptcha/api2/anchor  →  challenge token
+#    2. POST /recaptcha/api2/reload →  final reCAPTCHA response token
+#    3. POST https://hi2.in/api/custom  →  200 {"email":"prefix@domain","hash":…}
+#       • 200 with matching email  = inbox is available on hi2.in  ✓
+#       • anything else            = not available / blocked        ✗
+
+_HI2_SITEKEY  = '6LfEUPkgAAAAAKTgbMoewQkWBEQhO2VPL4QviKct'
+_HI2_CO       = base64.urlsafe_b64encode(b'https://hi2.in:443').decode().rstrip('=')
+_HI2_VER_CACHE: dict = {'v': None, 'ts': 0.0}
+_HI2_VER_LOCK = Lock()
+_HI2_UA       = ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+                 'AppleWebKit/537.36 (KHTML, like Gecko) '
+                 'Chrome/120.0.0.0 Safari/537.36')
+
+
+def _hi2_get_version() -> str:
+    """Return the current reCAPTCHA JS version (cached 1 h)."""
+    with _HI2_VER_LOCK:
+        if _HI2_VER_CACHE['v'] and time.time() - _HI2_VER_CACHE['ts'] < 3600:
+            return _HI2_VER_CACHE['v']
+    try:
+        r = requests.get(
+            'https://www.google.com/recaptcha/api.js',
+            params={'render': _HI2_SITEKEY},
+            headers={'User-Agent': _HI2_UA},
+            timeout=8,
+        )
+        m = re.search(r'/releases/([A-Za-z0-9_\-]+)/', r.text)
+        if m:
+            with _HI2_VER_LOCK:
+                _HI2_VER_CACHE['v']  = m.group(1)
+                _HI2_VER_CACHE['ts'] = time.time()
+            return m.group(1)
+    except Exception:
+        pass
+    return 'rAqPVhe2JMK6mSJKi8r_vw'          # safe fallback
+
+
+def _hi2_get_recaptcha_token() -> str | None:
+    """Generate a fresh invisible reCAPTCHA v2 token for hi2.in."""
+    version = _hi2_get_version()
+    cb      = ''.join(random.choices(string.ascii_lowercase + string.digits, k=10))
+
+    s = requests.Session()
+    s.headers.update({'User-Agent': _HI2_UA, 'Accept-Language': 'en-US,en;q=0.9'})
+
+    # ── Step 1: anchor ────────────────────────────────────────────────────────
+    anchor_url = (
+        f'https://www.google.com/recaptcha/api2/anchor'
+        f'?ar=1&k={_HI2_SITEKEY}&co={_HI2_CO}'
+        f'&hl=en&v={version}&size=invisible&cb={cb}'
+    )
+    try:
+        r1 = s.get(anchor_url, timeout=8)
+    except Exception:
+        return None
+
+    challenge = None
+    for pat in (r'"rresp","([^"]+)"',
+                r'id="recaptcha-token" value="([^"]+)"'):
+        m = re.search(pat, r1.text)
+        if m:
+            challenge = m.group(1)
+            break
+    if not challenge:
+        return None
+
+    # ── Step 2: reload ────────────────────────────────────────────────────────
+    reload_url = f'https://www.google.com/recaptcha/api2/reload?k={_HI2_SITEKEY}'
+    payload    = (
+        f'v={version}&reason=q&c={urllib.parse.quote(challenge)}'
+        f'&k={_HI2_SITEKEY}&co={_HI2_CO}&hl=en&size=invisible'
+        f'&chr=%5B89%2C64%2C27%5D&vh=13599012192&bg=!GgA4oQEAABkEBQAAAA'
+    )
+    try:
+        r2 = s.post(
+            reload_url, data=payload,
+            headers={'Content-Type': 'application/x-www-form-urlencoded',
+                     'Referer': anchor_url},
+            timeout=8,
+        )
+    except Exception:
+        return None
+
+    for pat in (r'"rresp","([^"]+)"', r'\["rresp","([^"]+)"'):
+        m = re.search(pat, r2.text)
+        if m:
+            return m.group(1)
+    return None
+
+
+def _hi2_check_available(username: str, domain: str = 'hi2.in') -> bool:
+    """Return True if username@domain is available on hi2.in, False if not.
+
+    Uses POST /api/custom (as seen in the hi2.in website HAR):
+      • 200 with email == username@domain  →  available  →  save hit
+      • 200 with different domain          →  unavailable (domain not assigned)
+      • 400 / 429 / error                 →  unavailable
+      • network failure                   →  True  (don't block on outage)
+    """
+    token = _hi2_get_recaptcha_token()
+    if not token:
+        return True          # can't verify → don't drop the hit
+
+    try:
+        r = requests.post(
+            'https://hi2.in/api/custom',
+            data={'domain': domain, 'prefix': username, 'recaptcha': token},
+            headers={
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Origin':   'https://hi2.in',
+                'Referer':  'https://hi2.in/',
+                'User-Agent': _HI2_UA,
+            },
+            timeout=10,
+        )
+        if r.status_code == 200:
+            data  = r.json()
+            email = data.get('email', '').lower()
+            return email == f'{username}@{domain}'.lower()
+        # 429 rate-limit or any other error → not available
+        return False
+    except Exception:
+        return True          # network error → don't block
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 #  METHOD 2  —  HI2 ALT
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -1507,7 +1638,14 @@ def _m2_worker(token, chat_id, stop_event):
                     if v2_status == 'registered':
                         _m2_good_insta += 1
                         _web_state['good'] = _m2_good_insta
-                        _m2_record_hit(token, chat_id, email, username)
+                        # ── hi2.in gate ───────────────────────────────────
+                        prefix = email.split('@')[0]
+                        if _hi2_check_available(prefix, 'hi2.in'):
+                            _m2_record_hit(token, chat_id, email, username)
+                        else:
+                            _m2_bad_insta += 1
+                            _web_state['bad_insta'] = _m2_bad_insta
+                        # ─────────────────────────────────────────────────
                     elif v2_status == 'not_registered':
                         _m2_bad_insta += 1
                         _web_state['bad_insta'] = _m2_bad_insta
@@ -1515,14 +1653,26 @@ def _m2_worker(token, chat_id, stop_event):
                         # V2 inconclusive — trust V1
                         _m2_good_insta += 1
                         _web_state['good'] = _m2_good_insta
-                        _m2_record_hit(token, chat_id, email, username)
+                        prefix = email.split('@')[0]
+                        if _hi2_check_available(prefix, 'hi2.in'):
+                            _m2_record_hit(token, chat_id, email, username)
+                        else:
+                            _m2_bad_insta += 1
+                            _web_state['bad_insta'] = _m2_bad_insta
 
                 elif result_v1 == 'check_v2':
                     v2_status, username = _m2_check_v2(email, client)
                     if v2_status == 'registered':
                         _m2_good_insta += 1
                         _web_state['good'] = _m2_good_insta
-                        _m2_record_hit(token, chat_id, email, username)
+                        # ── hi2.in gate ───────────────────────────────────
+                        prefix = email.split('@')[0]
+                        if _hi2_check_available(prefix, 'hi2.in'):
+                            _m2_record_hit(token, chat_id, email, username)
+                        else:
+                            _m2_bad_insta += 1
+                            _web_state['bad_insta'] = _m2_bad_insta
+                        # ─────────────────────────────────────────────────
                     elif v2_status == 'unknown':
                         _m2_bad_email += 1
                         _web_state['bad_email'] = _m2_bad_email
@@ -1887,7 +2037,15 @@ def _m3_worker(token, chat_id, stop_event):
                     if v2_status == "registered":
                         _m3_good_insta += 1
                         _web_state['good'] = _m3_good_insta
-                        _m3_save_hit(token, chat_id, email, "V1", username, True)
+                        # ── hi2.in gate ───────────────────────────────────
+                        _eprefix = email.split('@')[0]
+                        _edomain = email.split('@')[1]
+                        if _hi2_check_available(_eprefix, _edomain):
+                            _m3_save_hit(token, chat_id, email, "V1", username, True)
+                        else:
+                            _m3_bad_insta += 1
+                            _web_state['bad_insta'] = _m3_bad_insta
+                        # ─────────────────────────────────────────────────
                     elif v2_status == "not_registered":
                         _m3_bad_insta += 1
                         _web_state['bad_insta'] = _m3_bad_insta
@@ -1895,14 +2053,30 @@ def _m3_worker(token, chat_id, stop_event):
                         # V2 inconclusive — trust V1
                         _m3_good_insta += 1
                         _web_state['good'] = _m3_good_insta
-                        _m3_save_hit(token, chat_id, email, "V1", username, True)
+                        # ── hi2.in gate ───────────────────────────────────
+                        _eprefix = email.split('@')[0]
+                        _edomain = email.split('@')[1]
+                        if _hi2_check_available(_eprefix, _edomain):
+                            _m3_save_hit(token, chat_id, email, "V1", username, True)
+                        else:
+                            _m3_bad_insta += 1
+                            _web_state['bad_insta'] = _m3_bad_insta
+                        # ─────────────────────────────────────────────────
 
                 elif result_v1 == "check_v2":
                     v2_status, username, user_pk = _m3_check_v2(email, client)
                     if v2_status == "registered":
                         _m3_good_insta += 1
                         _web_state['good'] = _m3_good_insta
-                        _m3_save_hit(token, chat_id, email, "V2", username, True)
+                        # ── hi2.in gate ───────────────────────────────────
+                        _eprefix = email.split('@')[0]
+                        _edomain = email.split('@')[1]
+                        if _hi2_check_available(_eprefix, _edomain):
+                            _m3_save_hit(token, chat_id, email, "V2", username, True)
+                        else:
+                            _m3_bad_insta += 1
+                            _web_state['bad_insta'] = _m3_bad_insta
+                        # ─────────────────────────────────────────────────
                     elif v2_status == "unknown":
                         _m3_bad_email += 1
                         _web_state['bad_email'] = _m3_bad_email
