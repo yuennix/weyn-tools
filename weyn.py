@@ -1327,8 +1327,13 @@ def run_method1_web(token, chat_id, year_choice, min_followers, stop_event):
 
     _m1_gtokens()
 
-    NUM_SCANNERS = int(os.environ.get('M1_SCANNER_WORKERS', 800))
-    NUM_LOOKUP   = int(os.environ.get('M1_LOOKUP_WORKERS', 1000))
+    # NOTE: this runs inside a resource-limited container (shared thread/pid
+    # budget). Requesting hundreds of OS threads at once reliably hits
+    # "RuntimeError: can't start new thread", which used to crash this
+    # function straight into the `finally` below and silently flip the UI
+    # back to idle. Keep these conservative — see weyn-thread-limits memory.
+    NUM_SCANNERS = int(os.environ.get('M1_SCANNER_WORKERS', 150))
+    NUM_LOOKUP   = int(os.environ.get('M1_LOOKUP_WORKERS', 150))
     global _m1_pool, _m1_lookup_pool
     try:
         lookup_pool     = ThreadPoolExecutor(max_workers=NUM_LOOKUP)
@@ -1343,10 +1348,19 @@ def run_method1_web(token, chat_id, year_choice, min_followers, stop_event):
             r = random.choice(WORKING_RANGES)
             return r[0], r[1]
 
-        futures = [
-            scanner_pool.submit(_m1_sinsta, *_worker_range(), token, chat_id, min_followers, stop_event)
-            for _ in range(NUM_SCANNERS)
-        ]
+        futures = []
+        for _ in range(NUM_SCANNERS):
+            try:
+                futures.append(
+                    scanner_pool.submit(_m1_sinsta, *_worker_range(), token, chat_id, min_followers, stop_event)
+                )
+            except RuntimeError:
+                # Ran out of OS threads — keep whatever workers we already
+                # started instead of aborting the whole run.
+                break
+        if not futures:
+            _web_state['tg_status'] = 'error'
+            _web_state['tg_error']  = 'Could not start scan workers (out of threads). Try again in a moment.'
         for future in as_completed(futures):
             try:
                 future.result()
@@ -1760,14 +1774,21 @@ def run_method2_web(token, chat_id, min_followers, stop_event):
         'recent_hits': [], 'tg_status': '', 'tg_error': '',
     })
 
-    NUM_WORKERS = int(os.environ.get('M2_WORKERS', 1000))
+    # Kept conservative — see weyn-thread-limits memory: this container
+    # cannot reliably spawn hundreds of OS threads at once.
+    NUM_WORKERS = int(os.environ.get('M2_WORKERS', 150))
     try:
         pool    = ThreadPoolExecutor(max_workers=NUM_WORKERS)
         _m2_pool = pool
-        futures = [
-            pool.submit(_m2_worker, token, chat_id, stop_event)
-            for _ in range(NUM_WORKERS)
-        ]
+        futures = []
+        for _ in range(NUM_WORKERS):
+            try:
+                futures.append(pool.submit(_m2_worker, token, chat_id, stop_event))
+            except RuntimeError:
+                break
+        if not futures:
+            _web_state['tg_status'] = 'error'
+            _web_state['tg_error']  = 'Could not start scan workers (out of threads). Try again in a moment.'
         for future in as_completed(futures):
             try:
                 future.result()
@@ -2130,14 +2151,21 @@ def run_method3_web(token, chat_id, stop_event):
         'recent_hits': [], 'tg_status': '', 'tg_error': '',
     })
 
-    NUM_WORKERS = int(os.environ.get('M3_WORKERS', 1000))
+    # Kept conservative — see weyn-thread-limits memory: this container
+    # cannot reliably spawn hundreds of OS threads at once.
+    NUM_WORKERS = int(os.environ.get('M3_WORKERS', 150))
     try:
         pool = ThreadPoolExecutor(max_workers=NUM_WORKERS)
         _m3_pool = pool
-        futures = [
-            pool.submit(_m3_worker, token, chat_id, stop_event)
-            for _ in range(NUM_WORKERS)
-        ]
+        futures = []
+        for _ in range(NUM_WORKERS):
+            try:
+                futures.append(pool.submit(_m3_worker, token, chat_id, stop_event))
+            except RuntimeError:
+                break
+        if not futures:
+            _web_state['tg_status'] = 'error'
+            _web_state['tg_error']  = 'Could not start scan workers (out of threads). Try again in a moment.'
         for future in as_completed(futures):
             try:
                 future.result()

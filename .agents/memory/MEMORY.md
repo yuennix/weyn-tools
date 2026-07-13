@@ -1,1 +1,2 @@
 - [Gunicorn SSE configuration](gunicorn-sse-config.md) — gthread + threads 4 + timeout 0 required or live stats always show 0 due to worker timeout killing the SSE process.
+- [WEYN scanner thread limits](weyn-thread-limits.md) — container's real thread ceiling is ~600-1000 total, far below `ulimit`; keep scan worker pools under ~300-400 combined or start crashes instantly.
