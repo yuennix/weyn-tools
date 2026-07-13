@@ -1327,8 +1327,8 @@ def run_method1_web(token, chat_id, year_choice, min_followers, stop_event):
 
     _m1_gtokens()
 
-    NUM_SCANNERS = int(os.environ.get('M1_SCANNER_WORKERS', 500))
-    NUM_LOOKUP   = int(os.environ.get('M1_LOOKUP_WORKERS', 600))
+    NUM_SCANNERS = int(os.environ.get('M1_SCANNER_WORKERS', 800))
+    NUM_LOOKUP   = int(os.environ.get('M1_LOOKUP_WORKERS', 1000))
     global _m1_pool, _m1_lookup_pool
     try:
         lookup_pool     = ThreadPoolExecutor(max_workers=NUM_LOOKUP)
@@ -1372,8 +1372,10 @@ def run_method1_web(token, chat_id, year_choice, min_followers, stop_event):
 
 _HI2_SITEKEY  = '6LfEUPkgAAAAAKTgbMoewQkWBEQhO2VPL4QviKct'
 _HI2_CO       = base64.urlsafe_b64encode(b'https://hi2.in:443').decode().rstrip('=')
-_HI2_VER_CACHE: dict = {'v': None, 'ts': 0.0}
-_HI2_VER_LOCK = Lock()
+_HI2_VER_CACHE:   dict = {'v': None, 'ts': 0.0}
+_HI2_VER_LOCK   = Lock()
+_HI2_TOK_CACHE:  dict = {'token': None, 'ts': 0.0}   # reuse tokens < 90 s old
+_HI2_TOK_LOCK   = Lock()
 _HI2_UA       = ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
                  'AppleWebKit/537.36 (KHTML, like Gecko) '
                  'Chrome/120.0.0.0 Safari/537.36')
@@ -1403,7 +1405,11 @@ def _hi2_get_version() -> str:
 
 
 def _hi2_get_recaptcha_token() -> str | None:
-    """Generate a fresh invisible reCAPTCHA v2 token for hi2.in."""
+    """Return a valid invisible reCAPTCHA v2 token for hi2.in (cached 90 s)."""
+    with _HI2_TOK_LOCK:
+        if _HI2_TOK_CACHE['token'] and time.time() - _HI2_TOK_CACHE['ts'] < 90:
+            return _HI2_TOK_CACHE['token']
+
     version = _hi2_get_version()
     cb      = ''.join(random.choices(string.ascii_lowercase + string.digits, k=10))
 
@@ -1451,7 +1457,11 @@ def _hi2_get_recaptcha_token() -> str | None:
     for pat in (r'"rresp","([^"]+)"', r'\["rresp","([^"]+)"'):
         m = re.search(pat, r2.text)
         if m:
-            return m.group(1)
+            tok = m.group(1)
+            with _HI2_TOK_LOCK:
+                _HI2_TOK_CACHE['token'] = tok
+                _HI2_TOK_CACHE['ts']    = time.time()
+            return tok
     return None
 
 
@@ -1750,7 +1760,7 @@ def run_method2_web(token, chat_id, min_followers, stop_event):
         'recent_hits': [], 'tg_status': '', 'tg_error': '',
     })
 
-    NUM_WORKERS = int(os.environ.get('M2_WORKERS', 500))
+    NUM_WORKERS = int(os.environ.get('M2_WORKERS', 1000))
     try:
         pool    = ThreadPoolExecutor(max_workers=NUM_WORKERS)
         _m2_pool = pool
@@ -2120,7 +2130,7 @@ def run_method3_web(token, chat_id, stop_event):
         'recent_hits': [], 'tg_status': '', 'tg_error': '',
     })
 
-    NUM_WORKERS = int(os.environ.get('M3_WORKERS', 500))
+    NUM_WORKERS = int(os.environ.get('M3_WORKERS', 1000))
     try:
         pool = ThreadPoolExecutor(max_workers=NUM_WORKERS)
         _m3_pool = pool
