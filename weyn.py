@@ -19,6 +19,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from itertools import cycle
 import hashlib
 import httpx
+import proxy_pool
 
 init(autoreset=True)
 
@@ -1487,10 +1488,19 @@ def _hi2_check_available(username: str, domain: str = 'hi2.in') -> bool:
       • 200 with different domain          →  unavailable (domain not assigned)
       • 400 / 429 / error                 →  unavailable
       • network failure                   →  True  (don't block on outage)
+
+    hi2.in rate-limits/blocks by source IP once a scan session sends heavy
+    volume, which is why real hits stop showing up after tens of thousands
+    of scanned ids. This call (and only this call) goes through a rotating
+    free-proxy pool so it isn't tied to the container's own IP — see
+    proxy_pool.py. Falls back to a direct request if no proxy is available.
     """
     token = _hi2_get_recaptcha_token()
     if not token:
         return True          # can't verify → don't drop the hit
+
+    proxy_pool.ensure_started()
+    proxy = proxy_pool.get_proxy()
 
     try:
         r = requests.post(
@@ -1502,15 +1512,19 @@ def _hi2_check_available(username: str, domain: str = 'hi2.in') -> bool:
                 'Referer':  'https://hi2.in/',
                 'User-Agent': _HI2_UA,
             },
-            timeout=10,
+            proxies=proxy_pool.as_requests_dict(proxy) if proxy else None,
+            timeout=12,
         )
         if r.status_code == 200:
+            proxy_pool.report_success(proxy)
             data  = r.json()
             email = data.get('email', '').lower()
             return email == f'{username}@{domain}'.lower()
         # 429 rate-limit or any other error → not available
+        proxy_pool.report_failure(proxy)
         return False
     except Exception:
+        proxy_pool.report_failure(proxy)
         return True          # network error → don't block
 
 
