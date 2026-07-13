@@ -545,7 +545,7 @@ def _m1_rest_bloks_v2(email):
         'x-pigeon-session-id': f"UFS-{uuid.uuid4()}-0",
     }
     try:
-        response = requests.post(url, data=payload, headers=headers, timeout=20)
+        response = requests.post(url, data=payload, headers=headers, timeout=8)
         if email in response.text:
             return email
         return None
@@ -701,7 +701,7 @@ def _m1_get_masked(username):
         'x-ig-app-id': '1217981644879628',
     }
     try:
-        response = requests.post(url, data=payload, headers=headers, timeout=20)
+        response = requests.post(url, data=payload, headers=headers, timeout=8)
         contact_points = (
             response.json()
             .get("data", {})
@@ -736,7 +736,7 @@ def _m1_gtokens():
                 "google-accounts-xsrf": "1",
                 "user-agent": random.choice(_M1_USER_AGENTS),
             }
-            res1 = requests.get(f"{_M1_GOOGLE_URL}{endpoint}", headers=headers, timeout=15)
+            res1 = requests.get(f"{_M1_GOOGLE_URL}{endpoint}", headers=headers, timeout=8)
             if res1.status_code != 200:
                 continue
             tok = re.search(
@@ -1074,10 +1074,16 @@ def _m1_save_hit(username, domain, user, token, chat_id):
     email_str  = f"{username}@{domain}"
     meta       = "True" if posts > 2 else "False"
 
-    reset_mask = _m1_rest_v1(username)
-    masked     = _m1_get_masked(username)
+    # Run the three slow lookups in parallel instead of serially
+    with ThreadPoolExecutor(max_workers=3) as _hit_ex:
+        _f_reset  = _hit_ex.submit(_m1_rest_v1, username)
+        _f_masked = _hit_ex.submit(_m1_get_masked, username)
+        _f_about  = _hit_ex.submit(_m1_get_about_account, user_id, username)
+        reset_mask = _f_reset.result()
+        masked     = _f_masked.result()
+        _about_raw = _f_about.result()
 
-    about          = _m1_get_about_account(user_id, username)
+    about          = _about_raw
     join_date      = about.get("join_date") or year
     country_name   = about.get("country") or "-"
     country_flag   = _m1_get_country_flag(country_name)
@@ -1150,8 +1156,20 @@ def _m1_sinsta(min_id, max_id, token, chat_id, min_followers=0, stop_event=None)
     _BRANDS = ["SAMSUNG","HUAWEI","LGE/lge","HTC","ASUS","ZTE","ONEPLUS","XIAOMI","OPPO","VIVO","SONY","REALME"]
     _VERS   = ["23/6.0","24/7.0","25/7.1.1","26/8.0","27/8.1","28/9.0"]
     _CHARS  = "azertyuiopmlkjhgfdsqwxcvbnAZERTYUIOPMLKJHGFDSQWXCVBN1234567890"
+    consecutive_429 = 0   # adaptive backoff counter
+    req_count       = 0   # session recycle counter
+    _SESSION_RECYCLE = 150  # recycle session every N requests to shed rate-limit state
     while not (stop_event and stop_event.is_set()):
         try:
+            # Recycle session periodically so rate-limit cookies don't accumulate
+            req_count += 1
+            if req_count % _SESSION_RECYCLE == 0:
+                try:
+                    local_session.close()
+                except Exception:
+                    pass
+                local_session = _register_session(requests.Session())
+
             user_id    = random.randrange(min_id, max_id)
             rnd        = str(random.randint(2500000000, 21254029834))
             user_agent = (
@@ -1198,10 +1216,23 @@ def _m1_sinsta(min_id, max_id, token, chat_id, min_followers=0, stop_event=None)
 
             resp = local_session.post(_M1_INSTA_GRAPHQL, headers=headers, data=data, timeout=2)
             if resp.status_code == 429:
-                time.sleep(0.1)
+                # Exponential backoff: 0.5s, 1s, 2s, 4s … cap at 8s
+                consecutive_429 += 1
+                backoff = min(0.5 * (2 ** (consecutive_429 - 1)), 8.0)
+                time.sleep(backoff)
+                # Recycle session immediately when heavily rate-limited
+                if consecutive_429 >= 3:
+                    try:
+                        local_session.close()
+                    except Exception:
+                        pass
+                    local_session = _register_session(requests.Session())
+                    req_count = 0
                 continue
             if resp.status_code != 200:
                 continue
+
+            consecutive_429 = 0  # reset backoff on any successful response
 
             user = resp.json().get("data", {}).get("user")
             if user and user.get("username"):
@@ -1215,9 +1246,10 @@ def _m1_sinsta(min_id, max_id, token, chat_id, min_followers=0, stop_event=None)
                 else:
                     _m1_cinstagram(username, user, token, chat_id, local_session)
 
-            time.sleep(0.08)
+            # Jittered sleep — avoids synchronized bursts from 500 workers
+            time.sleep(random.uniform(0.03, 0.08))
         except Exception:
-            time.sleep(0.2)
+            time.sleep(random.uniform(0.1, 0.3))
             continue
 
 
@@ -1250,7 +1282,7 @@ def run_method1_web(token, chat_id, year_choice, min_followers, stop_event):
     _m1_gtokens()
 
     NUM_SCANNERS = int(os.environ.get('M1_SCANNER_WORKERS', 500))
-    NUM_LOOKUP   = int(os.environ.get('M1_LOOKUP_WORKERS', 300))
+    NUM_LOOKUP   = int(os.environ.get('M1_LOOKUP_WORKERS', 600))
     global _m1_pool, _m1_lookup_pool
     try:
         lookup_pool     = ThreadPoolExecutor(max_workers=NUM_LOOKUP)
