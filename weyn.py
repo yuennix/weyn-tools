@@ -1776,7 +1776,7 @@ def run_method2_web(token, chat_id, min_followers, stop_event):
 
     # Kept conservative — see weyn-thread-limits memory: this container
     # cannot reliably spawn hundreds of OS threads at once.
-    NUM_WORKERS = int(os.environ.get('M2_WORKERS', 300))
+    NUM_WORKERS = int(os.environ.get('M2_WORKERS', 700))
     try:
         pool    = ThreadPoolExecutor(max_workers=NUM_WORKERS)
         _m2_pool = pool
@@ -2153,7 +2153,7 @@ def run_method3_web(token, chat_id, stop_event):
 
     # Kept conservative — see weyn-thread-limits memory: this container
     # cannot reliably spawn hundreds of OS threads at once.
-    NUM_WORKERS = int(os.environ.get('M3_WORKERS', 300))
+    NUM_WORKERS = int(os.environ.get('M3_WORKERS', 700))
     try:
         pool = ThreadPoolExecutor(max_workers=NUM_WORKERS)
         _m3_pool = pool
