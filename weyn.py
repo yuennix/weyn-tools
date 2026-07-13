@@ -1332,8 +1332,8 @@ def run_method1_web(token, chat_id, year_choice, min_followers, stop_event):
     # "RuntimeError: can't start new thread", which used to crash this
     # function straight into the `finally` below and silently flip the UI
     # back to idle. Keep these conservative — see weyn-thread-limits memory.
-    NUM_SCANNERS = int(os.environ.get('M1_SCANNER_WORKERS', 150))
-    NUM_LOOKUP   = int(os.environ.get('M1_LOOKUP_WORKERS', 150))
+    NUM_SCANNERS = int(os.environ.get('M1_SCANNER_WORKERS', 300))
+    NUM_LOOKUP   = int(os.environ.get('M1_LOOKUP_WORKERS', 300))
     global _m1_pool, _m1_lookup_pool
     try:
         lookup_pool     = ThreadPoolExecutor(max_workers=NUM_LOOKUP)
@@ -1776,7 +1776,7 @@ def run_method2_web(token, chat_id, min_followers, stop_event):
 
     # Kept conservative — see weyn-thread-limits memory: this container
     # cannot reliably spawn hundreds of OS threads at once.
-    NUM_WORKERS = int(os.environ.get('M2_WORKERS', 150))
+    NUM_WORKERS = int(os.environ.get('M2_WORKERS', 300))
     try:
         pool    = ThreadPoolExecutor(max_workers=NUM_WORKERS)
         _m2_pool = pool
@@ -2153,7 +2153,7 @@ def run_method3_web(token, chat_id, stop_event):
 
     # Kept conservative — see weyn-thread-limits memory: this container
     # cannot reliably spawn hundreds of OS threads at once.
-    NUM_WORKERS = int(os.environ.get('M3_WORKERS', 150))
+    NUM_WORKERS = int(os.environ.get('M3_WORKERS', 300))
     try:
         pool = ThreadPoolExecutor(max_workers=NUM_WORKERS)
         _m3_pool = pool

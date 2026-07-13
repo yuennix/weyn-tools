@@ -20,10 +20,13 @@ process before `can't start new thread` fires. `ulimit` does not reflect the
 actual (likely cgroup pids) constraint here.
 
 **How to apply:** Keep total simultaneous worker threads (summed across all
-pools created by one scan) well under ~300-400 as a safe margin (confirmed
-600 total works, 1000 total reliably fails). Current safe defaults in
-`weyn.py`: M1 scanner=150 + lookup=150, M2=150, M3=150. If someone bumps these
-via `M1_SCANNER_WORKERS`/`M1_LOOKUP_WORKERS`/`M2_WORKERS`/`M3_WORKERS` env
-vars, warn them of this ceiling. Any future thread-pool code in this project
-should also guard `pool.submit()` calls against `RuntimeError` instead of
-letting it silently kill the run.
+pools created by one scan) well under ~600-800 as a safe margin (confirmed
+600 total works reliably, 1000 total reliably fails). Current defaults in
+`weyn.py`: M1 scanner=300 + lookup=300 (600 total, tested stable with real
+traffic), M2=300, M3=300. User explicitly requested 300/pool after being told
+500/pool (1000 total for M1) sits right at the known failure line. If asked
+to raise these further, re-test with a real run (not just sleep-threads) at
+the target count before committing, and warn if approaching ~600 combined
+per method. Any future thread-pool code in this project should also guard
+`pool.submit()` calls against `RuntimeError` instead of letting it silently
+kill the run.
