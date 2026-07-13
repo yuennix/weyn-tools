@@ -592,6 +592,44 @@ def _m1_lookup_instagram(email):
     return False
 
 
+def _m1_hi2_is_taken(username):
+    """Check whether username@hi2.in is already registered on Instagram.
+    Returns True  → inbox is claimed by someone else (skip this hit).
+    Returns False → inbox is free/available (proceed).
+    On any error the check is skipped (returns False) so hits are not dropped.
+    """
+    email = f"{username}@hi2.in"
+    try:
+        # Fast path: check_email endpoint
+        with httpx.Client(http2=True, timeout=5) as client:
+            resp = client.post(
+                "https://i.instagram.com/api/v1/users/check_email/",
+                data={"email": email},
+                headers={
+                    "User-Agent": "Instagram 370.1.0.43.96 Android (34/14; 450dpi; 1080x2207; samsung; SM-A235F; a23; qcom; en_IN; 704872281)",
+                    "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
+                    "x-ig-app-id": "567067343352427",
+                }
+            )
+            body = resp.json()
+            # email_is_taken = someone already registered their Instagram with this hi2.in address
+            if body.get("email_is_taken") is True:
+                return True
+            # allow_shared_email_registration: True means it's on Instagram as a shared mailbox
+            if body.get("allow_shared_email_registration") is True:
+                return True
+    except Exception:
+        pass
+    try:
+        # Fallback: bloks search — if the email appears in the response it's registered
+        result = _m1_rest_bloks_v2(email)
+        if result:
+            return True
+    except Exception:
+        pass
+    return False
+
+
 # ── Reset email fetch ──
 
 def _m1_rest_v1(username):
@@ -1146,6 +1184,14 @@ def _m1_cinstagram(username, user, token, chat_id, loc_session):
     email = f"{username}@gmail.com"
     if _m1_lookup_instagram(email):
         _m1_good_insta += 1
+        # ── hi2.in gate ──────────────────────────────────────────────────────
+        # Before spending time on the Gmail check, verify the hi2.in inbox for
+        # this username is still free. If someone already registered their
+        # Instagram account with username@hi2.in, that inbox is claimed — skip.
+        if _m1_hi2_is_taken(username):
+            _m1_bad_insta += 1
+            return
+        # ─────────────────────────────────────────────────────────────────────
         _m1_cgmail(username, user, token, chat_id, requests.Session())
     else:
         _m1_bad_insta += 1
