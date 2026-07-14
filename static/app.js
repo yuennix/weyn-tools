@@ -22,7 +22,16 @@
   const minLabel       = document.getElementById('minLabel');
   const minInput       = document.getElementById('min_followers');
 
-  const statIds = ['hits','good','bad_insta','bad_email','taken','limit','scanned','total'];
+  const statIds = ['hits','good','bad_insta','bad_email','scanned','total'];
+  const timerEl = document.getElementById('s-timer');
+
+  function formatElapsed(sec) {
+    sec = Math.max(0, Math.floor(sec || 0));
+    const h = String(Math.floor(sec / 3600)).padStart(2, '0');
+    const m = String(Math.floor((sec % 3600) / 60)).padStart(2, '0');
+    const s = String(sec % 60).padStart(2, '0');
+    return `${h}:${m}:${s}`;
+  }
 
   // ── Method selector ──
   function selectMethod(m) {
@@ -127,6 +136,7 @@
         setTimeout(() => card.classList.remove('bump'), 300);
       }
     });
+    if (timerEl) timerEl.textContent = formatElapsed(d.elapsed);
     if (d.method && !_starting) {
       const labels = { '1': 'M1 · STANDARD', '2': 'M2 · HI2 ALT', '3': 'M3 · HI2.IN/TELEGMAIL' };
       const classes = { '1': 'badge', '2': 'badge badge-m2', '3': 'badge badge-m3' };
@@ -223,6 +233,7 @@
       const el = document.getElementById('s-' + k);
       if (el) el.textContent = '0';
     });
+    if (timerEl) timerEl.textContent = '00:00:00';
 
     try {
       const yearEl       = document.getElementById('year_choice');

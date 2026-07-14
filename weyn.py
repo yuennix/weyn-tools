@@ -113,6 +113,7 @@ def close_all_sessions():
 def force_stop():
     """Immediately shut down all thread pools and mark state as stopped."""
     _web_state['running'] = False
+    _web_state['start_time'] = None
     for pool_name in ('_m1_pool', '_m1_lookup_pool', '_m2_pool', '_m3_pool'):
         pool = globals().get(pool_name)
         if pool is not None:
@@ -245,6 +246,7 @@ _web_state = {
     'taken': 0, 'limit': 0, 'total': 0, 'verified': 0,
     'recent_hits': [],
     'tg_status': '', 'tg_error': '',
+    'start_time': None,
 }
 _web_lock = Lock()
 
@@ -1330,6 +1332,7 @@ def run_method1_web(token, chat_id, year_choice, min_followers, stop_event):
         "hits": 0, "good": 0, "bad_insta": 0, "bad_email": 0,
         "taken": 0, "limit": 0, "total": 0, "verified": 0,
         "recent_hits": [], "tg_status": "", "tg_error": "",
+        "start_time": time.time(),
     })
 
     _m1_next_about_session()
@@ -1813,6 +1816,7 @@ def run_method2_web(token, chat_id, min_followers, stop_event):
         'hits': 0, 'good': 0, 'bad_insta': 0, 'bad_email': 0,
         'taken': 0, 'limit': 0, 'total': 0, 'scanned': 0,
         'recent_hits': [], 'tg_status': '', 'tg_error': '',
+        'start_time': time.time(),
     })
 
     # Kept conservative — see weyn-thread-limits memory: this container
@@ -2191,6 +2195,7 @@ def run_method3_web(token, chat_id, stop_event):
         'hits': 0, 'good': 0, 'bad_insta': 0, 'bad_email': 0,
         'taken': 0, 'limit': 0, 'total': 0, 'scanned': 0,
         'recent_hits': [], 'tg_status': '', 'tg_error': '',
+        'start_time': time.time(),
     })
 
     # Kept conservative — see weyn-thread-limits memory: this container

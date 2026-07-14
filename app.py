@@ -340,10 +340,12 @@ def stats():
             if _heartbeat_counter >= 30:
                 _heartbeat_counter = 0
                 yield ": keepalive\n\n"
-            running   = weyn._web_state.get('running', False)
-            tg_status = weyn._web_state.get('tg_status', '')
-            tg_error  = weyn._web_state.get('tg_error', '')
-            method    = weyn._web_state.get('method', '1')
+            running    = weyn._web_state.get('running', False)
+            tg_status  = weyn._web_state.get('tg_status', '')
+            tg_error   = weyn._web_state.get('tg_error', '')
+            method     = weyn._web_state.get('method', '1')
+            start_time = weyn._web_state.get('start_time')
+            elapsed    = (time.time() - start_time) if (running and start_time) else 0
             if method == '2':
                 payload = {
                     'running'    : running,
@@ -352,10 +354,9 @@ def stats():
                     'good'       : weyn._m2_good_insta,
                     'bad_insta'  : weyn._m2_bad_insta,
                     'bad_email'  : weyn._m2_bad_email,
-                    'taken'      : weyn._m2_taken,
-                    'limit'      : weyn._m2_limit,
                     'total'      : weyn._m2_total,
                     'scanned'    : weyn._m2_scanned,
+                    'elapsed'    : elapsed,
                     'recent_hits': list(weyn._m2_found_emails[-20:]),
                     'tg_status'  : tg_status,
                     'tg_error'   : tg_error,
@@ -368,10 +369,9 @@ def stats():
                     'good'       : weyn._m3_good_insta,
                     'bad_insta'  : weyn._m3_bad_insta,
                     'bad_email'  : weyn._m3_bad_email,
-                    'taken'      : weyn._m3_taken,
-                    'limit'      : weyn._m3_limit,
                     'total'      : weyn._m3_total,
                     'scanned'    : weyn._m3_scanned,
+                    'elapsed'    : elapsed,
                     'recent_hits': list(weyn._m3_found_emails[-20:]),
                     'tg_status'  : tg_status,
                     'tg_error'   : tg_error,
@@ -384,10 +384,9 @@ def stats():
                     'good'       : weyn._m1_good_insta,
                     'bad_insta'  : weyn._m1_bad_insta,
                     'bad_email'  : weyn._m1_bad_email,
-                    'taken'      : weyn._m1_taken,
-                    'limit'      : weyn._m1_limit,
                     'total'      : weyn._m1_total,
                     'scanned'    : weyn._m1_scanned,
+                    'elapsed'    : elapsed,
                     'recent_hits': list(weyn._m1_found_emails[-20:]),
                     'tg_status'  : tg_status,
                     'tg_error'   : tg_error,
