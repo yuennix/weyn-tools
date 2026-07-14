@@ -91,6 +91,16 @@ def _register_session(s):
         _active_sessions.append(s)
     return s
 
+def _interruptible_sleep(duration, stop_event, step=0.2):
+    """Sleep for `duration` seconds but wake up early (in <= `step`s) if
+    stop_event gets set -- used for backoff sleeps that could otherwise
+    block a worker thread for several seconds after Stop is pressed."""
+    end = time.time() + duration
+    while time.time() < end:
+        if stop_event and stop_event.is_set():
+            return
+        time.sleep(min(step, max(0, end - time.time())))
+
 def close_all_sessions():
     with _active_sessions_lock:
         for s in _active_sessions:
@@ -1266,7 +1276,9 @@ def _m1_sinsta(min_id, max_id, token, chat_id, min_followers=0, stop_event=None)
                 # Exponential backoff: 0.5s, 1s, 2s, 4s … cap at 8s
                 consecutive_429 += 1
                 backoff = min(0.5 * (2 ** (consecutive_429 - 1)), 8.0)
-                time.sleep(backoff)
+                _interruptible_sleep(backoff, stop_event)
+                if stop_event and stop_event.is_set():
+                    break
                 # Recycle session immediately when heavily rate-limited
                 if consecutive_429 >= 3:
                     try:
@@ -1294,9 +1306,9 @@ def _m1_sinsta(min_id, max_id, token, chat_id, min_followers=0, stop_event=None)
                     _m1_cinstagram(username, user, token, chat_id, local_session)
 
             # Jittered sleep — avoids synchronized bursts from 500 workers
-            time.sleep(random.uniform(0.03, 0.08))
+            _interruptible_sleep(random.uniform(0.03, 0.08), stop_event)
         except Exception:
-            time.sleep(random.uniform(0.1, 0.3))
+            _interruptible_sleep(random.uniform(0.1, 0.3), stop_event)
             continue
 
 
@@ -1672,6 +1684,7 @@ def _m2_worker(token, chat_id, stop_event):
         client = httpx.Client(http2=True, timeout=5)
     except Exception:
         client = httpx.Client(timeout=5)
+    _register_session(client)
 
     try:
         while not (stop_event and stop_event.is_set()):
@@ -2076,6 +2089,7 @@ def _m3_worker(token, chat_id, stop_event):
         client = httpx.Client(http2=True, timeout=5)
     except Exception:
         client = httpx.Client(timeout=5)
+    _register_session(client)
 
     try:
         while not (stop_event and stop_event.is_set()):
