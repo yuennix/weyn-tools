@@ -245,6 +245,10 @@ def download_hits():
     )
 
 
+_M2_HI2_FILE = 'm2_hi2.txt'
+_M3_HI2_FILE = 'm3_hi2.txt'
+
+
 @app.route('/api/download_m2')
 def download_m2():
     if not is_authenticated():
@@ -252,12 +256,15 @@ def download_m2():
     emails = list(weyn._m2_email_list)
     if not emails:
         return ('No M2 hits this session.', 404)
-    content = '\n'.join(emails)
-    from flask import Response
-    return Response(
-        content,
-        mimetype='text/plain',
-        headers={'Content-Disposition': 'attachment; filename="m2_hits.txt"'}
+    # Rewrite the same file on disk every download so it always reflects
+    # the current session's hits (emails only, one per line).
+    with open(_M2_HI2_FILE, 'w', encoding='utf-8') as f:
+        f.write('\n'.join(emails) + '\n')
+    return __import__('flask').send_file(
+        os.path.abspath(_M2_HI2_FILE),
+        as_attachment=True,
+        download_name='hi2.txt',
+        mimetype='text/plain'
     )
 
 
@@ -268,12 +275,13 @@ def download_m3():
     emails = list(weyn._m3_email_list)
     if not emails:
         return ('No M3 hits this session.', 404)
-    content = '\n'.join(emails)
-    from flask import Response
-    return Response(
-        content,
-        mimetype='text/plain',
-        headers={'Content-Disposition': 'attachment; filename="m3_hits.txt"'}
+    with open(_M3_HI2_FILE, 'w', encoding='utf-8') as f:
+        f.write('\n'.join(emails) + '\n')
+    return __import__('flask').send_file(
+        os.path.abspath(_M3_HI2_FILE),
+        as_attachment=True,
+        download_name='hi2.txt',
+        mimetype='text/plain'
     )
 
 
