@@ -47,11 +47,26 @@ _using_authenticated = False
 
 
 def _parse_authenticated(raw: str):
+    """Accepts one proxy per line, in either format:
+      ip:port:user:pass
+      user:pass@ip:port
+    or plain "ip:port" for unauthenticated proxies.
+    """
     proxies, auth = [], {}
     for line in raw.replace(',', '\n').split('\n'):
         line = line.strip()
         if not line:
             continue
+
+        if '@' in line:
+            cred, hostport = line.split('@', 1)
+            if ':' in cred and ':' in hostport:
+                user, pw = cred.split(':', 1)
+                key = hostport
+                proxies.append(key)
+                auth[key] = (user, pw)
+            continue
+
         parts = line.split(':')
         if len(parts) == 4:
             ip, port, user, pw = parts
