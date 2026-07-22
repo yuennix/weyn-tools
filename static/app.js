@@ -60,22 +60,23 @@
   methodBtn2.addEventListener('click', () => { if (!startBtn.disabled) selectMethod('2'); });
   methodBtn3.addEventListener('click', () => { if (!startBtn.disabled) selectMethod('3'); });
 
-  // ── Strip iOS smart-punctuation from token/chat_id strings ──
+  // ── Strip iOS smart-punctuation and control chars from token/chat_id strings ──
   function sanitizeInput(str) {
     return String(str)
       .replace(/[\u2013\u2014\u2015]/g, '-')   // en-dash / em-dash → hyphen
       .replace(/[\u2018\u2019]/g, "'")          // curly single quotes → straight
       .replace(/[\u201C\u201D]/g, '"')          // curly double quotes → straight
       .replace(/\u00A0/g, ' ')                  // non-breaking space → space
-      .trim();
+      .replace(/[\u0000-\u001F\u007F-\u009F]/g, '') // strip null bytes & control chars
+      .trim();                                  // iOS URLSession rejects bodies with these
   }
 
   // ── Persist token & chat_id across refreshes ──
   const tokenEl  = document.getElementById('token');
   const chatIdEl = document.getElementById('chat_id');
 
-  if (localStorage.getItem('tg_token'))   tokenEl.value  = localStorage.getItem('tg_token');
-  if (localStorage.getItem('tg_chat_id')) chatIdEl.value = localStorage.getItem('tg_chat_id');
+  if (localStorage.getItem('tg_token'))   tokenEl.value  = sanitizeInput(localStorage.getItem('tg_token'));
+  if (localStorage.getItem('tg_chat_id')) chatIdEl.value = sanitizeInput(localStorage.getItem('tg_chat_id'));
 
   tokenEl.addEventListener('input',  () => localStorage.setItem('tg_token',   tokenEl.value));
   chatIdEl.addEventListener('input', () => localStorage.setItem('tg_chat_id', chatIdEl.value));
