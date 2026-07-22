@@ -1030,33 +1030,36 @@ def run_method1_web(token, chat_id, year_choice, min_followers, stop_event):
 #       • 200 with matching email  = inbox is available on hi2.in  ✓
 #       • anything else            = not available / blocked        ✗
 
+# ── HI2 availability checker (from github.com/yuennix/hi2-mail-checker) ──────
+
 _HI2_SITEKEY  = '6LfEUPkgAAAAAKTgbMoewQkWBEQhO2VPL4QviKct'
-_HI2_CO       = base64.urlsafe_b64encode(b'https://hi2.in:443').decode().rstrip('=')
-_HI2_VER_CACHE:   dict = {'v': None, 'ts': 0.0}
-_HI2_VER_LOCK   = Lock()
-_HI2_TOK_CACHE:  dict = {}   # proxy key (or 'direct') -> {'token':..., 'ts':...}, reused < 90 s
-_HI2_TOK_LOCK   = Lock()
+_HI2_CO       = 'aHR0cHM6Ly9oaTIuaW46NDQz'
 _HI2_UA       = ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
                  'AppleWebKit/537.36 (KHTML, like Gecko) '
-                 'Chrome/120.0.0.0 Safari/537.36')
+                 'Chrome/124.0.0.0 Safari/537.36')
+
+_HI2_VER_LOCK   = Lock()
+_HI2_VER_CACHE: dict = {'version': None, 'ts': 0.0}
+
+_HI2_TOK_LOCK   = Lock()
+_HI2_TOK_CACHE: dict = {'token': None, 'ts': 0.0}
 
 
 def _hi2_get_version() -> str:
-    """Return the current reCAPTCHA JS version (cached 1 h)."""
+    """Fetch (and cache for 1 h) the current recaptcha api.js release version."""
     with _HI2_VER_LOCK:
-        if _HI2_VER_CACHE['v'] and time.time() - _HI2_VER_CACHE['ts'] < 3600:
-            return _HI2_VER_CACHE['v']
+        if _HI2_VER_CACHE['version'] and time.time() - _HI2_VER_CACHE['ts'] < 3600:
+            return _HI2_VER_CACHE['version']
     try:
         r = requests.get(
             'https://www.google.com/recaptcha/api.js',
-            params={'render': _HI2_SITEKEY},
             headers={'User-Agent': _HI2_UA},
             timeout=8,
         )
-        m = re.search(r'/releases/([A-Za-z0-9_\-]+)/', r.text)
+        m = re.search(r'/releases/([\w-]+)/', r.text)
         if m:
             with _HI2_VER_LOCK:
-                _HI2_VER_CACHE['v']  = m.group(1)
+                _HI2_VER_CACHE['version'] = m.group(1)
                 _HI2_VER_CACHE['ts'] = time.time()
             return m.group(1)
     except Exception:
@@ -1064,32 +1067,18 @@ def _hi2_get_version() -> str:
     return 'rAqPVhe2JMK6mSJKi8r_vw'          # safe fallback
 
 
-def _hi2_get_recaptcha_token(proxy: str | None = None) -> str | None:
-    """Return a valid invisible reCAPTCHA v2 token for hi2.in (cached 90 s).
-
-    Fetched through the same proxy (if any) that will make the follow-up
-    /api/custom call, so the recaptcha session and the check are always
-    made from the same exit IP — mixing IPs between the two risks hi2.in
-    treating the token as invalid/suspicious and just failing the check.
-    Cached per-proxy so different proxies don't share a token cache.
-    """
-    cache_key = proxy or 'direct'
+def _hi2_get_recaptcha_token() -> str | None:
+    """Return a valid invisible reCAPTCHA v2 token for hi2.in (cached 90 s)."""
     with _HI2_TOK_LOCK:
-        entry = _HI2_TOK_CACHE.get(cache_key)
-        if entry and time.time() - entry['ts'] < 90:
-            return entry['token']
+        if _HI2_TOK_CACHE['token'] and time.time() - _HI2_TOK_CACHE['ts'] < 90:
+            return _HI2_TOK_CACHE['token']
 
     version = _hi2_get_version()
     cb      = ''.join(random.choices(string.ascii_lowercase + string.digits, k=10))
 
     s = requests.Session()
     s.headers.update({'User-Agent': _HI2_UA, 'Accept-Language': 'en-US,en;q=0.9'})
-    if proxy:
-        proxies = proxy_pool.as_requests_dict(proxy)
-        if proxies:
-            s.proxies.update(proxies)
 
-    # ── Step 1: anchor ────────────────────────────────────────────────────────
     anchor_url = (
         f'https://www.google.com/recaptcha/api2/anchor'
         f'?ar=1&k={_HI2_SITEKEY}&co={_HI2_CO}'
@@ -1101,8 +1090,7 @@ def _hi2_get_recaptcha_token(proxy: str | None = None) -> str | None:
         return None
 
     challenge = None
-    for pat in (r'"rresp","([^"]+)"',
-                r'id="recaptcha-token" value="([^"]+)"'):
+    for pat in (r'"rresp","([^"]+)"', r'id="recaptcha-token" value="([^"]+)"'):
         m = re.search(pat, r1.text)
         if m:
             challenge = m.group(1)
@@ -1110,7 +1098,6 @@ def _hi2_get_recaptcha_token(proxy: str | None = None) -> str | None:
     if not challenge:
         return None
 
-    # ── Step 2: reload ────────────────────────────────────────────────────────
     reload_url = f'https://www.google.com/recaptcha/api2/reload?k={_HI2_SITEKEY}'
     payload    = (
         f'v={version}&reason=q&c={urllib.parse.quote(challenge)}'
@@ -1132,34 +1119,23 @@ def _hi2_get_recaptcha_token(proxy: str | None = None) -> str | None:
         if m:
             tok = m.group(1)
             with _HI2_TOK_LOCK:
-                _HI2_TOK_CACHE[cache_key] = {'token': tok, 'ts': time.time()}
+                _HI2_TOK_CACHE['token'] = tok
+                _HI2_TOK_CACHE['ts'] = time.time()
             return tok
     return None
 
 
 def _hi2_check_available(username: str, domain: str = 'hi2.in') -> bool:
-    """Return True if username@domain is available on hi2.in, False if not.
+    """Return True if username@domain is available on hi2.in, False if taken or error.
 
-    Uses POST /api/custom (as seen in the hi2.in website HAR):
-      • 200 with email == username@domain  →  available  →  save hit
-      • 200 with different domain          →  unavailable (domain not assigned)
-      • 400 / 429 / error                 →  unavailable
-      • network failure                   →  True  (don't block on outage)
-
-    hi2.in rate-limits/blocks by source IP once a scan session sends heavy
-    volume, which is why real hits stop showing up after tens of thousands
-    of scanned ids. This call (and only this call) goes through a rotating
-    proxy pool so it isn't tied to the container's own IP — see
-    proxy_pool.py. The recaptcha token is fetched through that same proxy
-    so the whole check comes from one consistent exit IP. Falls back to a
-    direct request if no proxy is available.
+    Calls hi2.in /api/custom with a fresh reCAPTCHA token (cached 90 s).
+      • 200 + email matches  → available  → True
+      • 200 + mismatch       → taken      → False
+      • non-200 / exception  → error      → False
     """
-    proxy_pool.ensure_started()
-    proxy = proxy_pool.get_proxy()
-
-    token = _hi2_get_recaptcha_token(proxy)
+    token = _hi2_get_recaptcha_token()
     if not token:
-        return False         # can't verify → don't save unconfirmed hit
+        return False
 
     try:
         r = requests.post(
@@ -1171,20 +1147,17 @@ def _hi2_check_available(username: str, domain: str = 'hi2.in') -> bool:
                 'Referer':  'https://hi2.in/',
                 'User-Agent': _HI2_UA,
             },
-            proxies=proxy_pool.as_requests_dict(proxy) if proxy else None,
-            timeout=12,
+            timeout=10,
         )
         if r.status_code == 200:
-            proxy_pool.report_success(proxy)
             data  = r.json()
             email = data.get('email', '').lower()
-            return email == f'{username}@{domain}'.lower()
-        # 429 rate-limit or any other error → not available
-        proxy_pool.report_failure(proxy)
+            if email == f'{username}@{domain}'.lower():
+                return True   # available
+            return False      # taken
         return False
     except Exception:
-        proxy_pool.report_failure(proxy)
-        return False         # network error → don't save unconfirmed hit
+        return False
 
 
 # ══════════════════════════════════════════════════════════════════════════════
