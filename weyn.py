@@ -1151,7 +1151,7 @@ def _hi2_check_available(username: str, domain: str = 'hi2.in') -> bool:
 
     token = _hi2_get_recaptcha_token(proxy)
     if not token:
-        return True          # can't verify → don't drop the hit
+        return False         # can't verify → don't save unconfirmed hit
 
     try:
         r = requests.post(
@@ -1176,7 +1176,7 @@ def _hi2_check_available(username: str, domain: str = 'hi2.in') -> bool:
         return False
     except Exception:
         proxy_pool.report_failure(proxy)
-        return True          # network error → don't block
+        return False         # network error → don't save unconfirmed hit
 
 
 # ══════════════════════════════════════════════════════════════════════════════
