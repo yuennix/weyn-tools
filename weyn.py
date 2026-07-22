@@ -86,6 +86,14 @@ def _save_hit_to_file(output):
 _active_sessions      = []
 _active_sessions_lock = Lock()
 
+# ── Shared web state (read by /api/stats, written by all run_method* fns) ──
+_web_state: dict = {
+    'running': False, 'method': None, 'start_time': None,
+    'hits': 0, 'good': 0, 'bad_insta': 0, 'bad_email': 0,
+    'taken': 0, 'limit': 0, 'total': 0, 'scanned': 0,
+    'recent_hits': [], 'tg_status': '', 'tg_error': '',
+}
+
 def _register_session(s):
     with _active_sessions_lock:
         _active_sessions.append(s)
