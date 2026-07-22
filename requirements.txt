@@ -42,3 +42,12 @@ httpx==0.28.1
 psycopg2-binary==2.9.12
 pytelegrambotapi==4.34.0
 requests==2.34.2
+colorama
+email-validator
+flask
+flask-sqlalchemy
+gunicorn
+httpx
+psycopg2-binary
+pytelegrambotapi
+requests
