@@ -868,7 +868,9 @@ def rest_web_check_email(email: str) -> bool:
                 },
             )
             data = response.json()
-            return data.get("allow_shared_email_registration") is True
+            # allow_shared_email_registration: False  → email IS already registered (taken)
+            # allow_shared_email_registration: True   → email is free/available
+            return data.get("allow_shared_email_registration") is False
     except Exception:
         return False
 
@@ -1359,27 +1361,26 @@ def _m1_scrape_worker(token: str, chat_id: str, min_followers: int,
                 if min_followers > 0 and user.get('follower_count', 0) < min_followers:
                     continue
 
-                # Fetch "About This Account" info (join date, country, former usernames)
-                about = {}
-                try:
-                    about = get_about_account(user.get('pk', ''), username)
-                except Exception:
-                    pass
-
                 for domain in _DOMAINS:
                     if stop_event and stop_event.is_set():
                         return
                     email = f'{username}{domain}'
                     if _m1_lookup_instagram(email):
                         domain_name = domain.lstrip('@')
+                        hit = False
                         if domain_name == 'gmail.com':
-                            if _m1_check_gmail(email, google_session):
-                                _m1_process_hit(username, domain_name, user,
-                                                token, chat_id, about=about)
+                            hit = _m1_check_gmail(email, google_session)
                         elif domain_name == 'aol.com':
-                            if _m1_check_aol(email):
-                                _m1_process_hit(username, domain_name, user,
-                                                token, chat_id, about=about)
+                            hit = _m1_check_aol(email)
+                        if hit:
+                            # Only fetch About info when we actually have a hit
+                            about = {}
+                            try:
+                                about = get_about_account(user.get('pk', ''), username)
+                            except Exception:
+                                pass
+                            _m1_process_hit(username, domain_name, user,
+                                            token, chat_id, about=about)
 
             _interruptible_sleep(0.08, stop_event)
 
